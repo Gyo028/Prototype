@@ -1,0 +1,66 @@
+/* Our Works carousel */
+#works {
+    overflow: hidden;
+}
+
+.works-carousel-wrap {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    padding: 30px 0 50px;
+}
+
+.work-card {
+    width: 100%;
+    overflow: hidden;
+    border-radius: 10px;
+    background: white;
+}
+
+.work-card img {
+    width: 100%;
+    height: 340px;
+    object-fit: cover;
+}
+
+.works-nav-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 65px;
+    height: 65px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10;
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    transition: transform 0.2s ease;
+}
+
+.works-nav-btn:hover {
+    transform: translateY(-50%) scale(1.08);
+}
+
+.works-nav-btn img {
+    width: 65px;
+    height: 65px;
+    object-fit: contain;
+}
+
+@media (max-width: 1200px) {
+    .work-card img { height: 430px; }
+    .works-nav-btn,
+    .works-nav-btn img { width: 80px; height: 80px; }
+}
+
+@media (max-width: 768px) {
+    .work-card img { height: 300px; }
+    .works-nav-btn,
+    .works-nav-btn img { width: 65px; height: 65px; }
+}
+
+@media (max-width: 640px) {
+    .work-card img { height: 240px; }
+}

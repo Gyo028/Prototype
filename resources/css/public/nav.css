@@ -1,0 +1,14 @@
+/* Public header navigation */
+@layer components {
+    .nav-link-item {
+        @apply text-[17px] font-bold text-ink hover:text-gold transition-colors duration-200 relative pb-0.5;
+    }
+    .nav-link-item::after {
+        content: '';
+        @apply absolute bottom-0 left-0 w-0 h-0.5 bg-gold transition-all duration-300;
+    }
+    .nav-link-item:hover::after,
+    .nav-link-item.active::after {
+        @apply w-full;
+    }
+}

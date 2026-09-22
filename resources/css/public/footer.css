@@ -1,0 +1,22 @@
+/* Public footer */
+@layer components {
+    .footer-icon {
+        @apply w-7 h-7;
+    }
+
+    .footer-social {
+        @apply w-10 h-10 transition-transform duration-200 hover:scale-110;
+    }
+
+    .footer-divider {
+        @apply h-px bg-gray-300 my-6;
+    }
+
+    .footer-text {
+        @apply text-[18px] text-ink;
+    }
+
+    .footer-copy {
+        @apply text-center text-[18px] text-gray-400;
+    }
+}

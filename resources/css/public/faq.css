@@ -1,0 +1,39 @@
+/* FAQ page */
+@layer components {
+    .faq-card {
+        @apply bg-white rounded-2xl border border-gray-200 shadow-sm transition-all duration-300;
+        min-height: 120px;
+    }
+
+    .faq-card:hover {
+        @apply shadow-lg;
+    }
+
+    .faq-header {
+        @apply flex items-center justify-between p-6 min-h-[120px] cursor-pointer list-none;
+    }
+
+    .faq-header::-webkit-details-marker {
+        display: none;
+    }
+
+    .faq-question {
+        @apply flex-1 text-[20px] font-semibold text-[#23235B] pr-6;
+    }
+
+    .faq-icon {
+        @apply w-10 h-10 rounded-full bg-gold text-white flex items-center justify-center shrink-0;
+    }
+
+    .faq-arrow {
+        @apply w-5 h-5 transition-transform duration-300;
+    }
+
+    .faq-card[open] .faq-arrow {
+        transform: rotate(180deg);
+    }
+
+    .faq-answer {
+        @apply px-6 pb-6 text-[17px] text-gray-500 leading-8;
+    }
+}
