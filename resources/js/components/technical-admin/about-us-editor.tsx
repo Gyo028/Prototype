@@ -3,12 +3,7 @@ import { useState } from 'react';
 import { Field, GoldButton, OutlineButton, Panel, PanelHeader, inputClass, textareaClass } from '@/components/dashboard/ui';
 import { cn } from '@/lib/utils';
 
-/*
- * Editor for the About Us section on the landing page.
- * A section title plus the body text. Paragraphs are separated by a blank line.
- *
- * Maps to a `website_contents` row: title and content (text) in the ERD.
- */
+
 
 const LIMITS = { title: 40, content: 1500 };
 

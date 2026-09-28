@@ -3,14 +3,59 @@ import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { cx } from '@/components/dashboard/ui';
 
-
+/*
+ * Step 3: "Services & Assets" — a three-panel workspace matching the Figma
+ * 2D Design Tool's overall page shape (Selection | Layout | Quotation), so
+ * this step and the eventual Design Layout step feel like one tool:
+ *
+ *   - Selection Panel  (left):   what the customer picks: add-on services,
+ *                                a design theme, then the design assets they
+ *                                want included (chairs, backdrop, balloons...).
+ *                                All three sections are collapsible. A theme
+ *                                carries its own venue (Outdoor / Indoor) and
+ *                                style, which the customer filters by directly
+ *                                here — venue is not a separate Project
+ *                                Details field. Design assets are a checklist
+ *                                only: no price and no quantity here. They are
+ *                                bundled into the flat styling fee below, and
+ *                                their quantities (how many chairs, etc.) are
+ *                                worked out automatically from the guest count
+ *                                once the Layout Panel exists to place them.
+ *   - Layout Panel     (middle): the canvas. Each selected service and design
+ *                                asset is drawn as its name only — plain text, no
+ *                                box and no image — and placed automatically at a
+ *                                fixed spot on the panel. The chosen design theme
+ *                                is the background: its name sits in the middle.
+ *                                Real artwork replaces the text later.
+ *                                                                 [backlog 14]
+ *   - Quotation Panel  (right):  a flat Event Styling fee, always included,
+ *                                plus a running total for any add-on services
+ *                                selected. Design assets aren't priced here.
+ *
+ * Mall Activation is quoted after the ocular visit, so for it the same panels
+ * behave differently: guest-based items (`standardOnly`) are not offered, no
+ * prices are shown, and the Quotation Panel says the quote is pending instead
+ * of showing an estimate. The layout still works for it.
+ *
+ * Services Needed lists ADD-ON services only (DJ, photobooth, catering...).
+ * Styling itself is not a checkbox here — the customer already chose "Event
+ * Styling" as the request type in Step 1, so it is billed automatically and
+ * shown as its own line in the Quotation Panel. Add-ons are chosen as plain
+ * toggle buttons rather than checkboxes, to keep the list compact.
+ *
+ * The catalog below is hardcoded — a few sample rows only — until it comes
+ * from the database (`services` in the ERD).
+ */
 
 const peso = (n: number) => `₱${n.toLocaleString('en-PH')}`;
 
-
+// Flat fee for the styling service itself, included automatically with every
+// Event Styling request. One flat price for now, regardless of theme or
+// guest count — replace with real pricing once that is decided.
 const STYLING_FEE = 45000;
 
-//budget checker
+/** Turns a Project Details budget option (e.g. "₱50,000 – ₱100,000", "Below ₱50,000",
+ * "Above ₱500,000") into a numeric range so the live quotation can be checked against it. */
 function parseBudgetRange(budget: string): { min: number; max: number | null } | null {
     if (!budget) return null;
     const num = (text: string) => Number(text.replace(/[^\d]/g, ''));
@@ -22,7 +67,10 @@ function parseBudgetRange(budget: string): { min: number; max: number | null } |
     return Number.isFinite(lo) && Number.isFinite(hi) ? { min: lo, max: hi } : null;
 }
 
-
+// Add-on services only. Styling is automatic once "Event Styling" is chosen
+// in Step 1, so no styling package is listed here.
+// `zone` is the area of the layout the item is placed in. `standardOnly` items
+// are not offered for a Mall Activation (they exist to serve a guest count).
 type ZoneId = 'stage' | 'entrance' | 'entertainment' | 'dining' | 'food' | 'photo' | 'lighting';
 
 const requestableServices: { id: number; name: string; category: string; price: number; unit: string; zone: ZoneId; standardOnly?: boolean }[] = [
@@ -34,7 +82,10 @@ const requestableServices: { id: number; name: string; category: string; price: 
     { id: 6, name: 'Host / Emcee Services', category: 'Host', price: 5000, unit: '', zone: 'stage' },
 ];
 
-
+// Where each area of the layout sits on the canvas. An item is drawn as plain text at
+// its zone's spot; several items in one zone stack as lines. The centre is left free
+// for the design theme, which is the background, so everything sits in a left or a
+// right column. Positions are % of the panel.
 const ZONE_POSITIONS: Record<ZoneId, string> = {
     stage: 'top-[8%] left-[5%] items-start text-left',
     lighting: 'top-[8%] right-[5%] items-end text-right',
@@ -46,10 +97,15 @@ const ZONE_POSITIONS: Record<ZoneId, string> = {
 };
 const ZONE_IDS = Object.keys(ZONE_POSITIONS) as ZoneId[];
 
-
+// A theme is an isometric layout template (per the ERD's `design_themes`) that
+// design assets will be auto-placed onto in the Layout Panel. Venue (Outdoor /
+// Indoor) and style are attributes of the theme itself, not Project Details
+// fields — the customer filters by them directly in this panel.
 const VENUES = ['Outdoor', 'Indoor'] as const;
 
-
+// Design assets are a checklist only — no price, no quantity (see the header
+// comment above). A small sample list for now; moves to `layout_assets` in
+// the database later.
 type AssetCategory = 'Furniture' | 'Structures' | 'Decors' | 'Lighting';
 const ASSET_CATEGORIES: AssetCategory[] = ['Furniture', 'Structures', 'Decors', 'Lighting'];
 
@@ -80,22 +136,27 @@ type Props = {
     serviceIds: number[];
     onServiceIdsChange: (ids: number[]) => void;
     serviceError?: string;
-
+    /** Expected guest count from Project Details, used to price per-pax services (e.g. catering). */
     guests?: number;
     themeId: string | null;
     onThemeIdChange: (id: string | null) => void;
+    /** Event type from Project Details, used to filter the design themes shown. */
     eventTypeId?: string;
+    /** Budget range from Project Details, used to flag the live quotation against it. */
     budget?: string;
+    /** Design assets the customer wants included. Checklist only — no price, no quantity. */
     assetIds: string[];
     onAssetIdsChange: (ids: string[]) => void;
-    showLayout?: boolean;
 };
 
 function PanelHeader({ title }: { title: string }) {
     return <p className="mb-3 text-xs font-bold tracking-wide text-ink uppercase">{title}</p>;
 }
 
-//Design Panel
+/**
+ * The Layout Panel canvas. Nothing but text: the design theme's name in the middle
+ * (it is the background), and each selection's name placed at its spot.
+ */
 function LayoutPreview({ themeName, itemsByZone }: { themeName?: string; itemsByZone: Record<ZoneId, string[]> }) {
     const hasItems = ZONE_IDS.some((z) => itemsByZone[z].length > 0);
 
@@ -108,13 +169,13 @@ function LayoutPreview({ themeName, itemsByZone }: { themeName?: string; itemsBy
                 backgroundSize: '24px 24px',
             }}
         >
-
+            {/* The design theme: the whole background */}
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 px-6 text-center">
                 <p className={themeName ? 'text-lg font-bold text-ink-soft' : 'text-sm text-ink-soft/60'}>{themeName ?? 'No theme selected yet'}</p>
                 {!hasItems && <p className="text-[11px] text-ink-soft/60">Pick services or design assets and they appear here.</p>}
             </div>
 
-
+            {/* Each selection, placed automatically at its zone's spot */}
             {ZONE_IDS.map((zone) =>
                 itemsByZone[zone].length > 0 ? (
                     <div key={zone} className={cx('absolute flex max-w-[40%] flex-col gap-1 text-xs font-bold text-ink', ZONE_POSITIONS[zone])}>
@@ -128,6 +189,7 @@ function LayoutPreview({ themeName, itemsByZone }: { themeName?: string; itemsBy
     );
 }
 
+/** A titled, collapsible block used for both Services Needed and Design Theme. */
 function CollapsibleSection({
     title,
     required,
@@ -171,28 +233,32 @@ export default function ServicesAssetsSelector({
     budget,
     assetIds,
     onAssetIdsChange,
-    showLayout = false,
 }: Props) {
     const [servicesOpen, setServicesOpen] = useState(true);
-    const [themeOpen, setThemeOpen] = useState(false);
-    const [assetsOpen, setAssetsOpen] = useState(false);
+    const [themeOpen, setThemeOpen] = useState(true);
+    const [assetsOpen, setAssetsOpen] = useState(true);
     const [venueFilter, setVenueFilter] = useState<'All' | (typeof VENUES)[number]>('All');
 
-
+    // Event Type (from Project Details) narrows automatically, falling back to
+    // every theme if it would otherwise leave nothing to show. Venue and Style
+    // are the customer's own filters on top of that, so an empty result from
+    // either is shown as-is rather than silently ignored.
     const byEventType = eventTypeId ? designThemes.filter((t) => t.eventTypeId === eventTypeId) : designThemes;
     const afterAutoFilters = byEventType.length ? byEventType : designThemes;
     const visibleThemes = afterAutoFilters.filter((t) => venueFilter === 'All' || t.venue === venueFilter);
 
     const selectedTheme = themeId ? designThemes.find((t) => t.id === themeId) : undefined;
 
-
+    // What is offered depends on the request. A Mall Activation is quoted after the
+    // ocular visit, so guest-based items are not offered and nothing is priced.
     const isMall = eventTypeId === 'mall';
     const visibleServices = requestableServices.filter((s) => !(isMall && s.standardOnly));
     const visibleAssets = layoutAssets.filter((a) => !(isMall && a.standardOnly));
     const selectedServices = visibleServices.filter((s) => serviceIds.includes(s.id));
     const selectedAssets = visibleAssets.filter((a) => assetIds.includes(a.id));
 
-
+    // Selections that no longer apply to the request are dropped, so they cannot be
+    // submitted while hidden (e.g. after changing an earlier answer to Mall Activation).
     useEffect(() => {
         if (isMall) {
             const keptServices = serviceIds.filter((id) => !requestableServices.find((s) => s.id === id)?.standardOnly);
@@ -201,19 +267,17 @@ export default function ServicesAssetsSelector({
             if (keptAssets.length !== assetIds.length) onAssetIdsChange(keptAssets);
         }
         if (themeId && byEventType.length && !byEventType.some((t) => t.id === themeId)) onThemeIdChange(null);
-
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [eventTypeId]);
 
-
+    // The text layout: every selected service and asset, grouped by the area it is placed in.
     const itemsByZone = Object.fromEntries(
         ZONE_IDS.map((z) => [z, [...selectedServices, ...selectedAssets].filter((i) => i.zone === z).map((i) => i.name)]),
     ) as Record<ZoneId, string[]>;
 
     const themeNote = !eventTypeId
         ? 'Choose an Event Type in Project Details to see themes made for it. Showing all themes for now.'
-        : showLayout
-          ? 'Optional. Your selections are arranged in the layout automatically.'
-          : 'Optional. Your chosen theme is saved with your request.';
+        : 'Optional. Your selections are arranged in the layout automatically.';
 
     const toggleService = (id: number) =>
         onServiceIdsChange(serviceIds.includes(id) ? serviceIds.filter((x) => x !== id) : [...serviceIds, id]);
@@ -221,7 +285,8 @@ export default function ServicesAssetsSelector({
     const toggleAsset = (id: string) =>
         onAssetIdsChange(assetIds.includes(id) ? assetIds.filter((x) => x !== id) : [...assetIds, id]);
 
-
+    // Per-pax services (e.g. catering) are priced against the guest count from
+    // Project Details; everything else is a flat, one-time price.
     const lineFor = (s: (typeof requestableServices)[number]) => {
         const qty = s.unit === 'pax' ? guests : 1;
         return { qty, total: s.price * qty };
@@ -229,7 +294,7 @@ export default function ServicesAssetsSelector({
     const addOnsTotal = selectedServices.reduce((sum, s) => sum + lineFor(s).total, 0);
     const estimatedTotal = STYLING_FEE + addOnsTotal;
 
-
+    // Flags the live total against the customer's stated budget. Silent when it fits.
     const budgetRange = budget ? parseBudgetRange(budget) : null;
     const budgetFlag =
         budgetRange && budgetRange.max !== null && estimatedTotal > budgetRange.max
@@ -239,7 +304,9 @@ export default function ServicesAssetsSelector({
               : null;
 
     return (
-
+        // One outer container holding all three panels, like the workspace behind
+        // the Figma tool's panels. The middle column (Layout Panel) is given the
+        // most room: the two side panels are fixed-width, it takes what's left.
         <div className="rounded-2xl border border-black/15 bg-neutral-50 p-4">
             <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)_220px] lg:items-stretch">
                 {/* ---- Selection Panel ---- */}
@@ -301,7 +368,9 @@ export default function ServicesAssetsSelector({
                     >
                         <p className="mb-3 text-[11px] text-ink-soft">{themeNote}</p>
 
-
+                        {/* Venue and Style are filters the customer applies themselves, on
+                            top of the automatic Event Type narrowing above — venue lives on
+                            the theme itself, not as a separate Project Details field. */}
                         <div className="mb-1.5 flex flex-wrap gap-1.5">
                             {(['All', ...VENUES] as const).map((venue) => (
                                 <button
@@ -409,22 +478,11 @@ export default function ServicesAssetsSelector({
                     </CollapsibleSection>
                 </div>
 
-
+                {/* ---- Layout Panel: the canvas, text only. flex-1 lets it fill whatever
+                    height the row stretches to. ---- */}
                 <div className="flex h-full flex-col rounded-xl border border-black/15 bg-white p-3">
                     <PanelHeader title="Design Preview" />
-                    {showLayout ? (
-                        <LayoutPreview themeName={selectedTheme?.name} itemsByZone={itemsByZone} />
-                    ) : (
-                        <div
-                            className="flex min-h-72 flex-1 items-center justify-center rounded-lg border border-dashed border-black/20 bg-neutral-50"
-                            style={{
-                                backgroundImage: 'linear-gradient(rgba(0,0,0,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px)',
-                                backgroundSize: '24px 24px',
-                            }}
-                        >
-                            <p className="text-lg font-bold text-ink-soft">Design Layout</p>
-                        </div>
-                    )}
+                    <LayoutPreview themeName={selectedTheme?.name} itemsByZone={itemsByZone} />
                 </div>
 
                 {/* ---- Quotation Panel: running total for the selected services ---- */}

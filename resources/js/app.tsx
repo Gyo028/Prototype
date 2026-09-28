@@ -24,6 +24,14 @@ void createInertiaApp({
                 return null;
             case name.startsWith('technical-admin/'):
                 return null;
+            case name.startsWith('project-manager/'):
+                return null;
+            case name.startsWith('design-specialist/'):
+                return null;
+            case name.startsWith('owner/'):
+                return null;
+            case name.startsWith('bookkeeper/'):
+                return null;
             default:
                 return AppLayout;
         }

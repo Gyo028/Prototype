@@ -2,22 +2,10 @@ import { Check, ImageIcon, RotateCcw, Trash2, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { Field, GoldButton, OutlineButton, Panel, PanelHeader, inputClass, textareaClass } from '@/components/dashboard/ui';
 
-/*
- * Editor for the Hero Section at the top of the landing page.
- * The headline is shown in two parts (first line dark, second line gold),
- * followed by the subheadline, the background image and the call-to-action
- * button. The button always leads to the customer service request, so only
- * its label is editable.
- *
- * Maps to `website_contents` (title, content) and `website_content_images`
- * (the background) in the ERD.
- */
-
-// Backlog item 10 leaves the size limit as [X] MB. Set it here once decided.
 const MAX_IMAGE_MB = 5;
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
-// The background the landing page uses when no custom image has been uploaded.
+
 const DEFAULT_BACKGROUND = '/images/hero-bg.webp';
 
 const LIMITS = { headline: 60, highlight: 60, subheadline: 200, button: 30 };
@@ -27,11 +15,10 @@ type Hero = {
     highlight: string;
     subheadline: string;
     button: string;
-    /** Background image URL. Undefined means the default background is used. */
     background?: string;
 };
 
-// Current landing page content.
+
 const seedHero: Hero = {
     headline: 'Unforgettable Events,',
     highlight: 'Perfectly Planned',

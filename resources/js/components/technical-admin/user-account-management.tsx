@@ -21,15 +21,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 
-/* ------------------------------------------------------------------ */
-/* Types and constants                                                */
-/* ------------------------------------------------------------------ */
 
-/*
- * The roles and what each role can access are defined in code by the developer
- * (App\Enums\Role and the role middleware). The Technical Admin only picks one
- * of these roles for each account.
- */
 const ROLES = ['Customer', 'Project Manager', 'Design Specialist', 'Bookkeeper', 'Owner', 'Technical Admin'] as const;
 type RoleName = (typeof ROLES)[number];
 
@@ -48,7 +40,7 @@ const roleTone: Record<RoleName, PillTone> = {
 
 const statusTone: Record<Status, PillTone> = { Active: 'green', Archived: 'gray' };
 
-// Placeholder data until the database is connected.
+
 const seedUsers: User[] = [
     { id: 1, name: 'Juan dela Cruz', email: 'juan@email.com', role: 'Customer', status: 'Active', added: 'May 24' },
     { id: 2, name: 'Ana Reyes', email: 'ana@email.com', role: 'Project Manager', status: 'Active', added: 'May 22' },
@@ -60,18 +52,16 @@ const initials = (name: string) =>
 
 const today = () => new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
-/* ------------------------------------------------------------------ */
-/* Component                                                          */
-/* ------------------------------------------------------------------ */
+
 
 export default function UserAccountManagement() {
     const [users, setUsers] = useState<User[]>(seedUsers);
 
-    // Table controls
+
     const [query, setQuery] = useState('');
     const [roleFilter, setRoleFilter] = useState('All Roles');
 
-    // Add / edit dialog
+
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editing, setEditing] = useState<User | null>(null);
     const [form, setForm] = useState({ name: '', email: '', role: 'Customer' as RoleName });
@@ -86,7 +76,6 @@ export default function UserAccountManagement() {
         );
     }, [users, query, roleFilter]);
 
-    /* ---- actions ---- */
 
     const openAdd = () => {
         setEditing(null);
@@ -130,7 +119,6 @@ export default function UserAccountManagement() {
         setDialogOpen(false);
     };
 
-    /* ---- render ---- */
 
     return (
         <>

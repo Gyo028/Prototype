@@ -21,9 +21,7 @@ import HeroEditor from '@/components/technical-admin/hero-editor';
 import OurServicesEditor from '@/components/technical-admin/our-services-editor';
 import OurWorksEditor from '@/components/technical-admin/our-works-editor';
 
-/* ------------------------------------------------------------------ */
-/* Sections of the public site, in the order they appear on the page  */
-/* ------------------------------------------------------------------ */
+
 
 type SectionStatus = 'Published' | 'Unpublished changes' | 'Managed elsewhere';
 
@@ -34,13 +32,10 @@ type Section = {
     icon: LucideIcon;
     status: SectionStatus;
     updated: string;
-    /** Sections that open their own admin page instead of the editor below */
     href?: string;
-    /** Sections the Technical Admin cannot edit */
     readOnlyNote?: string;
 };
 
-// Placeholder data until the database is connected.
 const seedSections: Section[] = [
     { id: 'hero', title: 'Hero Section', description: 'Main headline, subheadline, background and Start Project button.', icon: LayoutTemplate, status: 'Published', updated: '10 minutes ago' },
     { id: 'about', title: 'About Us', description: 'Company introduction shown below the hero.', icon: Info, status: 'Published', updated: '3 weeks ago' },
@@ -56,9 +51,7 @@ const statusTone: Record<SectionStatus, PillTone> = {
     'Managed elsewhere': 'gray',
 };
 
-/* ------------------------------------------------------------------ */
-/* Component                                                          */
-/* ------------------------------------------------------------------ */
+
 
 export default function WebsiteContentManagement() {
     const [sections, setSections] = useState(seedSections);
@@ -72,13 +65,11 @@ export default function WebsiteContentManagement() {
             list.map((s) => (s.status === 'Unpublished changes' ? { ...s, status: 'Published', updated: 'Just now' } : s)),
         );
 
-    // Called by a section editor after its changes are saved
     const markUnpublished = (id: string) =>
         setSections((list) =>
             list.map((s) => (s.id === id ? { ...s, status: 'Unpublished changes', updated: 'Just now' } : s)),
         );
 
-    /* ---- Editing a single section (editors are added one by one) ---- */
     if (active) {
         return (
             <>
@@ -111,7 +102,6 @@ export default function WebsiteContentManagement() {
         );
     }
 
-    /* ---- Section selection (card style) ---- */
     return (
         <>
             <PageHeader

@@ -42,28 +42,3 @@ export const designSpecialistNav: NavGroup[] = [
         items: [{ title: 'Assigned Projects', href: '/design-specialist/projects' }],
     },
 ];
-
-export const ownerNav: NavGroup[] = [
-    {
-        label: 'Main',
-        items: [{ title: 'Dashboard', href: '/owner' }],
-    },
-    {
-        label: 'Management',
-        items: [{ title: 'Business Overview', href: '/owner/business-overview' }],
-    },
-];
-
-export const bookkeeperNav: NavGroup[] = [
-    {
-        label: 'Main',
-        items: [{ title: 'Dashboard', href: '/bookkeeper' }],
-    },
-    {
-        label: 'Management',
-        items: [
-            { title: 'Expenses', href: '/bookkeeper/expenses' },
-            { title: 'Financial Reports', href: '/bookkeeper/financial-reports' },
-        ],
-    },
-];

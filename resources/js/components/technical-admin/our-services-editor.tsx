@@ -3,24 +3,13 @@ import { useState } from 'react';
 import { Field, GoldButton, OutlineButton, Panel, PanelHeader, inputClass, textareaClass } from '@/components/dashboard/ui';
 import { cn } from '@/lib/utils';
 
-/*
- * Editor for the Our Services section on the landing page: a section title,
- * an optional intro line, and the three service cards shown under it.
- *
- * Maps to `website_contents` rows with section = 'services' in the ERD
- * (title and content for the heading, and one row per card).
- *
- * These cards are a short introduction to the service areas. The individual
- * services customers can select, and their prices, are managed under
- * Services & Assets.
- */
 
 const LIMITS = { title: 40, intro: 200, cardTitle: 40, cardText: 150 };
 
 type Card = { title: string; description: string };
 type OurServices = { title: string; intro: string; cards: Card[] };
 
-// Current landing page content.
+
 const seedServices: OurServices = {
     title: 'Our Services',
     intro: '',

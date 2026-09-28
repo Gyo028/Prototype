@@ -3,16 +3,11 @@ import { useRef, useState } from 'react';
 import { GoldButton, OutlineButton, Panel, Pill, cx, inputClass } from '@/components/dashboard/ui';
 import { works as landingPageWorks } from '@/data/works';
 
-/*
- * Editor for the "Our Works" showcase on the landing page.
- * The showcase has exactly 10 slots. A slot is either empty or holds one photo,
- * and the slot number is the order the photo appears in the carousel
- * (sort_order in `website_content_images`). Empty slots are not shown publicly.
- */
+
 
 const SLOT_COUNT = 10;
 
-// Backlog item 10 leaves the size limit as [X] MB. Set it here once decided.
+
 const MAX_IMAGE_MB = 5;
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -20,7 +15,7 @@ type Slot = { filled: boolean; src?: string; alt: string };
 
 const emptySlot = (): Slot => ({ filled: false, alt: '' });
 
-// Starts with the photos currently shown on the landing page (see data/works.ts).
+
 const seedSlots: Slot[] = [
     ...landingPageWorks.slice(0, SLOT_COUNT).map((w) => ({
         filled: true,
@@ -56,7 +51,7 @@ export default function OurWorksEditor({ onSaved }: { onSaved?: () => void }) {
 
     const setSlot = (index: number, slot: Slot) => update(slots.map((s, i) => (i === index ? slot : s)));
 
-    /* Upload or replace the photo in one slot */
+
     const onSlotFile = (index: number, files: FileList | null) => {
         const file = files?.[0];
         if (!file) return;
@@ -67,11 +62,10 @@ export default function OurWorksEditor({ onSaved }: { onSaved?: () => void }) {
         setError('');
         const previous = slots[index];
         const next = fileToSlot(file);
-        // Keep the existing alt text when replacing a photo
         setSlot(index, { ...next, alt: previous.filled && previous.alt ? previous.alt : next.alt });
     };
 
-    /* Fill the empty slots, in order, with several files at once */
+
     const onBulkFiles = (files: FileList | null) => {
         if (!files) return;
         const list = Array.from(files);
@@ -100,7 +94,7 @@ export default function OurWorksEditor({ onSaved }: { onSaved?: () => void }) {
         if (confirm(`Remove the photo in slot ${index + 1}?`)) setSlot(index, emptySlot());
     };
 
-    /* Swap a slot with its neighbour (works for empty slots too) */
+
     const move = (index: number, direction: -1 | 1) => {
         const target = index + direction;
         if (target < 0 || target >= SLOT_COUNT) return;

@@ -2,29 +2,18 @@ import { Link } from '@inertiajs/react';
 import { ArrowRight, Check, ImageIcon, Plus } from 'lucide-react';
 import { Panel, Pill, cx } from '@/components/dashboard/ui';
 
-/*
- * Customer dashboard (Figma "Customer Dashboard"): summary cards, actions that
- * need attention, project progress, billing summary, recent notifications and
- * the upcoming appointment. Appointments are scheduled from the project itself
- * (My Projects), so the dashboard only shows the next one.
- *
- * All data below is placeholder until the database is connected.
- */
 
-/* ------------------------------------------------------------------ */
-/* Placeholder data                                                   */
-/* ------------------------------------------------------------------ */
 
 const STAGES = ['Booking', 'Design', 'Fabrication', 'Setup', 'Completed'];
 
+//temporaty data for dashboard
 type Project = {
     id: number;
     name: string;
-    eventDate: string; // ISO date
+    eventDate: string; 
     venue?: string;
     type: string;
     theme: string;
-    /** Index of the stage in progress: earlier stages are done, later ones are not started */
     stage: number;
     status: string;
 };
@@ -49,9 +38,7 @@ const notifications = [
 
 const appointment = { title: 'Ocular Visit: Santos Wedding', when: 'Oct 5, 2026 — 10:00 AM', booked: 'Booked Sep 19, 2026' };
 
-/* ------------------------------------------------------------------ */
-/* Helpers                                                            */
-/* ------------------------------------------------------------------ */
+
 
 const peso = (n: number) => `₱${n.toLocaleString('en-PH')}`;
 const formatDate = (iso: string) =>
@@ -92,9 +79,7 @@ function ProgressTracker({ stage }: { stage: number }) {
     );
 }
 
-/* ------------------------------------------------------------------ */
-/* Component                                                          */
-/* ------------------------------------------------------------------ */
+
 
 export default function CustomerDashboard() {
     const nextEvent = [...projects].sort((a, b) => a.eventDate.localeCompare(b.eventDate))[0];

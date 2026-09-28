@@ -4,17 +4,7 @@ import { PageHeader, Panel } from '@/components/dashboard/ui';
 import AssetThemeManagement from '@/components/technical-admin/asset-theme-management';
 import ServiceManagement from '@/components/technical-admin/service-management';
 
-/*
- * Landing screen for service configuration (backlog item 11).
- * Two areas to choose from: Services and Assets — aligned with the
- * customer-facing Services & Assets step:
- *  - Services: the flat Event Styling fee plus add-on services (DJ,
- *    photography, catering...), matching Services Needed on the customer side.
- *  - Assets: Design Themes and Design Assets, matching those two sections in
- *    the customer's Selection Panel. Kept as one "Assets" area with two tabs
- *    rather than a third card, since both feed the same Layout Panel.
- * The card images are empty placeholders for now.
- */
+
 
 type AreaId = 'services' | 'assets';
 
@@ -35,7 +25,7 @@ export default function ServicesAndAssetsManagement() {
     const [activeId, setActiveId] = useState<AreaId | null>(null);
     const active = areas.find((a) => a.id === activeId) ?? null;
 
-    /* ---- A selected area ---- */
+
     if (active) {
         return (
             <>
@@ -53,7 +43,6 @@ export default function ServicesAndAssetsManagement() {
         );
     }
 
-    /* ---- Selection ---- */
     return (
         <>
             <PageHeader

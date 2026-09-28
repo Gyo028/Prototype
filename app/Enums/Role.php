@@ -31,7 +31,11 @@ enum Role: string
     {
         return match ($this) {
             self::Customer => 'customer.dashboard',
+            self::ProjectManager => 'project-manager.dashboard',
+            self::DesignSpecialist => 'design-specialist.dashboard',
             self::TechnicalAdmin => 'technical-admin.dashboard',
+            self::Owner => 'owner.dashboard',
+            self::Bookkeeper => 'bookkeeper.dashboard',
             default => 'dashboard',
         };
     }

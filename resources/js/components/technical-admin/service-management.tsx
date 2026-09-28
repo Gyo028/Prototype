@@ -22,27 +22,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 
-/*
- * Service configuration (backlog item 11). Each service maps to a row of
- * `services` in the ERD: service_name, service_category, description,
- * pricing_type ('fixed' | 'per_unit'), unit_type and status (active / inactive).
- *
- * Aligned with the customer-facing Services & Assets step: Event Styling
- * itself is not a service the customer picks — it's a flat fee, automatically
- * included with every Event Styling request. It is kept here as a single
- * locked row (id 0) so its price stays editable without letting anyone
- * create a second one, rename it, or turn it off. Everything else in this
- * list is an add-on the customer can select (DJ, photography, catering...),
- * matching the categories used on the customer side: Entertainment,
- * Photo & Video, Catering, Host.
- *
- * Services are switched on or off rather than deleted, because approved
- * requests and quotations refer to them (project_request_services).
- *
- * NOTE FOR THE DOCUMENTATION: `services` still has no price column in the
- * ERD (see the earlier documentation-updates note) — `price` here is a
- * placeholder field until that's added.
- */
+
 
 const PAGE_SIZE = 6;
 const BASE_FEE_ID = 0;
@@ -60,11 +40,10 @@ type Service = {
     unitType: string;
     price: number;
     active: boolean;
-    /** The automatic Event Styling fee — locked identity fields, always included. */
     isBaseFee?: boolean;
 };
 
-// Placeholder data until the database is connected.
+
 const seed: Service[] = [
     { id: BASE_FEE_ID, name: 'Event Styling', category: 'Styling', description: 'Full event styling package. Automatically included with every Event Styling request.', pricingType: 'fixed', unitType: '', price: 45000, active: true, isBaseFee: true },
     { id: 1, name: 'DJ Services', category: 'Entertainment', description: 'Professional DJ and sound system for the event.', pricingType: 'fixed', unitType: '', price: 15000, active: true },
@@ -97,7 +76,7 @@ const emptyForm: Form = {
     active: true,
 };
 
-/* Icon-only button with an accessible name and a tooltip */
+
 function IconButton({
     label,
     onClick,

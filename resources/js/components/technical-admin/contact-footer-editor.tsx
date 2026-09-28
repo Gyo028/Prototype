@@ -2,12 +2,7 @@ import { Check, Mail, Phone, RotateCcw } from 'lucide-react';
 import { useState } from 'react';
 import { Field, GoldButton, OutlineButton, Panel, PanelHeader, inputClass } from '@/components/dashboard/ui';
 
-/*
- * Editor for the Contact & Footer section at the bottom of the landing page:
- * phone, email, address, social media links and the copyright line.
- *
- * Maps to `website_contents` in the ERD (one row per contact detail).
- */
+
 
 const LIMITS = { phone: 30, email: 100, address: 150, url: 200, copyright: 150 };
 
@@ -20,7 +15,7 @@ type Contact = {
     copyright: string;
 };
 
-// Current landing page footer. The phone number and Instagram link are still placeholders.
+
 const seedContact: Contact = {
     phone: '+63 0000000000',
     email: 'gr3ataseventsstyling@gmail.com',

@@ -11,19 +11,6 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 
-/*
- * Design Themes and Design Assets (backlog item 11 / the ERD's `design_themes`,
- * `layout_assets` and `asset_variants`). Aligned with the customer-facing
- * Design Theme and Design Assets sections of Services & Assets:
- *  - A theme carries the same fields the customer filters by (event type,
- *    venue, style) plus a guest cap.
- *  - An asset is a checklist item only — no price or quantity yet, matching
- *    the customer side, which defers pricing and quantities to the still
- *    unbuilt Layout Panel. `asset_variants.price` stays for later.
- *
- * Both are switched off rather than deleted, since approved layouts may
- * reference them (preliminary_layouts / preliminary_layout_items).
- */
 
 const EVENT_TYPES = [
     { id: 'corporate', name: 'Corporate' },
@@ -47,7 +34,7 @@ type Theme = {
     active: boolean;
 };
 
-// Placeholder data until the database is connected — matches the customer-side sample themes.
+
 const seedThemes: Theme[] = [
     { id: 'modern-lounge', name: 'Modern Lounge', eventTypeId: 'corporate', venue: 'Indoor', style: 'Modern', maxGuests: 150, swatch: 'linear-gradient(135deg,#e9e2d3,#cbbfa0)', active: true },
     { id: 'futuristic-gala', name: 'Futuristic Gala', eventTypeId: 'corporate', venue: 'Indoor', style: 'Futuristic', maxGuests: 300, swatch: 'linear-gradient(135deg,#dbe7ec,#7fa7b8)', active: true },
@@ -62,7 +49,7 @@ const seedThemes: Theme[] = [
 
 type Asset = { id: string; name: string; category: string; active: boolean };
 
-// Placeholder data until the database is connected — matches the customer-side sample assets.
+
 const seedAssets: Asset[] = [
     { id: 'chiavari-chair', name: 'Chiavari Chairs', category: 'Furniture', active: true },
     { id: 'cocktail-table', name: 'Cocktail Tables', category: 'Furniture', active: true },
@@ -77,7 +64,7 @@ const seedAssets: Asset[] = [
 const slugify = (name: string) =>
     name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || `item-${Date.now()}`;
 
-/* Icon-only button with an accessible name and a tooltip */
+
 function IconButton({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
     return (
         <button
@@ -92,9 +79,7 @@ function IconButton({ label, onClick, children }: { label: string; onClick: () =
     );
 }
 
-/* ---------------------------------------------------------------------- */
-/* Design Themes                                                          */
-/* ---------------------------------------------------------------------- */
+
 
 type ThemeForm = { name: string; eventTypeId: string; venue: string; style: string; maxGuests: string; active: boolean };
 const emptyThemeForm: ThemeForm = { name: '', eventTypeId: EVENT_TYPES[0].id, venue: VENUES[0], style: STYLES[0], maxGuests: '', active: true };
@@ -233,9 +218,7 @@ function ThemesTab() {
     );
 }
 
-/* ---------------------------------------------------------------------- */
-/* Design Assets                                                          */
-/* ---------------------------------------------------------------------- */
+
 
 type AssetForm = { name: string; category: string; active: boolean };
 const emptyAssetForm: AssetForm = { name: '', category: ASSET_CATEGORIES[0], active: true };
@@ -355,9 +338,7 @@ function AssetsTab() {
     );
 }
 
-/* ---------------------------------------------------------------------- */
-/* Container: tab switch                                                  */
-/* ---------------------------------------------------------------------- */
+
 
 export default function AssetThemeManagement() {
     const [tab, setTab] = useState<'themes' | 'assets'>('themes');

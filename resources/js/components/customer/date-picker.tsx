@@ -2,24 +2,7 @@ import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 import { cx } from '@/components/dashboard/ui';
 
-/*
- * An inline calendar, shown directly in the form (no dropdown, no native
- * <input type="date">, no external library). The grid is drawn as a true
- * lattice of ruled cells — like a tic-tac-toe board — rather than spaced-out
- * floating buttons: the weekday header and every day share one continuous
- * set of grid lines.
- *
- * Three kinds of days are not selectable, each shown differently so they
- * read at a glance:
- *  - Past dates and dates within the required lead time (1 month from
- *    today, since the business needs at least that much notice) — gray,
- *    struck through
- *  - Booked dates, where the business has no open slot — red, struck
- *    through, so they stand out from an ordinary "too soon" date
- *
- * Booked dates are placeholder data until the backend can report real
- * availability from `project_schedules` / `service_requests`.
- */
+
 
 const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 const MONTH_LABELS = [
@@ -45,8 +28,7 @@ const addMonths = (d: Date, n: number) => {
 const sameMonth = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
 const formatDisplay = (iso: string) => fromISO(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
-// Placeholder: dates the business already has fully booked. Replace with a
-// real availability check once the backend can report it.
+//sample dates
 const today0 = startOfDay(new Date());
 export const sampleBookedDates: string[] = [35, 42, 47, 55, 63, 80].map((offset) => {
     const d = new Date(today0);
@@ -56,17 +38,14 @@ export const sampleBookedDates: string[] = [35, 42, 47, 55, 63, 80].map((offset)
 
 type Props = {
     id?: string;
-    value: string; // ISO yyyy-mm-dd, or ''
+    value: string; 
     onChange: (iso: string) => void;
-    /** Earliest selectable date (ISO). Defaults to one month from today. */
     minDate?: string;
-    /** Exact dates that cannot be selected (ISO), e.g. already booked. */
     disabledDates?: string[];
     hasError?: boolean;
     className?: string;
 };
 
-// 7 columns × 7 rows: 1 header row of weekday labels + 6 rows of days.
 const COLS = 7;
 const TOTAL_ROWS = 7;
 
@@ -111,7 +90,6 @@ export default function DatePicker({ id, value, onChange, minDate, disabledDates
         onChange(toISO(d));
     };
 
-    // Build a 6-row grid starting on Sunday
     const firstOfMonth = new Date(viewMonth.getFullYear(), viewMonth.getMonth(), 1);
     const gridStart = new Date(firstOfMonth);
     gridStart.setDate(gridStart.getDate() - gridStart.getDay());
@@ -168,7 +146,7 @@ export default function DatePicker({ id, value, onChange, minDate, disabledDates
 
                 {days.map((d, i) => {
                     const col = i % COLS;
-                    const row = 1 + Math.floor(i / COLS); // row 0 is the weekday header
+                    const row = 1 + Math.floor(i / COLS);
                     const outside = !sameMonth(d, viewMonth);
                     const iso = toISO(d);
                     const booked = disabledSet.has(iso) && startOfDay(d) >= min;

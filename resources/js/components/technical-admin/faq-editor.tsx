@@ -21,22 +21,13 @@ import {
 import { faqs as landingPageFaqs } from '@/data/faqs';
 import type { Faq } from '@/data/faqs';
 
-/*
- * Editor for the FAQ page. Each entry maps to a row of `website_contents`
- * in the ERD with section = 'faq': title (the question, max 150 characters),
- * content (the answer) and sort_order (position in the list).
- *
- * Add and edit happen in a modal. Add, edit, delete and reorder apply to the
- * list right away; publishing them to the public site is done from the main
- * Website Content screen.
- */
 
 const QUESTION_MAX = 150;
 const PAGE_SIZE = 2;
 
 const emptyForm = { question: '', answer: '' };
 
-/* Icon-only button with an accessible name and a tooltip */
+
 function IconButton({
     label,
     onClick,
@@ -73,7 +64,7 @@ export default function FaqEditor({ onSaved }: { onSaved?: () => void }) {
     const [faqs, setFaqs] = useState<Faq[]>(landingPageFaqs);
     const [page, setPage] = useState(1);
 
-    // Add / edit modal
+
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editingId, setEditingId] = useState<number | null>(null);
     const [form, setForm] = useState(emptyForm);
@@ -125,7 +116,7 @@ export default function FaqEditor({ onSaved }: { onSaved?: () => void }) {
         commit(faqs.filter((x) => x.id !== f.id));
     };
 
-    // Moving an entry can push it onto another page, so the view follows it
+
     const move = (id: number, direction: -1 | 1) => {
         const index = faqs.findIndex((f) => f.id === id);
         const target = index + direction;

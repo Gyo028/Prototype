@@ -10,7 +10,6 @@ export default function WorksCarousel() {
     const [selected, setSelected] = useState(0);
     const autoplay = useRef(Autoplay({ delay: 3500, stopOnInteraction: false }));
 
-    // Track which slide is centered so we can highlight it and its neighbours
     useEffect(() => {
         if (!api) return;
 

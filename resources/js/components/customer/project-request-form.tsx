@@ -1,43 +1,11 @@
 import { Link } from '@inertiajs/react';
-import { ArrowLeft, CheckCircle2, FileText, ImageIcon, Info, PartyPopper, Plus, Upload, Wrench, X } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, FileText, ImageIcon, Plus, Upload, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import DatePicker from '@/components/customer/date-picker';
 import ServicesAssetsSelector from '@/components/customer/services-assets-selector';
-import { Field, GoldButton, OutlineButton, Panel, cx, inputClass, textareaClass } from '@/components/dashboard/ui';
+import { Field, GoldButton, OutlineButton, Panel, cx, inputClass, selectClass, textareaClass } from '@/components/dashboard/ui';
 
-/*
- * "Request New Project" — built one step at a time.
- *
- * Step 1: choose a request type (card selection).
- * Step 2: project details. Event Styling is fully built; Custom Designing
- * is deferred (its fields have not been decided yet), so it shows a
- * placeholder notice instead of a form.
- *
- * Step 3: Services & Assets — which services the customer needs, and
- * (optionally) which design assets they want, styled after the Figma 2D
- * Design Tool's Assets Library. No theme or canvas yet: this step only
- * builds the list; placement happens in the next step.
- *
- * Step 4: Project Description & Reference Files — both optional, and moved
- * out of Project Details so Step 2 stays short. This is the last step;
- * Submit Request lives here now.
- *
- * Added later, one at a time:
- *  - Design layout: design theme + layout assets, auto-placement, running
- *    initial cost                                                 [backlog 14]
- *  - Custom (non-library) items
- *  - Initial cost summary
- *
- * Maps to `service_requests` in the ERD. `request_type` is
- * ('event_styling' | 'custom_designing') — matching the ERD's enum.
- * Full name and email are not collected here; they come from the
- * logged-in customer's account.
- *
- * NOTE FOR THE DOCUMENTATION: `service_requests` has no budget column yet.
- * Budget is required on this form and needs to be added to the ERD
- * (e.g. `budget_range varchar(50)` or a numeric min/max pair).
- */
-
+//data for event types and budgets
 const EVENT_TYPES = [
     { id: 'corporate', name: 'Corporate' },
     { id: 'wedding', name: 'Wedding' },
@@ -48,25 +16,37 @@ const EVENT_TYPES = [
 
 const BUDGETS = ['Below ₱50,000', '₱50,000 – ₱100,000', '₱100,000 – ₱250,000', '₱250,000 – ₱500,000', 'Above ₱500,000'];
 
-// Step 4: reference image / file uploads.
+//data for time slots (6:00 AM to 11:30 PM, every 30 minutes)
+const TIME_SLOTS = Array.from({ length: 36 }, (_, i) => {
+    const total = 6 * 60 + i * 30;
+    const h = Math.floor(total / 60);
+    const m = total % 60;
+    return {
+        value: `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`,
+        label: `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`,
+        minutes: total,
+    };
+});
+
+// An event must run at least this long (end time minus start time).
+const MIN_EVENT_HOURS = 6;
+const toMinutes = (value: string) => {
+    const [h, m] = value.split(':').map(Number);
+    return h * 60 + m;
+};
+
+// Reference file upload settings.
 const MAX_FILES = 10;
 const MAX_FILE_MB = 10;
 const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/png', 'application/pdf'];
 type RefFile = { id: number; file: File; url?: string };
 
 
-// Matches the ERD's service_requests.request_type enum.
-type RequestType = 'event_styling' | 'custom_designing';
-
-const REQUEST_TYPES: { value: RequestType; title: string; hint: string; icon: typeof PartyPopper; available: boolean }[] = [
-    { value: 'event_styling', title: 'Event Styling', hint: 'Weddings, birthdays, corporate events, mall activations', icon: PartyPopper, available: true },
-    { value: 'custom_designing', title: 'Custom Designing', hint: 'A custom piece designed and produced for you, outside a full event', icon: Wrench, available: false },
-];
-
 type Form = {
-    requestType: RequestType | null;
     eventTypeId: string;
     eventDate: string;
+    eventStartTime: string;
+    eventEndTime: string;
     venue: string;
     budget: string;
     guests: string;
@@ -75,9 +55,10 @@ type Form = {
 
 export default function ProjectRequestForm() {
     const [form, setForm] = useState<Form>({
-        requestType: null,
         eventTypeId: '',
         eventDate: '',
+        eventStartTime: '',
+        eventEndTime: '',
         venue: '',
         budget: '',
         guests: '',
@@ -86,26 +67,19 @@ export default function ProjectRequestForm() {
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [submitted, setSubmitted] = useState(false);
 
-    // Step 2 (Project Details) -> Step 3 (Services & Assets) -> Step 4
-    // (Description & Reference Files), once request type is Event Styling.
+
     const [formStep, setFormStep] = useState<2 | 3 | 4>(2);
     const [serviceIds, setServiceIds] = useState<number[]>([]);
     const [themeId, setThemeId] = useState<string | null>(null);
     const [assetIds, setAssetIds] = useState<string[]>([]);
-    // TODO (next step): re-add layoutItems state (with quantities, derived from guest count)
-    // once the Layout Panel can place design assets.
-
-    // Step 4: reference files
+  
+   
     const fileRef = useRef<HTMLInputElement>(null);
     const [files, setFiles] = useState<RefFile[]>([]);
     const [fileError, setFileError] = useState('');
     const [dragging, setDragging] = useState(false);
     
 
-    const isStyling = form.requestType === 'event_styling';
-    const selectType = (value: RequestType) => setForm((f) => ({ ...f, requestType: value }));
-
-    // Requests need at least 1 month of lead time to prepare (matches DatePicker's default).
     const minEventDate = new Date();
     minEventDate.setHours(0, 0, 0, 0);
     minEventDate.setMonth(minEventDate.getMonth() + 1);
@@ -113,14 +87,40 @@ export default function ProjectRequestForm() {
 
     const set = <K extends keyof Form>(key: K, value: Form[K]) => setForm((f) => ({ ...f, [key]: value }));
 
+
+    const isMall = form.eventTypeId === 'mall';
+
+    const chooseEventType = (id: string) => {
+ 
+        setForm((f) => ({ ...f, eventTypeId: id, guests: id === 'mall' ? '' : f.guests }));
+        if (id === 'mall') {
+            setErrors((prev) => {
+                const next = { ...prev };
+                delete next.guests;
+                return next;
+            });
+        }
+    };
+
+
+    const lastSlotMinutes = TIME_SLOTS[TIME_SLOTS.length - 1].minutes;
+    const startSlots = TIME_SLOTS.filter((t) => t.minutes + MIN_EVENT_HOURS * 60 <= lastSlotMinutes);
+    const endSlots = form.eventStartTime
+        ? TIME_SLOTS.filter((t) => t.minutes >= toMinutes(form.eventStartTime) + MIN_EVENT_HOURS * 60)
+        : [];
+
     const continueFromDetails = () => {
         const e: Record<string, string> = {};
         if (!form.eventTypeId) e.eventTypeId = 'Choose an event type.';
         if (!form.eventDate) e.eventDate = 'Choose the event date.';
         else if (form.eventDate < minEventDateISO) e.eventDate = 'The event date must be at least 1 month from today.';
+        if (!form.eventStartTime) e.eventTime = 'Choose the start time.';
+        else if (!form.eventEndTime) e.eventTime = 'Choose the end time.';
+        else if (toMinutes(form.eventEndTime) - toMinutes(form.eventStartTime) < MIN_EVENT_HOURS * 60)
+            e.eventTime = `The event must run at least ${MIN_EVENT_HOURS} hours.`;
         if (!form.venue.trim()) e.venue = 'Venue is required.';
         if (!form.budget) e.budget = 'Choose a budget range.';
-        if (!form.guests || Number(form.guests) < 1) e.guests = 'Enter the expected number of guests.';
+        if (!isMall && (!form.guests || Number(form.guests) < 1)) e.guests = 'Enter the expected number of guests.';
         setErrors(e);
 
         if (Object.keys(e).length) {
@@ -135,7 +135,7 @@ export default function ProjectRequestForm() {
 
     const continueFromServices = () => {
         const e: Record<string, string> = {};
-        if (serviceIds.length === 0) e.services = 'Select at least one service.';
+        if (!isMall && serviceIds.length === 0) e.services = 'Select at least one service.';
         setErrors(e);
 
         if (Object.keys(e).length) {
@@ -148,7 +148,6 @@ export default function ProjectRequestForm() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
-    // Step 4: reference files (JPG, PNG or PDF; up to MAX_FILE_MB each, MAX_FILES total)
     const addFiles = (list: FileList | File[]) => {
         const incoming = Array.from(list);
         const problems: string[] = [];
@@ -169,9 +168,7 @@ export default function ProjectRequestForm() {
     };
 
     const submit = () => {
-        // TODO (backend): send to Laravel, e.g. router.post('/customer/projects', { ...form, serviceIds, themeId, assetIds, files })
-        // TODO (next step): design layout (theme + layout assets, auto-placement, running
-        // initial cost) and custom items are added to the payload here.
+
         setSubmitted(true);
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
@@ -196,82 +193,6 @@ export default function ProjectRequestForm() {
             </Panel>
         );
     }
-
-    /* ---- step 1: choose a request type ---- */
-
-    if (!form.requestType) {
-        return (
-            <>
-                <div className="mb-6">
-                    <h1 className="text-2xl font-bold text-ink">Request New Project</h1>
-                    <p className="mt-1 text-base text-ink-soft">What would you like to request?</p>
-                </div>
-
-                <div className="mx-auto grid max-w-3xl gap-6 sm:grid-cols-2">
-                    {REQUEST_TYPES.map((t) => (
-                        <button
-                            key={t.value}
-                            type="button"
-                            onClick={() => selectType(t.value)}
-                            aria-label={`Request ${t.title}`}
-                            className="group text-left"
-                        >
-                            <Panel className="flex h-full flex-col overflow-hidden p-0 transition group-hover:border-gold group-hover:shadow-md">
-                                {/* Image placeholder */}
-                                <div className="relative flex aspect-video items-center justify-center bg-neutral-200 text-neutral-400">
-                                    <ImageIcon className="size-16" />
-                                    {!t.available && (
-                                        <span className="absolute top-2 right-2 rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-bold tracking-wide text-ink-soft uppercase">
-                                            Coming soon
-                                        </span>
-                                    )}
-                                </div>
-
-                                <div className="flex flex-1 items-start gap-3 p-5">
-                                    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-gold/20 text-gold-dark">
-                                        <t.icon className="size-5" />
-                                    </span>
-                                    <div>
-                                        <h2 className="text-lg font-bold text-ink">{t.title}</h2>
-                                        <p className="mt-1 text-xs text-ink-soft">{t.hint}</p>
-                                    </div>
-                                </div>
-                            </Panel>
-                        </button>
-                    ))}
-                </div>
-            </>
-        );
-    }
-
-    /* ---- step 2, custom designing: deferred ---- */
-
-    if (!isStyling) {
-        return (
-            <div className="mx-auto max-w-2xl">
-                <button
-                    type="button"
-                    onClick={() => setForm((f) => ({ ...f, requestType: null }))}
-                    className="mb-4 inline-flex items-center gap-1.5 text-xs font-bold text-gold-dark hover:underline"
-                >
-                    <ArrowLeft className="size-3.5" /> Change request type
-                </button>
-                <Panel className="p-8 text-center">
-                    <Info className="mx-auto size-10 text-gold-dark" />
-                    <h1 className="mt-3 text-xl font-bold text-ink">Custom Designing requests aren't open yet</h1>
-                    <p className="mt-2 text-sm text-ink-soft">
-                        We're still setting up this request type. For now, please reach out to us directly for custom, made-to-order pieces, or submit an
-                        Event Styling request if your project is part of a full event.
-                    </p>
-                    <OutlineButton className="mt-5" onClick={() => setForm((f) => ({ ...f, requestType: 'event_styling' }))}>
-                        Switch to Event Styling
-                    </OutlineButton>
-                </Panel>
-            </div>
-        );
-    }
-
-    /* ---- step 3, event styling: Services & Assets ---- */
 
     if (formStep === 3) {
         return (
@@ -322,8 +243,6 @@ export default function ProjectRequestForm() {
         );
     }
 
-    /* ---- step 4, event styling: Description & Reference Files ---- */
-
     if (formStep === 4) {
         return (
             <>
@@ -344,6 +263,13 @@ export default function ProjectRequestForm() {
                                 <ArrowLeft className="size-3.5" /> Back to Services &amp; Assets
                             </button>
                         </div>
+
+                        {isMall && (
+                            <p className="mb-4 rounded-lg bg-gold/10 px-3 py-2 text-xs text-ink">
+                                Mall activations are quoted after the ocular visit. Describe your concept and attach references. They are what our
+                                team brings to the visit.
+                            </p>
+                        )}
 
                         <Field label="Project Description" htmlFor="pr-desc">
                             <textarea
@@ -453,7 +379,6 @@ export default function ProjectRequestForm() {
         );
     }
 
-    /* ---- step 2, event styling ---- */
 
     return (
         <>
@@ -464,23 +389,9 @@ export default function ProjectRequestForm() {
 
             <div className="mx-auto max-w-4xl space-y-4">
                 <Panel>
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                        <h2 className="text-lg font-bold text-ink">Project Details</h2>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setForm((f) => ({ ...f, requestType: null }));
-                                setFormStep(2);
-                            }}
-                            className="inline-flex shrink-0 items-center gap-1.5 text-xs font-bold text-gold-dark hover:underline"
-                        >
-                            <ArrowLeft className="size-3.5" /> Change request type
-                        </button>
-                    </div>
+                    <h2 className="mb-3 text-lg font-bold text-ink">Project Details</h2>
 
-                    {/* Left: the dropdown / text fields, no outer box. Project Description
-                        moved to Step 4, so this column is intentionally shorter than the
-                        calendar now — that's fine, there's no border here to reveal it. */}
+
                     <div className="grid gap-5 lg:grid-cols-2">
                         <div className="flex flex-col gap-5">
                             <Field label="Event Type" required error={errors.eventTypeId}>
@@ -494,7 +405,7 @@ export default function ProjectRequestForm() {
                                                 key={t.id}
                                                 type="button"
                                                 aria-pressed={on}
-                                                onClick={() => set('eventTypeId', t.id)}
+                                                onClick={() => chooseEventType(t.id)}
                                                 className={cx(
                                                     'rounded-lg border p-2.5 text-left text-sm font-bold text-ink transition',
                                                     on ? 'border-gold bg-gold/10' : 'border-black/15 hover:bg-black/[0.02]',
@@ -519,18 +430,23 @@ export default function ProjectRequestForm() {
                             </Field>
 
 
-                            <Field label="Expected Guests" htmlFor="pr-guests" required error={errors.guests}>
+                            <Field label="Expected Guests" htmlFor="pr-guests" required={!isMall} error={errors.guests}>
                                 <input
                                     id="pr-guests"
                                     type="number"
                                     min="1"
+                                    disabled={isMall}
                                     data-error={errors.guests ? '' : undefined}
                                     className={inputClass}
-                                    placeholder="e.g. 100"
+                                    placeholder={isMall ? 'Not needed' : 'e.g. 100'}
                                     value={form.guests}
                                     onChange={(e) => set('guests', e.target.value)}
                                 />
-                                <span className="text-[11px] text-ink-soft">An estimate is fine if you don't have an exact count yet.</span>
+                                <span className="text-[11px] text-ink-soft">
+                                    {isMall
+                                        ? "Not needed for mall activations. We'll measure the space at the ocular visit."
+                                        : "An estimate is fine if you don't have an exact count yet."}
+                                </span>
                             </Field>
 
                             <Field label="Budget Range" required error={errors.budget}>
@@ -556,17 +472,76 @@ export default function ProjectRequestForm() {
                             </Field>
                         </div>
 
-                        <Field label="Event Date" htmlFor="pr-date" required error={errors.eventDate}>
-                            <div data-error={errors.eventDate ? '' : undefined}>
-                                <DatePicker
-                                    id="pr-date"
-                                    value={form.eventDate}
-                                    onChange={(iso) => set('eventDate', iso)}
-                                    minDate={minEventDateISO}
-                                    hasError={!!errors.eventDate}
-                                />
-                            </div>
-                        </Field>
+                        <div className="flex flex-col gap-5">
+                            <Field label="Event Date" htmlFor="pr-date" required error={errors.eventDate}>
+                                <div data-error={errors.eventDate ? '' : undefined}>
+                                    <DatePicker
+                                        id="pr-date"
+                                        value={form.eventDate}
+                                        onChange={(iso) => set('eventDate', iso)}
+                                        minDate={minEventDateISO}
+                                        hasError={!!errors.eventDate}
+                                    />
+                                </div>
+                            </Field>
+
+
+                            <Field label="Event Time" required error={errors.eventTime}>
+                                <div data-error={errors.eventTime ? '' : undefined} className="grid grid-cols-2 gap-3">
+                                    <div className="grid gap-1">
+                                        <label htmlFor="pr-start" className="text-[11px] text-ink-soft">
+                                            Start
+                                        </label>
+                                        <select
+                                            id="pr-start"
+                                            className={selectClass}
+                                            value={form.eventStartTime}
+                                            onChange={(e) => {
+                                                const start = e.target.value;
+                                                // Changing the start clears the end unless it still meets the minimum length.
+                                                setForm((f) => ({
+                                                    ...f,
+                                                    eventStartTime: start,
+                                                    eventEndTime:
+                                                        start && f.eventEndTime && toMinutes(f.eventEndTime) - toMinutes(start) >= MIN_EVENT_HOURS * 60
+                                                            ? f.eventEndTime
+                                                            : '',
+                                                }));
+                                            }}
+                                        >
+                                            <option value="">Select start</option>
+                                            {startSlots.map((t) => (
+                                                <option key={t.value} value={t.value}>
+                                                    {t.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="grid gap-1">
+                                        <label htmlFor="pr-end" className="text-[11px] text-ink-soft">
+                                            End
+                                        </label>
+                                        <select
+                                            id="pr-end"
+                                            className={selectClass}
+                                            value={form.eventEndTime}
+                                            disabled={!form.eventStartTime}
+                                            onChange={(e) => set('eventEndTime', e.target.value)}
+                                        >
+                                            <option value="">{form.eventStartTime ? 'Select end' : 'Choose a start first'}</option>
+                                            {endSlots.map((t) => (
+                                                <option key={t.value} value={t.value}>
+                                                    {t.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+                                <span className="text-[11px] text-ink-soft">
+                                    30-minute steps, and an event runs at least {MIN_EVENT_HOURS} hours. Latest start: {startSlots[startSlots.length - 1].label}.
+                                </span>
+                            </Field>
+                        </div>
                     </div>
                 </Panel>
 

@@ -22,24 +22,11 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 
-/*
- * Employee records (backlog item 9). Maps to `employees` in the ERD:
- * first_name, last_name, contact_number, email, position_id and employee_status.
- *
- * An employee does NOT need a user account. `user_id` is optional:
- *  - Staff who log in (Project Manager, Design Specialist, Bookkeeper) can be linked
- *    to their account.
- *  - Field personnel (the Fabrication Head and the Installation Head) have no login.
- *    They receive work orders and reminders by email, so the email address is
- *    required for everyone.
- *
- * Employees are archived (Inactive) rather than deleted, because production
- * assignments refer to them.
- */
+
 
 const PAGE_SIZE = 8;
 
-// From `employee_positions`.
+
 const POSITIONS = ['Fabrication Head', 'Installation Head', 'Project Manager', 'Design Specialist', 'Bookkeeper'];
 
 const positionTone: Record<string, PillTone> = {
@@ -57,12 +44,11 @@ type Employee = {
     position: string;
     contact: string;
     email: string;
-    /** Linked user account (users.user_id), or null when the employee has no login */
     userId: number | null;
     active: boolean;
 };
 
-// Placeholder staff accounts (users with a staff role). Customers are never employees.
+
 const staffAccounts = [
     { id: 101, name: 'Ana Reyes', email: 'ana@email.com', role: 'Project Manager' },
     { id: 102, name: 'Mark Santos', email: 'mark@email.com', role: 'Design Specialist' },
@@ -70,7 +56,7 @@ const staffAccounts = [
     { id: 104, name: 'Paolo Villar', email: 'paolo@email.com', role: 'Design Specialist' },
 ];
 
-// Placeholder data until the database is connected.
+
 const seed: Employee[] = [
     { id: 1, firstName: 'Ana', lastName: 'Reyes', position: 'Project Manager', contact: '0917 000 0001', email: 'ana@email.com', userId: 101, active: true },
     { id: 2, firstName: 'Mark', lastName: 'Santos', position: 'Design Specialist', contact: '0917 000 0002', email: 'mark@email.com', userId: 102, active: true },
@@ -89,7 +75,7 @@ type Form = {
     position: string;
     contact: string;
     email: string;
-    userId: string; // '' = no login
+    userId: string; 
     active: boolean;
 };
 
@@ -106,7 +92,7 @@ const emptyForm: Form = {
 const initials = (e: Employee) => (e.firstName[0] + e.lastName[0]).toUpperCase();
 const emailOk = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 
-/* Icon-only button with an accessible name and a tooltip */
+
 function IconButton({
     label,
     onClick,
@@ -152,7 +138,7 @@ export default function EmployeeRecordsManagement() {
 
     const accountFor = (userId: number | null) => staffAccounts.find((a) => a.id === userId);
 
-    // Accounts that are free to link (not already linked to another employee)
+
     const availableAccounts = staffAccounts.filter(
         (a) => !employees.some((e) => e.userId === a.id && e.id !== editingId),
     );
@@ -179,7 +165,7 @@ export default function EmployeeRecordsManagement() {
         setDialogOpen(true);
     };
 
-    // Choosing an account fills in the blanks from it, so nothing is typed twice
+
     const chooseAccount = (value: string) => {
         const account = staffAccounts.find((a) => String(a.id) === value);
         setForm((f) => {

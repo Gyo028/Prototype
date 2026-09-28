@@ -3,23 +3,7 @@ import { Bell, CreditCard, FilePlus, FolderOpen, House, LogOut, Star } from 'luc
 import type { LucideIcon } from 'lucide-react';
 import { cx } from '@/components/dashboard/ui';
 
-/*
- * Sidebar for the Customer account (Figma "Customer Dashboard").
- * Unlike the staff sidebar it has no user block or group headings:
- * a single list of icon links, a divider, then Logout.
- *
- * Every item maps to a Customer function in the documentation (backlog item in brackets):
- *  - New Project Request   submit a request with the 2D layout and initial cost  [12, 14]
- *  - My Projects           the Plan Project stages of each project: consultation and
- *                          ocular visit scheduling, design proposal review, contract
- *                          signing, request status and progress          [15, 19, 25, 17, 33]
- *  - Billing & Payments    bills (reservation fee, final billing, additional charges),
- *                          receipt upload, payment history, disputes              [26, 29]
- *  - Notifications         project updates and required actions                   [33]
- *  - Ratings & Reviews     feedback on a completed project                        [35]
- * Upcoming appointments are shown on the dashboard. Browsing services, packages and
- * sample works is done on the public website.
- */
+
 
 type CustomerNavItem = { title: string; href: string; icon: LucideIcon };
 
@@ -33,7 +17,6 @@ export const customerNav: CustomerNavItem[] = [
 ];
 
 type Props = {
-    /** Called after a link is clicked (used to close the mobile drawer) */
     onNavigate?: () => void;
 };
 
@@ -41,8 +24,7 @@ export default function CustomerSidebar({ onNavigate }: Props) {
     const { url } = usePage();
     const path = url.split('?')[0];
 
-    // The dashboard link must match exactly, otherwise it would stay
-    // highlighted on every page under /customer
+
     const isActive = (href: string) => (href === '/customer' ? path === href : path.startsWith(href));
 
     return (
