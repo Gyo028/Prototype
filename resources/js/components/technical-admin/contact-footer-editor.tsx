@@ -1,3 +1,4 @@
+import { router } from '@inertiajs/react';
 import { Check, Mail, Phone, RotateCcw } from 'lucide-react';
 import { useState } from 'react';
 import { Field, GoldButton, OutlineButton, Panel, PanelHeader, inputClass } from '@/components/dashboard/ui';
@@ -6,7 +7,8 @@ import { Field, GoldButton, OutlineButton, Panel, PanelHeader, inputClass } from
 
 const LIMITS = { phone: 30, email: 100, address: 150, url: 200, copyright: 150 };
 
-type Contact = {
+const CONTACT_URL = '/technical-admin/website-content/contact';
+export type Contact = {
     phone: string;
     email: string;
     address: string;
@@ -16,23 +18,15 @@ type Contact = {
 };
 
 
-const seedContact: Contact = {
-    phone: '+63 0000000000',
-    email: 'gr3ataseventsstyling@gmail.com',
-    address: 'Altezza, Deparo, Caloocan City',
-    facebook: 'https://www.facebook.com/share/17uj5e738o/',
-    instagram: '',
-    copyright: "© 2026 Great A's Event Styling Services. All rights reserved.",
-};
-
 const emailOk = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 const urlOk = (v: string) => /^https?:\/\/\S+\.\S+/.test(v);
 
-export default function ContactFooterEditor({ onSaved }: { onSaved?: () => void }) {
-    const [saved, setSaved] = useState<Contact>(seedContact);
-    const [contact, setContact] = useState<Contact>(seedContact);
+export default function ContactFooterEditor({ contact: initial }: { contact: Contact }) {
+    const [saved, setSaved] = useState<Contact>(initial);
+    const [contact, setContact] = useState<Contact>(initial);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [message, setMessage] = useState('');
+    const [saving, setSaving] = useState(false);
 
     const dirty = JSON.stringify(contact) !== JSON.stringify(saved);
 
@@ -56,9 +50,17 @@ export default function ContactFooterEditor({ onSaved }: { onSaved?: () => void 
         setErrors(e);
         if (Object.keys(e).length) return;
 
-        setSaved(contact);
-        setMessage('Changes saved');
-        onSaved?.();
+        router.put(CONTACT_URL, contact, {
+            preserveScroll: true,
+            preserveState: true,
+            onStart: () => setSaving(true),
+            onFinish: () => setSaving(false),
+            onSuccess: () => {
+                setSaved(contact);
+                setMessage('Changes saved');
+            },
+            onError: (serverErrors) => setErrors(serverErrors),
+        });
     };
 
     const reset = () => {
@@ -157,7 +159,7 @@ export default function ContactFooterEditor({ onSaved }: { onSaved?: () => void 
                 <OutlineButton onClick={reset} disabled={!dirty}>
                     <RotateCcw className="size-4" /> Reset
                 </OutlineButton>
-                <GoldButton onClick={save} disabled={!dirty}>
+                <GoldButton onClick={save} disabled={!dirty || saving}>
                     <Check className="size-4" /> Save Changes
                 </GoldButton>
             </div>

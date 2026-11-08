@@ -1,3 +1,4 @@
+import { router } from '@inertiajs/react';
 import { ArrowDown, ArrowUp, Check, ChevronLeft, ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
@@ -18,10 +19,10 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { faqs as landingPageFaqs } from '@/data/faqs';
 import type { Faq } from '@/data/faqs';
 
 
+const FAQ_URL = '/technical-admin/website-content/faqs';
 const QUESTION_MAX = 150;
 const PAGE_SIZE = 2;
 
@@ -60,9 +61,9 @@ function IconButton({
     );
 }
 
-export default function FaqEditor({ onSaved }: { onSaved?: () => void }) {
-    const [faqs, setFaqs] = useState<Faq[]>(landingPageFaqs);
+export default function FaqEditor({ faqs }: { faqs: Faq[] }) {
     const [page, setPage] = useState(1);
+    const [saving, setSaving] = useState(false);
 
 
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -74,11 +75,6 @@ export default function FaqEditor({ onSaved }: { onSaved?: () => void }) {
     const current = Math.min(page, pages);
     const start = (current - 1) * PAGE_SIZE;
     const visible = faqs.slice(start, start + PAGE_SIZE);
-
-    const commit = (next: Faq[]) => {
-        setFaqs(next);
-        onSaved?.();
-    };
 
     const openAdd = () => {
         setEditingId(null);
@@ -102,18 +98,25 @@ export default function FaqEditor({ onSaved }: { onSaved?: () => void }) {
         if (Object.keys(e).length) return;
 
         const data = { question: form.question.trim(), answer: form.answer.trim() };
-        if (editingId === null) {
-            commit([...faqs, { id: Date.now(), ...data }]);
-            setPage(Math.ceil((faqs.length + 1) / PAGE_SIZE)); // jump to the new entry
-        } else {
-            commit(faqs.map((f) => (f.id === editingId ? { ...f, ...data } : f)));
-        }
-        setDialogOpen(false);
+        const options = {
+            preserveScroll: true,
+            preserveState: true,
+            onStart: () => setSaving(true),
+            onFinish: () => setSaving(false),
+            onSuccess: () => {
+                setDialogOpen(false);
+                if (editingId === null) setPage(Number.MAX_SAFE_INTEGER); // jump to the new entry (last page)
+            },
+            onError: (serverErrors: Record<string, string>) => setErrors(serverErrors),
+        };
+
+        if (editingId === null) router.post(FAQ_URL, data, options);
+        else router.patch(`${FAQ_URL}/${editingId}`, data, options);
     };
 
     const remove = (f: Faq) => {
         if (!confirm('Delete this FAQ?')) return;
-        commit(faqs.filter((x) => x.id !== f.id));
+        router.delete(`${FAQ_URL}/${f.id}`, { preserveScroll: true, preserveState: true });
     };
 
 
@@ -121,10 +124,15 @@ export default function FaqEditor({ onSaved }: { onSaved?: () => void }) {
         const index = faqs.findIndex((f) => f.id === id);
         const target = index + direction;
         if (target < 0 || target >= faqs.length) return;
-        const next = [...faqs];
-        [next[index], next[target]] = [next[target], next[index]];
-        commit(next);
-        setPage(Math.floor(target / PAGE_SIZE) + 1);
+        router.patch(
+            `${FAQ_URL}/${id}/move`,
+            { direction: direction === -1 ? 'up' : 'down' },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: () => setPage(Math.floor(target / PAGE_SIZE) + 1), // follow the entry to its new page
+            },
+        );
     };
 
     return (
@@ -263,7 +271,7 @@ export default function FaqEditor({ onSaved }: { onSaved?: () => void }) {
 
                     <DialogFooter>
                         <OutlineButton onClick={() => setDialogOpen(false)}>Cancel</OutlineButton>
-                        <GoldButton onClick={save}>
+                        <GoldButton onClick={save} disabled={saving}>
                             <Check className="size-4" /> Save
                         </GoldButton>
                     </DialogFooter>

@@ -3,6 +3,15 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
+use App\Http\Controllers\TechnicalAdmin\UserAccountController;
+use App\Http\Controllers\TechnicalAdmin\EmployeeController;
+use App\Http\Controllers\TechnicalAdmin\FaqController;
+use App\Http\Controllers\TechnicalAdmin\WebsiteContentController;
+use App\Http\Controllers\TechnicalAdmin\ServiceController;
+use App\Http\Controllers\TechnicalAdmin\ServicesAssetsController;
+use App\Http\Controllers\TechnicalAdmin\DesignThemeController;
+use App\Http\Controllers\TechnicalAdmin\LayoutAssetController;
+use App\Http\Controllers\TechnicalAdmin\DashboardController;
 
 // Landing Page
 Route::inertia('/', 'public/landing')->name('home');
@@ -23,11 +32,35 @@ Route::middleware(['auth', 'verified', 'role:technical_admin'])
     ->prefix('technical-admin')
     ->name('technical-admin.')
     ->group(function () {
-        Route::inertia('/', 'technical-admin/dashboard')->name('dashboard');
-        Route::inertia('users', 'technical-admin/users')->name('users');
-        Route::inertia('website-content', 'technical-admin/website-content')->name('website-content');
-        Route::inertia('services-assets', 'technical-admin/services-assets')->name('services-assets');
-        Route::inertia('employees', 'technical-admin/employees')->name('employees');
+        Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+        Route::get('users', [UserAccountController::class, 'index'])->name('users');
+        Route::post('users', [UserAccountController::class, 'store'])->name('users.store');
+        Route::patch('users/{user}', [UserAccountController::class, 'update'])->name('users.update');
+        Route::patch('users/{user}/archive', [UserAccountController::class, 'archive'])->name('users.archive');
+        Route::patch('users/{user}/restore', [UserAccountController::class, 'restore'])->name('users.restore');
+        Route::get('website-content', [WebsiteContentController::class, 'index'])->name('website-content');
+        Route::put('website-content/about', [WebsiteContentController::class, 'updateAbout'])->name('website-content.about');
+        Route::put('website-content/services', [WebsiteContentController::class, 'updateServices'])->name('website-content.services');
+        Route::put('website-content/contact', [WebsiteContentController::class, 'updateContact'])->name('website-content.contact');
+        Route::post('website-content/faqs', [FaqController::class, 'store'])->name('website-content.faqs.store');
+        Route::patch('website-content/faqs/{faq}', [FaqController::class, 'update'])->name('website-content.faqs.update');
+        Route::delete('website-content/faqs/{faq}', [FaqController::class, 'destroy'])->name('website-content.faqs.destroy');
+        Route::patch('website-content/faqs/{faq}/move', [FaqController::class, 'move'])->name('website-content.faqs.move');
+        Route::get('services-assets', [ServicesAssetsController::class, 'index'])->name('services-assets');
+        Route::post('services-assets/services', [ServiceController::class, 'store'])->name('services-assets.services.store');
+        Route::patch('services-assets/services/{service}', [ServiceController::class, 'update'])->name('services-assets.services.update');
+        Route::patch('services-assets/services/{service}/status', [ServiceController::class, 'status'])->name('services-assets.services.status');
+        Route::post('services-assets/themes', [DesignThemeController::class, 'store'])->name('services-assets.themes.store');
+        Route::patch('services-assets/themes/{theme}', [DesignThemeController::class, 'update'])->name('services-assets.themes.update');
+        Route::patch('services-assets/themes/{theme}/status', [DesignThemeController::class, 'status'])->name('services-assets.themes.status');
+        Route::post('services-assets/assets', [LayoutAssetController::class, 'store'])->name('services-assets.assets.store');
+        Route::patch('services-assets/assets/{asset}', [LayoutAssetController::class, 'update'])->name('services-assets.assets.update');
+        Route::patch('services-assets/assets/{asset}/status', [LayoutAssetController::class, 'status'])->name('services-assets.assets.status');
+        Route::get('employees', [EmployeeController::class, 'index'])->name('employees');
+        Route::post('employees', [EmployeeController::class, 'store'])->name('employees.store');
+        Route::patch('employees/{employee}', [EmployeeController::class, 'update'])->name('employees.update');
+        Route::patch('employees/{employee}/archive', [EmployeeController::class, 'archive'])->name('employees.archive');
+        Route::patch('employees/{employee}/restore', [EmployeeController::class, 'restore'])->name('employees.restore');
     });
 
 Route::middleware(['auth', 'verified', 'role:customer'])

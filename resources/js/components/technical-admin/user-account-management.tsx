@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { router } from '@inertiajs/react';
+import { useEffect, useMemo, useState } from 'react';
 import {
     DangerButton,
     Field,
@@ -21,51 +22,64 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 
-
-const ROLES = ['Customer', 'Project Manager', 'Design Specialist', 'Bookkeeper', 'Owner', 'Technical Admin'] as const;
-type RoleName = (typeof ROLES)[number];
+const USERS_URL = '/technical-admin/users';
 
 type Status = 'Active' | 'Archived';
 
-type User = { id: number; name: string; email: string; role: RoleName; status: Status; added: string };
+/** A staff account as sent by UserAccountController. Customers and Technical Admins are never sent. */
+export type StaffUser = {
+    id: number;
+    name: string;
+    email: string;
+    role: string; // display name, e.g. "Project Manager"
+    roleKey: string; // e.g. "project_manager"
+    status: Status;
+    added: string;
+};
 
-const roleTone: Record<RoleName, PillTone> = {
-    Customer: 'blue',
+export type RoleOption = { value: string; label: string };
+
+/** Sent once, right after an account is created. */
+export type NewAccount = { name: string; email: string; password: string };
+
+const roleTone: Record<string, PillTone> = {
     'Project Manager': 'cream',
     'Design Specialist': 'purple',
     Bookkeeper: 'green',
     Owner: 'yellow',
-    'Technical Admin': 'gray',
 };
 
 const statusTone: Record<Status, PillTone> = { Active: 'green', Archived: 'gray' };
 
-
-const seedUsers: User[] = [
-    { id: 1, name: 'Juan dela Cruz', email: 'juan@email.com', role: 'Customer', status: 'Active', added: 'May 24' },
-    { id: 2, name: 'Ana Reyes', email: 'ana@email.com', role: 'Project Manager', status: 'Active', added: 'May 22' },
-    { id: 3, name: 'Mark Santos', email: 'mark@email.com', role: 'Design Specialist', status: 'Active', added: 'May 21' },
-];
-
 const initials = (name: string) =>
     name.split(' ').filter(Boolean).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
 
-const today = () => new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+type Props = {
+    users: StaffUser[];
+    roles: RoleOption[];
+    newAccount: NewAccount | null;
+};
 
-
-
-export default function UserAccountManagement() {
-    const [users, setUsers] = useState<User[]>(seedUsers);
-
-
+export default function UserAccountManagement({ users, roles, newAccount }: Props) {
     const [query, setQuery] = useState('');
     const [roleFilter, setRoleFilter] = useState('All Roles');
 
-
     const [dialogOpen, setDialogOpen] = useState(false);
-    const [editing, setEditing] = useState<User | null>(null);
-    const [form, setForm] = useState({ name: '', email: '', role: 'Customer' as RoleName });
+    const [editing, setEditing] = useState<StaffUser | null>(null);
+    const [form, setForm] = useState({ name: '', email: '', role: roles[0]?.value ?? '' });
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const [saving, setSaving] = useState(false);
+
+    // The temporary password is shown once, in its own dialog, right after the account is created.
+    const [created, setCreated] = useState<NewAccount | null>(null);
+    const [copied, setCopied] = useState(false);
+
+    useEffect(() => {
+        if (newAccount) {
+            setCreated(newAccount);
+            setCopied(false);
+        }
+    }, [newAccount]);
 
     const visibleUsers = useMemo(() => {
         const q = query.trim().toLowerCase();
@@ -76,55 +90,72 @@ export default function UserAccountManagement() {
         );
     }, [users, query, roleFilter]);
 
-
     const openAdd = () => {
         setEditing(null);
-        setForm({ name: '', email: '', role: 'Customer' });
+        setForm({ name: '', email: '', role: roles[0]?.value ?? '' });
         setErrors({});
         setDialogOpen(true);
     };
 
-    const openEdit = (u: User) => {
+    const openEdit = (u: StaffUser) => {
         setEditing(u);
-        setForm({ name: u.name, email: u.email, role: u.role });
+        setForm({ name: u.name, email: u.email, role: u.roleKey });
         setErrors({});
         setDialogOpen(true);
     };
 
     const saveUser = () => {
         const e: Record<string, string> = {};
-        const email = form.email.trim().toLowerCase();
 
         if (!form.name.trim()) e.name = 'Full name is required.';
-        if (!email) e.email = 'Email address is required.';
-        else if (users.some((u) => u.email.toLowerCase() === email && u.id !== editing?.id))
-            e.email = 'Email already registered';
+        if (!form.email.trim()) e.email = 'Email address is required.';
 
         setErrors(e);
         if (Object.keys(e).length) return;
 
-        const data = { name: form.name.trim(), email: form.email.trim(), role: form.role };
-        setUsers((list) =>
-            editing
-                ? list.map((u) => (u.id === editing.id ? { ...u, ...data } : u))
-                : [...list, { id: Date.now(), status: 'Active', added: today(), ...data }],
-        );
-        setDialogOpen(false);
+        const options = {
+            preserveScroll: true,
+            onStart: () => setSaving(true),
+            onFinish: () => setSaving(false),
+            onSuccess: () => setDialogOpen(false),
+            onError: (serverErrors: Record<string, string>) => setErrors(serverErrors),
+        };
+
+        if (editing) router.patch(`${USERS_URL}/${editing.id}`, form, options);
+        else router.post(USERS_URL, form, options);
     };
 
     const toggleArchive = () => {
         if (!editing) return;
-        const next: Status = editing.status === 'Archived' ? 'Active' : 'Archived';
-        setUsers((list) => list.map((u) => (u.id === editing.id ? { ...u, status: next } : u)));
-        setDialogOpen(false);
+        const action = editing.status === 'Archived' ? 'restore' : 'archive';
+
+        router.patch(
+            `${USERS_URL}/${editing.id}/${action}`,
+            {},
+            {
+                preserveScroll: true,
+                onStart: () => setSaving(true),
+                onFinish: () => setSaving(false),
+                onSuccess: () => setDialogOpen(false),
+            },
+        );
     };
 
+    const copyPassword = async () => {
+        if (!created) return;
+        try {
+            await navigator.clipboard.writeText(created.password);
+            setCopied(true);
+        } catch {
+            setCopied(false); // clipboard blocked: the password is still visible to copy by hand
+        }
+    };
 
     return (
         <>
             <PageHeader
                 title="User Accounts"
-                description="Search, add and edit user accounts. Click a user to edit their account."
+                description="Search, add and edit staff accounts. Click a user to edit their account."
             />
 
             {/* Toolbar: search on the left, filter and add on the right */}
@@ -149,8 +180,8 @@ export default function UserAccountManagement() {
                             aria-label="Filter by role"
                         >
                             <option>All Roles</option>
-                            {ROLES.map((r) => (
-                                <option key={r}>{r}</option>
+                            {roles.map((r) => (
+                                <option key={r.value}>{r.label}</option>
                             ))}
                         </select>
                     </div>
@@ -194,7 +225,7 @@ export default function UserAccountManagement() {
                                 <td className="px-2 py-3 text-ink">{u.name}</td>
                                 <td className="px-2 py-3 text-ink">{u.email}</td>
                                 <td className="px-2 py-3">
-                                    <Pill tone={roleTone[u.role]}>{u.role}</Pill>
+                                    <Pill tone={roleTone[u.role] ?? 'gray'}>{u.role}</Pill>
                                 </td>
                                 <td className="px-2 py-3">
                                     <Pill tone={statusTone[u.status]}>{u.status}</Pill>
@@ -222,7 +253,7 @@ export default function UserAccountManagement() {
                         <DialogDescription>
                             {editing
                                 ? `Update the account of ${editing.name}.`
-                                : 'Create the account and assign a role.'}
+                                : 'Create the account and assign a role. A temporary password is generated for you.'}
                         </DialogDescription>
                     </DialogHeader>
 
@@ -252,29 +283,64 @@ export default function UserAccountManagement() {
                             />
                         </Field>
 
-                        <Field label="Role" htmlFor="u-role" required>
+                        <Field label="Role" htmlFor="u-role" required error={errors.role}>
                             <select
                                 id="u-role"
                                 className={selectClass}
                                 value={form.role}
-                                onChange={(e) => setForm({ ...form, role: e.target.value as RoleName })}
+                                onChange={(e) => setForm({ ...form, role: e.target.value })}
                             >
-                                {ROLES.map((r) => (
-                                    <option key={r}>{r}</option>
+                                {roles.map((r) => (
+                                    <option key={r.value} value={r.value}>
+                                        {r.label}
+                                    </option>
                                 ))}
                             </select>
                         </Field>
 
                         <DialogFooter>
                             {editing && (
-                                <DangerButton className="sm:mr-auto" onClick={toggleArchive}>
+                                <DangerButton className="sm:mr-auto" onClick={toggleArchive} disabled={saving}>
                                     {editing.status === 'Archived' ? 'Restore Account' : 'Archive Account'}
                                 </DangerButton>
                             )}
                             <OutlineButton onClick={() => setDialogOpen(false)}>Cancel</OutlineButton>
-                            <GoldButton type="submit">{editing ? 'Save Changes' : 'Create User'}</GoldButton>
+                            <GoldButton type="submit" disabled={saving}>
+                                {editing ? 'Save Changes' : 'Create User'}
+                            </GoldButton>
                         </DialogFooter>
                     </form>
+                </DialogContent>
+            </Dialog>
+
+            {/* ---------------- Temporary password (shown once) ---------------- */}
+            <Dialog open={created !== null} onOpenChange={(open) => !open && setCreated(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Account created</DialogTitle>
+                        <DialogDescription>
+                            Give this temporary password to {created?.name}. It is shown only once and cannot be
+                            viewed again. They can change it in Settings after logging in.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-3">
+                        <div>
+                            <p className="text-xs text-ink-soft uppercase">Email</p>
+                            <p className="text-sm text-ink">{created?.email}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-ink-soft uppercase">Temporary password</p>
+                            <p className="rounded-md border border-gold/50 bg-gold/10 px-3 py-2 font-mono text-base tracking-wide text-ink select-all">
+                                {created?.password}
+                            </p>
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <OutlineButton onClick={copyPassword}>{copied ? 'Copied' : 'Copy password'}</OutlineButton>
+                        <GoldButton onClick={() => setCreated(null)}>Done</GoldButton>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
         </>

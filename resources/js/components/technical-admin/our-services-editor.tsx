@@ -1,3 +1,4 @@
+import { router } from '@inertiajs/react';
 import { Check, Layers, RotateCcw } from 'lucide-react';
 import { useState } from 'react';
 import { Field, GoldButton, OutlineButton, Panel, PanelHeader, inputClass, textareaClass } from '@/components/dashboard/ui';
@@ -7,18 +8,9 @@ import { cn } from '@/lib/utils';
 const LIMITS = { title: 40, intro: 200, cardTitle: 40, cardText: 150 };
 
 type Card = { title: string; description: string };
-type OurServices = { title: string; intro: string; cards: Card[] };
+export type OurServices = { title: string; intro: string; cards: Card[] };
 
-
-const seedServices: OurServices = {
-    title: 'Our Services',
-    intro: '',
-    cards: [
-        { title: 'Corporate Events', description: 'Professional styling and management for brand activations, mall events, and corporate functions.' },
-        { title: 'Special Occasions', description: 'Creative setups for weddings, birthdays, debuts, and milestone celebrations.' },
-        { title: 'Custom Fabrication', description: 'Design and production of customized backdrops, props, and themed event structures.' },
-    ],
-};
+const SERVICES_URL = '/technical-admin/website-content/services';
 
 function Counter({ value, max }: { value: string; max: number }) {
     return (
@@ -28,11 +20,12 @@ function Counter({ value, max }: { value: string; max: number }) {
     );
 }
 
-export default function OurServicesEditor({ onSaved }: { onSaved?: () => void }) {
-    const [saved, setSaved] = useState<OurServices>(seedServices);
-    const [data, setData] = useState<OurServices>(seedServices);
+export default function OurServicesEditor({ services }: { services: OurServices }) {
+    const [saved, setSaved] = useState<OurServices>(services);
+    const [data, setData] = useState<OurServices>(services);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [message, setMessage] = useState('');
+    const [saving, setSaving] = useState(false);
 
     const dirty = JSON.stringify(data) !== JSON.stringify(saved);
 
@@ -54,9 +47,25 @@ export default function OurServicesEditor({ onSaved }: { onSaved?: () => void })
         setErrors(e);
         if (Object.keys(e).length) return;
 
-        setSaved(data);
-        setMessage('Changes saved');
-        onSaved?.();
+        router.put(SERVICES_URL, data, {
+            preserveScroll: true,
+            preserveState: true,
+            onStart: () => setSaving(true),
+            onFinish: () => setSaving(false),
+            onSuccess: () => {
+                setSaved(data);
+                setMessage('Changes saved');
+            },
+            onError: (serverErrors) => {
+                // cards.1.title -> title-1, the keys this form uses
+                const mapped: Record<string, string> = {};
+                Object.entries(serverErrors).forEach(([key, text]) => {
+                    const card = key.match(/^cards\.(\d+)\.(title|description)$/);
+                    mapped[card ? `${card[2]}-${card[1]}` : key] = text;
+                });
+                setErrors(mapped);
+            },
+        });
     };
 
     const reset = () => {
@@ -143,7 +152,7 @@ export default function OurServicesEditor({ onSaved }: { onSaved?: () => void })
                 <OutlineButton onClick={reset} disabled={!dirty}>
                     <RotateCcw className="size-4" /> Reset
                 </OutlineButton>
-                <GoldButton onClick={save} disabled={!dirty}>
+                <GoldButton onClick={save} disabled={!dirty || saving}>
                     <Check className="size-4" /> Save Changes
                 </GoldButton>
             </div>

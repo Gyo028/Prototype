@@ -1,3 +1,4 @@
+import { router } from '@inertiajs/react';
 import { Check, ChevronLeft, ChevronRight, Pencil, Plus } from 'lucide-react';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
@@ -22,16 +23,26 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 
+/*
+ * Service configuration. Each service is a row of
+ * `services`: service_name, service_category, description, pricing_type
+ * ('fixed' | 'per_unit'), unit_type, price and status (active / inactive).
+ * The data comes from ServicesAssetsController and is saved by ServiceController.
+ *
+ * The Event Styling fee (isBaseFee) is automatically included with every
+ * Event Styling request. Only its description and price can change; the
+ * server enforces this too.
+ *
+ * Services are switched on or off rather than deleted, because requests and
+ * quotations refer to them.
+ */
 
-
+const SERVICES_URL = '/technical-admin/services-assets/services';
 const PAGE_SIZE = 6;
-const BASE_FEE_ID = 0;
-const CATEGORIES = ['Entertainment', 'Photo & Video', 'Catering', 'Host'];
-const UNIT_TYPES = ['sqm', 'pc', 'set', 'hour', 'day', 'pax'];
 
 type PricingType = 'fixed' | 'per_unit';
 
-type Service = {
+export type Service = {
     id: number;
     name: string;
     category: string;
@@ -40,19 +51,9 @@ type Service = {
     unitType: string;
     price: number;
     active: boolean;
-    isBaseFee?: boolean;
+    /** The automatic Event Styling fee: locked identity fields, always included. */
+    isBaseFee: boolean;
 };
-
-
-const seed: Service[] = [
-    { id: BASE_FEE_ID, name: 'Event Styling', category: 'Styling', description: 'Full event styling package. Automatically included with every Event Styling request.', pricingType: 'fixed', unitType: '', price: 45000, active: true, isBaseFee: true },
-    { id: 1, name: 'DJ Services', category: 'Entertainment', description: 'Professional DJ and sound system for the event.', pricingType: 'fixed', unitType: '', price: 15000, active: true },
-    { id: 2, name: 'Photobooth Rental', category: 'Entertainment', description: 'On-site photobooth with props and instant prints.', pricingType: 'fixed', unitType: '', price: 8000, active: true },
-    { id: 3, name: 'Photography Package', category: 'Photo & Video', description: 'Event-day photography coverage.', pricingType: 'fixed', unitType: '', price: 20000, active: true },
-    { id: 4, name: 'Videography Package', category: 'Photo & Video', description: 'Event-day videography coverage with edited highlights.', pricingType: 'fixed', unitType: '', price: 25000, active: true },
-    { id: 5, name: 'Buffet Catering', category: 'Catering', description: 'Full buffet catering, priced per guest.', pricingType: 'per_unit', unitType: 'pax', price: 650, active: true },
-    { id: 6, name: 'Host / Emcee Services', category: 'Host', description: 'Professional host or emcee for the event program.', pricingType: 'fixed', unitType: '', price: 5000, active: true },
-];
 
 const peso = (n: number) => `₱${n.toLocaleString('en-PH')}`;
 
@@ -65,17 +66,6 @@ type Form = {
     price: string;
     active: boolean;
 };
-
-const emptyForm: Form = {
-    name: '',
-    category: CATEGORIES[0],
-    description: '',
-    pricingType: 'fixed',
-    unitType: '',
-    price: '',
-    active: true,
-};
-
 
 function IconButton({
     label,
@@ -105,14 +95,33 @@ function IconButton({
     );
 }
 
-export default function ServiceManagement() {
-    const [services, setServices] = useState<Service[]>(seed);
+type Props = {
+    services: Service[];
+    categories: string[];
+    unitTypes: string[];
+};
+
+export default function ServiceManagement({ services, categories, unitTypes }: Props) {
+    const emptyForm: Form = {
+        name: '',
+        category: categories[0] ?? '',
+        description: '',
+        pricingType: 'fixed',
+        unitType: '',
+        price: '',
+        active: true,
+    };
+
     const [page, setPage] = useState(1);
 
     const [dialogOpen, setDialogOpen] = useState(false);
-    const [editingId, setEditingId] = useState<number | null>(null);
+    const [editing, setEditing] = useState<Service | null>(null);
     const [form, setForm] = useState<Form>(emptyForm);
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const [saving, setSaving] = useState(false);
+
+    // Editing the Event Styling fee locks everything except description and price.
+    const editingBaseFee = editing?.isBaseFee ?? false;
 
     const pages = Math.max(1, Math.ceil(services.length / PAGE_SIZE));
     const current = Math.min(page, pages);
@@ -121,14 +130,14 @@ export default function ServiceManagement() {
     const activeCount = services.filter((s) => s.active).length;
 
     const openAdd = () => {
-        setEditingId(null);
+        setEditing(null);
         setForm(emptyForm);
         setErrors({});
         setDialogOpen(true);
     };
 
     const openEdit = (s: Service) => {
-        setEditingId(s.id);
+        setEditing(s);
         setForm({
             name: s.name,
             category: s.category,
@@ -151,27 +160,25 @@ export default function ServiceManagement() {
         setErrors(e);
         if (Object.keys(e).length) return;
 
-        const data = {
-            name: form.name.trim(),
-            category: form.category,
-            description: form.description.trim(),
-            pricingType: form.pricingType,
-            unitType: form.pricingType === 'per_unit' ? form.unitType : '',
-            price: Number(form.price),
-            active: form.active,
+        const data = { ...form, unitType: form.pricingType === 'per_unit' ? form.unitType : '' };
+        const options = {
+            preserveScroll: true,
+            preserveState: true,
+            onStart: () => setSaving(true),
+            onFinish: () => setSaving(false),
+            onSuccess: () => {
+                setDialogOpen(false);
+                if (editing === null) setPage(Number.MAX_SAFE_INTEGER); // jump to the new service (last page)
+            },
+            onError: (serverErrors: Record<string, string>) => setErrors(serverErrors),
         };
 
-        if (editingId === null) {
-            setServices([...services, { id: Date.now(), ...data }]);
-            setPage(Math.ceil((services.length + 1) / PAGE_SIZE)); // jump to the new service
-        } else {
-            setServices(services.map((s) => (s.id === editingId ? { ...s, ...data } : s)));
-        }
-        setDialogOpen(false);
+        if (editing === null) router.post(SERVICES_URL, data, options);
+        else router.patch(`${SERVICES_URL}/${editing.id}`, data, options);
     };
 
     const toggle = (id: number, active: boolean) =>
-        setServices(services.map((s) => (s.id === id ? { ...s, active } : s)));
+        router.patch(`${SERVICES_URL}/${id}/status`, { active }, { preserveScroll: true, preserveState: true });
 
     return (
         <div className="space-y-4">
@@ -275,16 +282,16 @@ export default function ServiceManagement() {
                 </div>
             )}
 
-            {/* Add / edit modal. Editing the Event Styling fee (BASE_FEE_ID) locks its
+            {/* Add / edit modal. Editing the Event Styling fee locks its
                 name, category, pricing type and availability — only its price and
                 description can change, so it can never be duplicated, renamed, priced
                 per-unit, or turned off. */}
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                 <DialogContent className="sm:max-w-2xl">
                     <DialogHeader>
-                        <DialogTitle>{editingId === BASE_FEE_ID ? 'Edit Event Styling Fee' : editingId === null ? 'Add Service' : 'Edit Service'}</DialogTitle>
+                        <DialogTitle>{editingBaseFee ? 'Edit Event Styling Fee' : editing === null ? 'Add Service' : 'Edit Service'}</DialogTitle>
                         <DialogDescription>
-                            {editingId === BASE_FEE_ID
+                            {editingBaseFee
                                 ? 'This flat fee is automatically included with every Event Styling request.'
                                 : 'Fill in the details for a new or existing add-on service.'}
                         </DialogDescription>
@@ -295,14 +302,14 @@ export default function ServiceManagement() {
                             <input
                                 id="svc-name"
                                 className={inputClass}
-                                disabled={editingId === BASE_FEE_ID}
+                                disabled={editingBaseFee}
                                 value={form.name}
                                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                             />
                         </Field>
 
-                        <Field label="Category" htmlFor="svc-category" required>
-                            {editingId === BASE_FEE_ID ? (
+                        <Field label="Category" htmlFor="svc-category" required error={errors.category}>
+                            {editingBaseFee ? (
                                 <input id="svc-category" className={inputClass} disabled value="Styling" />
                             ) : (
                                 <select
@@ -311,7 +318,7 @@ export default function ServiceManagement() {
                                     value={form.category}
                                     onChange={(e) => setForm({ ...form, category: e.target.value })}
                                 >
-                                    {CATEGORIES.map((c) => (
+                                    {categories.map((c) => (
                                         <option key={c}>{c}</option>
                                     ))}
                                 </select>
@@ -327,7 +334,7 @@ export default function ServiceManagement() {
                             />
                         </Field>
 
-                        {editingId === BASE_FEE_ID ? (
+                        {editingBaseFee ? (
                             <div className="sm:col-span-2">
                                 <span className="text-sm text-ink">Pricing type</span>
                                 <p className="mt-1.5 text-xs text-ink-soft">Fixed price only — the styling fee is not billed per unit.</p>
@@ -367,7 +374,7 @@ export default function ServiceManagement() {
                                             onChange={(e) => setForm({ ...form, unitType: e.target.value })}
                                         >
                                             <option value="" />
-                                            {UNIT_TYPES.map((u) => (
+                                            {unitTypes.map((u) => (
                                                 <option key={u}>{u}</option>
                                             ))}
                                         </select>
@@ -392,7 +399,7 @@ export default function ServiceManagement() {
                             />
                         </Field>
 
-                        {editingId !== BASE_FEE_ID && (
+                        {!editingBaseFee && (
                             <div className="flex items-center gap-3 sm:col-span-2">
                                 <span className="text-sm text-ink">Availability</span>
                                 <Switch checked={form.active} label="Availability" onChange={(v) => setForm({ ...form, active: v })} />
@@ -405,7 +412,7 @@ export default function ServiceManagement() {
 
                     <DialogFooter>
                         <OutlineButton onClick={() => setDialogOpen(false)}>Cancel</OutlineButton>
-                        <GoldButton onClick={save}>
+                        <GoldButton onClick={save} disabled={saving}>
                             <Check className="size-4" /> Save
                         </GoldButton>
                     </DialogFooter>

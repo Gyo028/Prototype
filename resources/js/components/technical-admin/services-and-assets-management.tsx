@@ -2,7 +2,9 @@ import { ArrowLeft, ArrowRight, ImageIcon } from 'lucide-react';
 import { useState } from 'react';
 import { PageHeader, Panel } from '@/components/dashboard/ui';
 import AssetThemeManagement from '@/components/technical-admin/asset-theme-management';
+import type { Asset, EventTypeOption, Theme } from '@/components/technical-admin/asset-theme-management';
 import ServiceManagement from '@/components/technical-admin/service-management';
+import type { Service } from '@/components/technical-admin/service-management';
 
 
 
@@ -21,10 +23,29 @@ const areas: { id: AreaId; title: string; description: string }[] = [
     },
 ];
 
-export default function ServicesAndAssetsManagement() {
+type Props = {
+    services: Service[];
+    categories: string[];
+    unitTypes: string[];
+    themes: Theme[];
+    eventTypes: EventTypeOption[];
+    styles: string[];
+    assets: Asset[];
+    assetCategories: string[];
+};
+
+export default function ServicesAndAssetsManagement({
+    services,
+    categories,
+    unitTypes,
+    themes,
+    eventTypes,
+    styles,
+    assets,
+    assetCategories,
+}: Props) {
     const [activeId, setActiveId] = useState<AreaId | null>(null);
     const active = areas.find((a) => a.id === activeId) ?? null;
-
 
     if (active) {
         return (
@@ -38,7 +59,11 @@ export default function ServicesAndAssetsManagement() {
                 </button>
                 <PageHeader title={`${active.title} Management`} description={active.description} />
 
-                {active.id === 'services' ? <ServiceManagement /> : <AssetThemeManagement />}
+                {active.id === 'services' ? (
+                    <ServiceManagement services={services} categories={categories} unitTypes={unitTypes} />
+                ) : (
+                                        <AssetThemeManagement themes={themes} eventTypes={eventTypes} styles={styles} assets={assets} assetCategories={assetCategories} />
+                )}
             </>
         );
     }

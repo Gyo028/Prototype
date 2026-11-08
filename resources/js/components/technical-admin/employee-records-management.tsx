@@ -1,3 +1,4 @@
+import { router } from '@inertiajs/react';
 import { Archive, ArchiveRestore, Check, ChevronLeft, ChevronRight, Pencil, Plus } from 'lucide-react';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
@@ -22,12 +23,23 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 
+/*
+ * Employee records.
+ * first_name, last_name, contact_number, email, position_id and employee_status.
+ *
+ * An employee does NOT need a user account. `user_id` is optional:
+ *  - Staff who log in (Project Manager, Design Specialist, Bookkeeper) can be linked
+ *    to their account.
+ *  - Field personnel (the Fabrication Head and the Installation Head) have no login.
+ *    They receive work orders and reminders by email, so the email address is
+ *    required for everyone.
+ *
+ * Employees are archived (Inactive) rather than deleted, because production
+ * assignments refer to them. The data comes from EmployeeController.
+ */
 
-
+const EMPLOYEES_URL = '/technical-admin/employees';
 const PAGE_SIZE = 8;
-
-
-const POSITIONS = ['Fabrication Head', 'Installation Head', 'Project Manager', 'Design Specialist', 'Bookkeeper'];
 
 const positionTone: Record<string, PillTone> = {
     'Fabrication Head': 'gray',
@@ -37,61 +49,39 @@ const positionTone: Record<string, PillTone> = {
     Bookkeeper: 'green',
 };
 
-type Employee = {
+/** From `employee_positions`. */
+export type Position = { id: number; name: string };
+
+/** A staff login account that can be linked to an employee. */
+export type StaffAccount = { id: number; name: string; email: string; role: string };
+
+export type Employee = {
     id: number;
     firstName: string;
     lastName: string;
+    positionId: number;
     position: string;
     contact: string;
     email: string;
+    /** Linked user account, or null when the employee has no login */
     userId: number | null;
     active: boolean;
 };
 
-
-const staffAccounts = [
-    { id: 101, name: 'Ana Reyes', email: 'ana@email.com', role: 'Project Manager' },
-    { id: 102, name: 'Mark Santos', email: 'mark@email.com', role: 'Design Specialist' },
-    { id: 103, name: 'Liza Ramos', email: 'liza@email.com', role: 'Bookkeeper' },
-    { id: 104, name: 'Paolo Villar', email: 'paolo@email.com', role: 'Design Specialist' },
-];
-
-
-const seed: Employee[] = [
-    { id: 1, firstName: 'Ana', lastName: 'Reyes', position: 'Project Manager', contact: '0917 000 0001', email: 'ana@email.com', userId: 101, active: true },
-    { id: 2, firstName: 'Mark', lastName: 'Santos', position: 'Design Specialist', contact: '0917 000 0002', email: 'mark@email.com', userId: 102, active: true },
-    { id: 3, firstName: 'Liza', lastName: 'Ramos', position: 'Bookkeeper', contact: '0917 000 0003', email: 'liza@email.com', userId: 103, active: true },
-    { id: 4, firstName: 'Ronaldo', lastName: 'Dizon', position: 'Fabrication Head', contact: '0917 000 0004', email: 'ronaldo@email.com', userId: null, active: true },
-    { id: 5, firstName: 'Jun', lastName: 'Aquino', position: 'Installation Head', contact: '0917 000 0005', email: 'jun@email.com', userId: null, active: true },
-    { id: 6, firstName: 'Carlo', lastName: 'Mendoza', position: 'Fabrication Head', contact: '0917 000 0006', email: 'carlo@email.com', userId: null, active: true },
-    { id: 7, firstName: 'Ben', lastName: 'Lopez', position: 'Installation Head', contact: '0917 000 0007', email: 'ben@email.com', userId: null, active: true },
-    { id: 8, firstName: 'Grace', lastName: 'Tan', position: 'Installation Head', contact: '0917 000 0008', email: 'grace@email.com', userId: null, active: false },
-    { id: 9, firstName: 'Paolo', lastName: 'Cruz', position: 'Fabrication Head', contact: '0917 000 0009', email: 'paolocruz@email.com', userId: null, active: true },
-];
-
 type Form = {
-    firstName: string;
-    lastName: string;
-    position: string;
-    contact: string;
+    first_name: string;
+    last_name: string;
+    position_id: string;
+    contact_number: string;
     email: string;
-    userId: string; 
+    user_id: string;
     active: boolean;
-};
-
-const emptyForm: Form = {
-    firstName: '',
-    lastName: '',
-    position: POSITIONS[0],
-    contact: '',
-    email: '',
-    userId: '',
-    active: true,
 };
 
 const initials = (e: Employee) => (e.firstName[0] + e.lastName[0]).toUpperCase();
 const emailOk = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
-
+// 09XXXXXXXXX or +639XXXXXXXXX, ignoring spaces and dashes (the server checks this again)
+const mobileOk = (v: string) => /^(09|\+639)\d{9}$/.test(v.replace(/[\s\-().]/g, ''));
 
 function IconButton({
     label,
@@ -121,14 +111,30 @@ function IconButton({
     );
 }
 
-export default function EmployeeRecordsManagement() {
-    const [employees, setEmployees] = useState<Employee[]>(seed);
+type Props = {
+    employees: Employee[];
+    positions: Position[];
+    staffAccounts: StaffAccount[];
+};
+
+export default function EmployeeRecordsManagement({ employees, positions, staffAccounts }: Props) {
+    const emptyForm: Form = {
+        first_name: '',
+        last_name: '',
+        position_id: String(positions[0]?.id ?? ''),
+        contact_number: '',
+        email: '',
+        user_id: '',
+        active: true,
+    };
+
     const [page, setPage] = useState(1);
 
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editingId, setEditingId] = useState<number | null>(null);
     const [form, setForm] = useState<Form>(emptyForm);
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const [saving, setSaving] = useState(false);
 
     const pages = Math.max(1, Math.ceil(employees.length / PAGE_SIZE));
     const current = Math.min(page, pages);
@@ -138,7 +144,7 @@ export default function EmployeeRecordsManagement() {
 
     const accountFor = (userId: number | null) => staffAccounts.find((a) => a.id === userId);
 
-
+    // One employee per account: hide accounts already linked to another employee.
     const availableAccounts = staffAccounts.filter(
         (a) => !employees.some((e) => e.userId === a.id && e.id !== editingId),
     );
@@ -153,72 +159,68 @@ export default function EmployeeRecordsManagement() {
     const openEdit = (e: Employee) => {
         setEditingId(e.id);
         setForm({
-            firstName: e.firstName,
-            lastName: e.lastName,
-            position: e.position,
-            contact: e.contact,
+            first_name: e.firstName,
+            last_name: e.lastName,
+            position_id: String(e.positionId),
+            contact_number: e.contact,
             email: e.email,
-            userId: e.userId ? String(e.userId) : '',
+            user_id: e.userId ? String(e.userId) : '',
             active: e.active,
         });
         setErrors({});
         setDialogOpen(true);
     };
 
-
+    // Picking an account pre-fills the empty fields from it.
     const chooseAccount = (value: string) => {
         const account = staffAccounts.find((a) => String(a.id) === value);
         setForm((f) => {
-            if (!account) return { ...f, userId: '' };
+            if (!account) return { ...f, user_id: '' };
             const [first, ...rest] = account.name.split(' ');
+            const position = positions.find((p) => p.name === account.role);
             return {
                 ...f,
-                userId: value,
-                firstName: f.firstName || first,
-                lastName: f.lastName || rest.join(' '),
+                user_id: value,
+                first_name: f.first_name || first,
+                last_name: f.last_name || rest.join(' '),
                 email: f.email || account.email,
-                position: POSITIONS.includes(account.role) ? account.role : f.position,
+                position_id: position ? String(position.id) : f.position_id,
             };
         });
     };
 
     const save = () => {
         const e: Record<string, string> = {};
-        const email = form.email.trim().toLowerCase();
+        const email = form.email.trim();
 
-        if (!form.firstName.trim()) e.firstName = 'First name is required.';
-        if (!form.lastName.trim()) e.lastName = 'Last name is required.';
-        if (!form.contact.trim()) e.contact = 'Contact number is required.';
-        else if (form.contact.replace(/\D/g, '').length < 7) e.contact = 'Enter a valid contact number.';
+        if (!form.first_name.trim()) e.first_name = 'First name is required.';
+        if (!form.last_name.trim()) e.last_name = 'Last name is required.';
+        if (!form.contact_number.trim()) e.contact_number = 'Contact number is required.';
+        else if (!mobileOk(form.contact_number)) e.contact_number = 'Enter a valid mobile number (09XXXXXXXXX or +639XXXXXXXXX).';
         if (!email) e.email = 'Email is required. Assignments are sent by email.';
         else if (!emailOk(email)) e.email = 'Enter a valid email address.';
-        else if (employees.some((x) => x.email.toLowerCase() === email && x.id !== editingId))
-            e.email = 'Email already registered';
 
         setErrors(e);
         if (Object.keys(e).length) return;
 
-        const data = {
-            firstName: form.firstName.trim(),
-            lastName: form.lastName.trim(),
-            position: form.position,
-            contact: form.contact.trim(),
-            email: form.email.trim(),
-            userId: form.userId ? Number(form.userId) : null,
-            active: form.active,
+        const data = { ...form, user_id: form.user_id || null };
+        const options = {
+            preserveScroll: true,
+            onStart: () => setSaving(true),
+            onFinish: () => setSaving(false),
+            onSuccess: () => {
+                setDialogOpen(false);
+                if (editingId === null) setPage(Number.MAX_SAFE_INTEGER); // jump to the new record (last page)
+            },
+            onError: (serverErrors: Record<string, string>) => setErrors(serverErrors),
         };
 
-        if (editingId === null) {
-            setEmployees([...employees, { id: Date.now(), ...data }]);
-            setPage(Math.ceil((employees.length + 1) / PAGE_SIZE)); // jump to the new record
-        } else {
-            setEmployees(employees.map((x) => (x.id === editingId ? { ...x, ...data } : x)));
-        }
-        setDialogOpen(false);
+        if (editingId === null) router.post(EMPLOYEES_URL, data, options);
+        else router.patch(`${EMPLOYEES_URL}/${editingId}`, data, options);
     };
 
     const setActive = (id: number, active: boolean) =>
-        setEmployees(employees.map((x) => (x.id === id ? { ...x, active } : x)));
+        router.patch(`${EMPLOYEES_URL}/${id}/${active ? 'restore' : 'archive'}`, {}, { preserveScroll: true });
 
     return (
         <div className="space-y-4">
@@ -362,42 +364,45 @@ export default function EmployeeRecordsManagement() {
                     </DialogHeader>
 
                     <div className="grid gap-4 sm:grid-cols-2">
-                        <Field label="First name" htmlFor="emp-first" required error={errors.firstName}>
+                        <Field label="First name" htmlFor="emp-first" required error={errors.first_name}>
                             <input
                                 id="emp-first"
                                 className={inputClass}
-                                value={form.firstName}
-                                onChange={(e) => setForm({ ...form, firstName: e.target.value })}
+                                value={form.first_name}
+                                onChange={(e) => setForm({ ...form, first_name: e.target.value })}
                             />
                         </Field>
-                        <Field label="Last name" htmlFor="emp-last" required error={errors.lastName}>
+                        <Field label="Last name" htmlFor="emp-last" required error={errors.last_name}>
                             <input
                                 id="emp-last"
                                 className={inputClass}
-                                value={form.lastName}
-                                onChange={(e) => setForm({ ...form, lastName: e.target.value })}
+                                value={form.last_name}
+                                onChange={(e) => setForm({ ...form, last_name: e.target.value })}
                             />
                         </Field>
 
-                        <Field label="Position" htmlFor="emp-position" required>
+                        <Field label="Position" htmlFor="emp-position" required error={errors.position_id}>
                             <select
                                 id="emp-position"
                                 className={selectClass}
-                                value={form.position}
-                                onChange={(e) => setForm({ ...form, position: e.target.value })}
+                                value={form.position_id}
+                                onChange={(e) => setForm({ ...form, position_id: e.target.value })}
                             >
-                                {POSITIONS.map((p) => (
-                                    <option key={p}>{p}</option>
+                                {positions.map((p) => (
+                                    <option key={p.id} value={p.id}>
+                                        {p.name}
+                                    </option>
                                 ))}
                             </select>
                         </Field>
-                        <Field label="Contact number" htmlFor="emp-contact" required error={errors.contact}>
+                        <Field label="Contact number" htmlFor="emp-contact" required error={errors.contact_number}>
                             <input
                                 id="emp-contact"
                                 type="tel"
+                                placeholder="09XX XXX XXXX"
                                 className={inputClass}
-                                value={form.contact}
-                                onChange={(e) => setForm({ ...form, contact: e.target.value })}
+                                value={form.contact_number}
+                                onChange={(e) => setForm({ ...form, contact_number: e.target.value })}
                             />
                         </Field>
 
@@ -411,11 +416,11 @@ export default function EmployeeRecordsManagement() {
                             />
                         </Field>
 
-                        <Field label="Linked account (optional)" htmlFor="emp-account" className="sm:col-span-2">
+                        <Field label="Linked account (optional)" htmlFor="emp-account" error={errors.user_id} className="sm:col-span-2">
                             <select
                                 id="emp-account"
                                 className={selectClass}
-                                value={form.userId}
+                                value={form.user_id}
                                 onChange={(e) => chooseAccount(e.target.value)}
                             >
                                 <option value="">No login (email only)</option>
@@ -443,7 +448,7 @@ export default function EmployeeRecordsManagement() {
 
                     <DialogFooter>
                         <OutlineButton onClick={() => setDialogOpen(false)}>Cancel</OutlineButton>
-                        <GoldButton onClick={save}>
+                        <GoldButton onClick={save} disabled={saving}>
                             <Check className="size-4" /> Save
                         </GoldButton>
                     </DialogFooter>

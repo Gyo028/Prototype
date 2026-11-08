@@ -1,3 +1,4 @@
+import { router } from '@inertiajs/react';
 import { Check, Info, RotateCcw } from 'lucide-react';
 import { useState } from 'react';
 import { Field, GoldButton, OutlineButton, Panel, PanelHeader, inputClass, textareaClass } from '@/components/dashboard/ui';
@@ -7,17 +8,9 @@ import { cn } from '@/lib/utils';
 
 const LIMITS = { title: 40, content: 1500 };
 
-type AboutUs = { title: string; content: string };
+const ABOUT_URL = '/technical-admin/website-content/about';
 
-// Current landing page content.
-const seedAbout: AboutUs = {
-    title: 'About Us',
-    content: [
-        "Gr3at A's Events Styling & Services - specializes in event set-up and styling. We customize according to the needs of our clients. We supply rattan lamps, synthetic rattan furniture, drum furniture, upholstery, gigantic fabric and foam flowers, sticker decals, lighted signage, sublimation, tarp and sticker prints. We manufacture wood and steel structures with installation. We also supply plants for your greening projects.",
-        "Gr3at A's is a company with a heart. We are committed to supporting the education of our scholars and selected charitable institutions.",
-        "With Gr3at A's, graces are shared. Happy to serve!",
-    ].join('\n\n'),
-};
+export type AboutUs = { title: string; content: string };
 
 const toParagraphs = (text: string) =>
     text
@@ -25,11 +18,12 @@ const toParagraphs = (text: string) =>
         .map((p) => p.trim())
         .filter(Boolean);
 
-export default function AboutUsEditor({ onSaved }: { onSaved?: () => void }) {
-    const [saved, setSaved] = useState<AboutUs>(seedAbout);
-    const [about, setAbout] = useState<AboutUs>(seedAbout);
+export default function AboutUsEditor({ about: initial }: { about: AboutUs }) {
+    const [saved, setSaved] = useState<AboutUs>(initial);
+    const [about, setAbout] = useState<AboutUs>(initial);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [message, setMessage] = useState('');
+    const [saving, setSaving] = useState(false);
 
     const dirty = JSON.stringify(about) !== JSON.stringify(saved);
     const paragraphs = toParagraphs(about.content);
@@ -46,9 +40,17 @@ export default function AboutUsEditor({ onSaved }: { onSaved?: () => void }) {
         setErrors(e);
         if (Object.keys(e).length) return;
 
-        setSaved(about);
-        setMessage('Changes saved');
-        onSaved?.();
+        router.put(ABOUT_URL, about, {
+            preserveScroll: true,
+            preserveState: true,
+            onStart: () => setSaving(true),
+            onFinish: () => setSaving(false),
+            onSuccess: () => {
+                setSaved(about);
+                setMessage('Changes saved');
+            },
+            onError: (serverErrors) => setErrors(serverErrors),
+        });
     };
 
     const reset = () => {
@@ -109,7 +111,7 @@ export default function AboutUsEditor({ onSaved }: { onSaved?: () => void }) {
                 <OutlineButton onClick={reset} disabled={!dirty}>
                     <RotateCcw className="size-4" /> Reset
                 </OutlineButton>
-                <GoldButton onClick={save} disabled={!dirty}>
+                <GoldButton onClick={save} disabled={!dirty || saving}>
                     <Check className="size-4" /> Save Changes
                 </GoldButton>
             </div>
