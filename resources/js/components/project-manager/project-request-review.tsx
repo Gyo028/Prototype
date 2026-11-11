@@ -1,7 +1,6 @@
-import { router, usePage } from '@inertiajs/react';
-import { Check, FileText, ImageIcon, X } from 'lucide-react';
+import { Link, router, usePage } from '@inertiajs/react';
+import { Check, X } from 'lucide-react';
 import { useState } from 'react';
-import type { ReactNode } from 'react';
 import { toast } from 'sonner';
 import {
     DangerButton,
@@ -15,7 +14,7 @@ import {
     inputClass,
     textareaClass,
 } from '@/components/dashboard/ui';
-import type { PillTone } from '@/components/dashboard/ui';
+import { RequestDetails, formatDate, formatDateTime, statusTone } from '@/components/project-manager/request-details';
 import {
     Dialog,
     DialogContent,
@@ -25,12 +24,13 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { SAMPLE_PROJECT_REQUESTS } from '@/data/project-manager/project-requests';
-import type { ProjectRequest, RequestStatus, RequestedService } from '@/data/project-manager/project-requests';
+import type { ProjectRequest, RequestStatus } from '@/data/project-manager/project-requests';
 
 /*
  * Backlog #13: Review and manage incoming project requests.
  * The Project Manager opens a request, reads what the customer submitted,
  * then approves or rejects it. A rejection cannot be sent without remarks.
+ * Approved requests continue on the Projects page (backlog #16).
  */
 
 const REQUESTS_URL = '/project-manager/service-requests';
@@ -39,60 +39,6 @@ type Filter = 'All' | RequestStatus;
 type Decision = 'approve' | 'reject';
 
 const FILTERS: Filter[] = ['Pending', 'Approved', 'Rejected', 'All'];
-
-const statusTone: Record<RequestStatus, PillTone> = {
-    Pending: 'yellow',
-    Approved: 'green',
-    Rejected: 'red',
-};
-
-/* ---------- formatting helpers ---------- */
-
-const peso = (n: number) => `₱${n.toLocaleString('en-PH')}`;
-
-// 'YYYY-MM-DD' → "Jan 16, 2027". The "T00:00" keeps the date from shifting a day because of time zones.
-const formatDate = (date: string) =>
-    new Date(`${date}T00:00:00`).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
-
-// ISO date-time → "Nov 8, 2026, 9:24 AM"
-const formatDateTime = (iso: string) =>
-    new Date(iso).toLocaleString('en-PH', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-    });
-
-// '14:00' → "2:00 PM"
-const formatTime = (time: string) => {
-    const [h, m] = time.split(':').map(Number);
-    return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
-};
-
-const servicePrice = (s: RequestedService) => (s.unit ? `${peso(s.price)} / ${s.unit}` : peso(s.price));
-
-/* ---------- small layout pieces used inside the dialog ---------- */
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-    return (
-        <section className="rounded-xl border border-black/10 p-4">
-            <h3 className="mb-3 text-xs font-bold tracking-wide text-ink-soft uppercase">{title}</h3>
-            {children}
-        </section>
-    );
-}
-
-function Detail({ label, children }: { label: string; children: ReactNode }) {
-    return (
-        <div>
-            <p className="text-xs text-ink-soft">{label}</p>
-            <p className="text-sm text-ink">{children}</p>
-        </div>
-    );
-}
-
-/* ---------- main component ---------- */
 
 type Props = {
     /** Sent by the controller. Leave it out to use the sample data. */
@@ -204,7 +150,7 @@ export default function ProjectRequestReview({ requests }: Props) {
             },
         );
     };
-
+    
     return (
         <>
             <PageHeader
@@ -309,104 +255,7 @@ export default function ProjectRequestReview({ requests }: Props) {
                                 </DialogDescription>
                             </DialogHeader>
 
-                            <div className="grid gap-4 md:grid-cols-2">
-                                <Section title="Customer">
-                                    <div className="grid gap-3">
-                                        <Detail label="Name">{selected.customer.name}</Detail>
-                                        <Detail label="Email">
-                                            <a href={`mailto:${selected.customer.email}`} className="text-gold-dark underline">
-                                                {selected.customer.email}
-                                            </a>
-                                        </Detail>
-                                        <Detail label="Contact number">{selected.customer.phone ?? '—'}</Detail>
-                                    </div>
-                                </Section>
-
-                                <Section title="Event Details">
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <Detail label="Event date">{formatDate(selected.eventDate)}</Detail>
-                                        <Detail label="Time">
-                                            {formatTime(selected.startTime)} – {formatTime(selected.endTime)}
-                                        </Detail>
-                                        <Detail label="Guests">{selected.guests ?? 'Not applicable'}</Detail>
-                                        <Detail label="Budget">{selected.budget}</Detail>
-                                        <div className="col-span-2">
-                                            <Detail label="Venue">
-                                                {selected.venue} ({selected.venueSetting})
-                                            </Detail>
-                                        </div>
-                                    </div>
-                                </Section>
-
-                                <div className="md:col-span-2">
-                                    <Section title="Description">
-                                        <p className="text-sm whitespace-pre-line text-ink">
-                                            {selected.description || 'No description provided.'}
-                                        </p>
-                                    </Section>
-                                </div>
-
-                                <Section title="Services">
-                                    {selected.services.length === 0 ? (
-                                        <p className="text-sm text-ink-soft">No services selected.</p>
-                                    ) : (
-                                        <ul className="divide-y divide-black/10">
-                                            {selected.services.map((s) => (
-                                                <li key={s.id} className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0">
-                                                    <div>
-                                                        <p className="text-sm text-ink">{s.name}</p>
-                                                        <p className="text-xs text-ink-soft">{s.category}</p>
-                                                    </div>
-                                                    <span className="text-sm font-semibold text-ink">{servicePrice(s)}</span>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    )}
-                                </Section>
-
-                                <Section title="Design Theme and Layout Assets">
-                                    <Detail label="Theme">{selected.theme ?? 'No theme selected'}</Detail>
-                                    <p className="mt-3 mb-1.5 text-xs text-ink-soft">Layout assets</p>
-                                    {selected.assets.length === 0 ? (
-                                        <p className="text-sm text-ink-soft">No layout assets selected.</p>
-                                    ) : (
-                                        <div className="flex flex-wrap gap-2">
-                                            {selected.assets.map((a) => (
-                                                <Pill key={a.id} tone="cream">
-                                                    {a.name}
-                                                </Pill>
-                                            ))}
-                                        </div>
-                                    )}
-                                </Section>
-
-                                <div className="md:col-span-2">
-                                    <Section title="Reference Files">
-                                        {selected.files.length === 0 ? (
-                                            <p className="text-sm text-ink-soft">No files uploaded.</p>
-                                        ) : (
-                                            <div className="flex flex-wrap gap-2">
-                                                {selected.files.map((f) => (
-                                                    <a
-                                                        key={f.id}
-                                                        href={f.url}
-                                                        target="_blank"
-                                                        rel="noreferrer"
-                                                        className="inline-flex items-center gap-2 rounded-lg border border-black/15 px-3 py-2 text-sm text-ink transition hover:border-gold hover:bg-gold/10"
-                                                    >
-                                                        {f.type === 'pdf' ? (
-                                                            <FileText className="size-4 text-red-600" />
-                                                        ) : (
-                                                            <ImageIcon className="size-4 text-sky-600" />
-                                                        )}
-                                                        {f.name}
-                                                    </a>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </Section>
-                                </div>
-                            </div>
+                            <RequestDetails request={selected} />
 
                             {/* Already decided: show the saved decision (read-only) */}
                             {selected.status !== 'Pending' && selected.decision && (
@@ -422,6 +271,15 @@ export default function ProjectRequestReview({ requests }: Props) {
                                     <p className="mt-1 text-sm text-ink-soft">
                                         {selected.decision.remarks ? `Remarks: ${selected.decision.remarks}` : 'No remarks.'}
                                     </p>
+                                    {selected.status === 'Approved' && (
+                                        <p className="mt-2 text-sm text-ink">
+                                            Next step: record the consultation on the{' '}
+                                            <Link href="/project-manager/projects" className="font-semibold text-gold-dark underline">
+                                                Projects
+                                            </Link>{' '}
+                                            page.
+                                        </p>
+                                    )}
                                 </div>
                             )}
 

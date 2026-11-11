@@ -11,6 +11,37 @@
 
 export type RequestStatus = 'Pending' | 'Approved' | 'Rejected';
 
+/* ---------- consultation (backlog #16) ---------- */
+
+export const CONSULTATION_OUTCOMES = ['Completed', 'Rescheduled', 'Customer did not attend'] as const;
+export type ConsultationOutcome = (typeof CONSULTATION_OUTCOMES)[number];
+
+export const PROJECT_DECISIONS = ['Proceed', 'Do not proceed'] as const;
+export type ProjectDecision = (typeof PROJECT_DECISIONS)[number];
+
+// Same budget ranges the customer chooses from on the request form.
+export const BUDGET_RANGES = [
+    'Below ₱50,000',
+    '₱50,000 – ₱100,000',
+    '₱100,000 – ₱250,000',
+    '₱250,000 – ₱500,000',
+    'Above ₱500,000',
+];
+
+export type Consultation = {
+    outcome: ConsultationOutcome;
+    summary: string; // what was discussed
+    additionalNotes: string | null; // extra project details from the consultation
+    ocularVisit: {
+        required: boolean;
+        scheduledAt: string | null; // 'YYYY-MM-DDTHH:mm' when required, otherwise null
+    };
+    decision: ProjectDecision;
+    decisionReason: string | null; // required when the decision is "Do not proceed"
+    recordedBy: string;
+    recordedAt: string; // ISO date-time
+};
+
 export type RequestedService = {
     id: number;
     name: string;
@@ -54,6 +85,7 @@ export type ProjectRequest = {
         decidedBy: string;
         decidedAt: string; // ISO date-time
     } | null; // null while the request is still Pending
+    consultation: Consultation | null; // null until the Project Manager records the consultation
 };
 
 export const SAMPLE_PROJECT_REQUESTS: ProjectRequest[] = [
@@ -90,6 +122,7 @@ export const SAMPLE_PROJECT_REQUESTS: ProjectRequest[] = [
         submittedAt: '2026-11-08T09:24:00+08:00',
         status: 'Pending',
         decision: null,
+        consultation: null,
     },
     {
         id: 2,
@@ -118,6 +151,7 @@ export const SAMPLE_PROJECT_REQUESTS: ProjectRequest[] = [
         submittedAt: '2026-11-09T15:02:00+08:00',
         status: 'Pending',
         decision: null,
+        consultation: null,
     },
     {
         id: 3,
@@ -139,6 +173,7 @@ export const SAMPLE_PROJECT_REQUESTS: ProjectRequest[] = [
         submittedAt: '2026-11-10T08:45:00+08:00',
         status: 'Pending',
         decision: null,
+        consultation: null,
     },
     {
         id: 4,
@@ -167,6 +202,7 @@ export const SAMPLE_PROJECT_REQUESTS: ProjectRequest[] = [
             decidedBy: 'Project Manager',
             decidedAt: '2026-11-04T10:00:00+08:00',
         },
+        consultation: null,
     },
     {
         id: 5,
@@ -194,6 +230,48 @@ export const SAMPLE_PROJECT_REQUESTS: ProjectRequest[] = [
             remarks: 'The budget cannot cover catering for 400 guests. Please adjust the guest count or budget and submit a new request.',
             decidedBy: 'Project Manager',
             decidedAt: '2026-11-02T09:15:00+08:00',
+        },
+        consultation: null,
+    },
+    {
+        id: 6,
+        code: 'REQ-0006',
+        customer: { name: 'Jessa Mendoza', email: 'jessa.mendoza@example.com', phone: '0927 888 0101' },
+        eventType: 'Wedding',
+        eventDate: '2027-03-06',
+        startTime: '15:00',
+        endTime: '23:00',
+        venue: 'Tagaytay Highlands Garden, Tagaytay City',
+        venueSetting: 'Outdoor',
+        guests: 180,
+        budget: '₱250,000 – ₱500,000',
+        description: 'Garden wedding with a white and sage green palette.',
+        services: [
+            { id: 3, name: 'Photography Package', category: 'Photo & Video', price: 20000, unit: '' },
+            { id: 5, name: 'Buffet Catering', category: 'Catering', price: 650, unit: 'pax' },
+        ],
+        theme: 'Rustic Garden',
+        assets: [
+            { id: 'entrance-arch', name: 'Entrance Arch', category: 'Structures' },
+            { id: 'chiavari-chair', name: 'Chiavari Chairs', category: 'Furniture' },
+        ],
+        files: [],
+        submittedAt: '2026-10-20T13:40:00+08:00',
+        status: 'Approved',
+        decision: {
+            remarks: 'Approved. Please book a consultation.',
+            decidedBy: 'Project Manager',
+            decidedAt: '2026-10-21T09:00:00+08:00',
+        },
+        consultation: {
+            outcome: 'Completed',
+            summary: 'Client confirmed the garden setup and asked for a rain plan with a tent.',
+            additionalNotes: 'Add a tent as backup in case of rain. Guest count raised to 180.',
+            ocularVisit: { required: true, scheduledAt: '2026-11-21T10:00' },
+            decision: 'Proceed',
+            decisionReason: null,
+            recordedBy: 'Project Manager',
+            recordedAt: '2026-10-28T16:20:00+08:00',
         },
     },
 ];

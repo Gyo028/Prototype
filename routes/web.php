@@ -77,6 +77,7 @@ Route::middleware(['auth', 'verified', 'role:project_manager'])
     ->group(function () {
         Route::inertia('/', 'project-manager/dashboard')->name('dashboard');
         Route::inertia('service-requests', 'project-manager/service-requests')->name('service-requests');
+        Route::inertia('projects', 'project-manager/projects')->name('projects');
     });
 
 Route::middleware(['auth', 'verified', 'role:design_specialist'])
