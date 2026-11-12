@@ -26,6 +26,7 @@ export const projectManagerNav: NavGroup[] = [
         label: 'Management',
         items: [
             { title: 'Service Requests', href: '/project-manager/service-requests' },
+            { title: 'Consultations', href: '/project-manager/consultations' },
             { title: 'Projects', href: '/project-manager/projects' },
             { title: 'Payments', href: '/project-manager/payments' },
             { title: 'Contracts', href: '/project-manager/contracts' },

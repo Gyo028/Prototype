@@ -25,12 +25,12 @@ import type { Consultation, ProjectRequest } from '@/data/project-manager/projec
 
 /*
  * Backlog #16: Record consultation outcomes.
- * The Projects page lists approved requests. The Project Manager opens one,
+ * The Consultations page lists approved requests. The Project Manager opens one,
  * records the consultation (see consultation-form.tsx), updates the project
  * details, and decides whether the project can proceed.
  */
 
-const PROJECTS_URL = '/project-manager/projects';
+const CONSULTATIONS_URL = '/project-manager/consultations';
 
 type Filter = 'Awaiting' | 'Proceed' | 'Not proceeding' | 'All';
 
@@ -50,7 +50,7 @@ type Props = {
     projects?: ProjectRequest[];
 };
 
-export default function ProjectList({ projects }: Props) {
+export default function ConsultationList({ projects }: Props) {
     const { props } = usePage();
     const managerName = props.auth?.user?.name ?? 'Project Manager';
 
@@ -160,7 +160,7 @@ export default function ProjectList({ projects }: Props) {
             return;
         }
 
-        router.patch(`${PROJECTS_URL}/${selected.id}/consultation`, payload, {
+        router.patch(`${CONSULTATIONS_URL}/${selected.id}`, payload, {
             preserveScroll: true,
             onStart: () => setSaving(true),
             onFinish: () => setSaving(false),
@@ -176,7 +176,7 @@ export default function ProjectList({ projects }: Props) {
     return (
         <>
             <PageHeader
-                title="Projects"
+                title="Consultations"
                 description="Approved requests. Record each consultation outcome and decide whether the project can proceed."
             />
 
