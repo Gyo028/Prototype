@@ -1,4 +1,6 @@
-export type NavItem = { title: string; href: string };
+export type NavLink = { title: string; href: string };
+/** A sidebar entry: either a normal link, or a dropdown that opens to show more links. */
+export type NavItem = NavLink | { title: string; children: NavLink[] };
 export type NavGroup = { label: string; items: NavItem[] };
 
 export const technicalAdminNav: NavGroup[] = [
@@ -26,12 +28,16 @@ export const projectManagerNav: NavGroup[] = [
         label: 'Management',
         items: [
             { title: 'Service Requests', href: '/project-manager/service-requests' },
-            { title: 'Consultations', href: '/project-manager/consultations' },
-            { title: 'Site Assessments', href: '/project-manager/site-assessments' },
-            { title: 'Design Assignments', href: '/project-manager/design-assignments' },
-            { title: 'Projects', href: '/project-manager/projects' },
+            {
+                title: 'Projects',
+                children: [
+                    { title: 'Consultations', href: '/project-manager/consultations' },
+                    { title: 'Site Assessments', href: '/project-manager/site-assessments' },
+                    { title: 'Contracts', href: '/project-manager/contracts' },
+                    { title: 'Design Assignments', href: '/project-manager/design-assignments' },
+                ],
+            },
             { title: 'Payments', href: '/project-manager/payments' },
-            { title: 'Contracts', href: '/project-manager/contracts' },
         ],
     },
 ];

@@ -80,7 +80,6 @@ Route::middleware(['auth', 'verified', 'role:project_manager'])
         Route::inertia('consultations', 'project-manager/consultations')->name('consultations');
         Route::inertia('site-assessments', 'project-manager/site-assessments')->name('site-assessments');
         Route::inertia('design-assignments', 'project-manager/design-assignments')->name('design-assignments');
-        Route::inertia('projects', 'project-manager/projects')->name('projects');
         Route::inertia('contracts', 'project-manager/contracts')->name('contracts');
     });
 
