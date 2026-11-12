@@ -1,5 +1,5 @@
-import { ArrowLeft, ArrowRight, Star } from 'lucide-react';
-import { useState } from 'react';
+import { Star } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 
 import { cn } from '@/lib/utils';
 
@@ -8,8 +8,6 @@ type Review = {
     role: string;
     quote: string;
     rating: number;
-    /** Card background photo. Placeholder images until real client photos are uploaded. */
-    background: string;
     /** Optional avatar photo. Falls back to initials. */
     avatar?: string;
     avatarColor: string;
@@ -17,30 +15,38 @@ type Review = {
 
 const reviews: Review[] = [
     {
-        name: 'Bang Upin',
-        role: 'Pedagang Asongan',
-        quote: 'Terimakasih banyak, kini ruanganku menjadi lebih mewah dan terlihat mahal',
-        rating: 4,
-        background: '/images/works/work-3.webp',
-        avatarColor: 'bg-amber-500',
+        name: 'Jessice Tan',
+        role: 'Corporate Event Client',
+        quote: 'The level of professionalism and real-time coordination for our corporate gala was incredible. We could visualize our setup beforehand, and the execution was flawless from start to finish.',
+        rating: 5,
+        avatarColor: 'bg-[#B8946A]',
     },
     {
-        name: 'Ibuk Sukijan',
-        role: 'Ibu Rumah Tangga',
-        quote: 'Makasih Panto, aku sekarang berasa tinggal di apartment karena barang-barang yang terlihat mewah',
-        rating: 4,
-        background: '/images/works/work-4.webp',
-        avatarColor: 'bg-neutral-800',
+        name: 'Carmela Lazaro',
+        role: 'Custom Fabrication Client',
+        quote: 'The live venue styling was picture-perfect!',
+        rating: 5,
+        avatarColor: 'bg-[#1F2023]',
     },
     {
-        name: 'Mpok Ina',
-        role: 'Karyawan Swasta',
-        quote: 'Sangat terjangkau untuk kantong saya yang tidak terlalu banyak',
-        rating: 4,
-        background: '/images/works/work-9.webp',
-        avatarColor: 'bg-sky-500',
+        name: 'Mark Johnson',
+        role: 'Wedding Client',
+        quote: 'Planning a wedding felt effortless with the automated schedule updates and clear role access. Every detail of our theme was executed beautifully, and staying within budget was stress-free!',
+        rating: 5,
+        avatarColor: 'bg-[#8A7A5C]',
+    },
+    // Placeholder review so the row has four cards like the design. Replace with a real client review.
+    {
+        name: 'Sarah Lim',
+        role: 'Birthday Client',
+        quote: 'Every detail of our theme was executed beautifully, and staying within budget was stress-free!',
+        rating: 5,
+        avatarColor: 'bg-[#D4B98C]',
     },
 ];
+
+// Italic quote font (DM Serif Display has no italic)
+const quoteSerif = "font-['Lora',serif]";
 
 function Stars({ rating }: { rating: number }) {
     return (
@@ -48,7 +54,7 @@ function Stars({ rating }: { rating: number }) {
             {Array.from({ length: 5 }, (_, i) => (
                 <Star
                     key={i}
-                    className={cn('h-3.5 w-3.5', i < rating ? 'fill-[#F28C28] text-[#F28C28]' : 'fill-[#F8D9B0] text-[#F8D9B0]')}
+                    className={cn('h-3.5 w-3.5', i < rating ? 'fill-[#C9A77C] text-[#C9A77C]' : 'fill-[#E8DCC6] text-[#E8DCC6]')}
                 />
             ))}
         </div>
@@ -63,13 +69,13 @@ function Avatar({ review }: { review: Review }) {
         .slice(0, 2);
 
     return (
-        <div className="absolute -top-8 left-1/2 -translate-x-1/2 rounded-full bg-white p-1.5">
+        <div className="absolute -top-[22px] left-1/2 -translate-x-1/2">
             {review.avatar ? (
-                <img src={review.avatar} alt={review.name} className="h-14 w-14 rounded-full object-cover" />
+                <img src={review.avatar} alt={review.name} className="h-11 w-11 rounded-md object-cover shadow-sm" />
             ) : (
                 <span
                     className={cn(
-                        'flex h-14 w-14 items-center justify-center rounded-full text-lg font-semibold text-white',
+                        'flex h-11 w-11 items-center justify-center rounded-md text-sm font-semibold text-white shadow-sm',
                         review.avatarColor,
                     )}
                 >
@@ -80,79 +86,156 @@ function Avatar({ review }: { review: Review }) {
     );
 }
 
-function ReviewCard({ review, className }: { review: Review; className?: string }) {
+function ReviewCard({ review }: { review: Review }) {
     return (
-        <article
-            className={cn(
-                'relative h-[420px] overflow-hidden rounded-3xl shadow-[0_32px_36px_-22px_rgba(0,0,0,0.45)] md:h-[460px]',
-                className,
-            )}
-        >
-            <img src={review.background} alt="" className="h-full w-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
-
-            <div className="absolute inset-x-5 bottom-5 rounded-2xl bg-white px-6 pt-11 pb-5 text-center shadow-lg">
-                <Avatar review={review} />
-                <h3 className="text-xl font-semibold text-black">{review.name}</h3>
-                <p className="text-xs text-neutral-500">{review.role}</p>
-                <p className="mt-4 text-sm leading-6 text-neutral-700">&ldquo;{review.quote}&rdquo;</p>
-                <Stars rating={review.rating} />
-            </div>
+        <article className="relative flex h-full flex-col rounded-2xl bg-white px-6 pt-9 pb-5 text-center shadow-[0_6px_18px_-8px_rgba(120,90,40,0.25)] transition-shadow duration-500 hover:shadow-[0_0_26px_rgba(201,167,124,0.45)]">
+            <Avatar review={review} />
+            <p className="text-base font-semibold text-[#111111]">{review.name}</p>
+            <p className="text-xs text-neutral-500">{review.role}</p>
+            <p className={`${quoteSerif} mt-3 flex-1 text-[13px] leading-[1.45] text-[#111111] italic`}>
+                &ldquo;{review.quote}&rdquo;
+            </p>
+            <Stars rating={review.rating} />
         </article>
     );
 }
 
-function ArrowButton({ direction, onClick }: { direction: 'prev' | 'next'; onClick: () => void }) {
-    const Icon = direction === 'prev' ? ArrowLeft : ArrowRight;
-
-    return (
-        <button
-            type="button"
-            onClick={onClick}
-            aria-label={direction === 'prev' ? 'Previous review' : 'Next review'}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-black shadow-[0_4px_16px_rgba(0,0,0,0.12)] transition-transform hover:scale-105"
-        >
-            <Icon className="h-5 w-5" strokeWidth={2.2} />
-        </button>
-    );
-}
+// The strip holds COPIES copies of the reviews. It auto-scrolls left and, whenever the scroll position
+// leaves the middle band (1 to 3 copy-widths), jumps by exactly 2 copy-widths. The copies are identical,
+// so the jump is invisible and the loop works in both directions, for auto-scroll and manual scrolling.
+const COPIES = 6;
+const SPEED = 40; // px per second
+const RESUME_DELAY = 2500; // ms of calm after the visitor stops touching before auto-scroll restarts
 
 export default function TestimonialsSection() {
-    const [offset, setOffset] = useState(0);
-    const total = reviews.length;
-    const visible = Array.from({ length: Math.min(3, total) }, (_, i) => reviews[(offset + i) % total]);
+    const scrollerRef = useRef<HTMLDivElement>(null);
+    const ui = useRef({ hovering: false, dragging: false, resumeAt: 0, dragStartX: 0, dragStartScroll: 0 });
+    const copyWidth = useRef(0);
 
-    const prev = () => setOffset((o) => (o - 1 + total) % total);
-    const next = () => setOffset((o) => (o + 1) % total);
+    const items = Array.from({ length: COPIES }, (_, copy) =>
+        reviews.map((review) => ({ review, copy, key: `${copy}-${review.name}` })),
+    ).flat();
+
+    const pause = (ms = RESUME_DELAY) => {
+        ui.current.resumeAt = performance.now() + ms;
+    };
+
+    /** Keep the scroll position inside the middle band; returns how far it jumped. */
+    const wrap = () => {
+        const el = scrollerRef.current;
+        const W = copyWidth.current;
+        if (!el || !W) return 0;
+
+        let delta = 0;
+        if (el.scrollLeft >= 3 * W) delta = -2 * W;
+        else if (el.scrollLeft < W) delta = 2 * W;
+
+        if (delta) {
+            el.scrollLeft += delta;
+            ui.current.dragStartScroll += delta;
+        }
+        return delta;
+    };
+
+    useEffect(() => {
+        const el = scrollerRef.current;
+        if (!el) return;
+
+        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        const measure = () => {
+            copyWidth.current = el.scrollWidth / COPIES;
+        };
+        measure();
+        el.scrollLeft = copyWidth.current; // start in the middle band so we can scroll both ways
+
+        const onResize = () => {
+            measure();
+            el.scrollLeft = copyWidth.current + (el.scrollLeft % copyWidth.current);
+        };
+        window.addEventListener('resize', onResize);
+
+        let pos = el.scrollLeft;
+        let last = performance.now();
+        let raf = 0;
+
+        const tick = (now: number) => {
+            const dt = Math.min(now - last, 50);
+            last = now;
+            const u = ui.current;
+
+            if (u.hovering || u.dragging || now < u.resumeAt || reduceMotion) {
+                pos = el.scrollLeft; // follow wherever the visitor took it
+            } else {
+                pos += (SPEED * dt) / 1000; // float accumulator keeps slow speeds smooth
+                el.scrollLeft = pos;
+            }
+            raf = requestAnimationFrame(tick);
+        };
+        raf = requestAnimationFrame(tick);
+
+        return () => {
+            cancelAnimationFrame(raf);
+            window.removeEventListener('resize', onResize);
+        };
+    }, []);
 
     return (
-        <section id="testimonials" className="scroll-mt-16 bg-white py-16 lg:py-24">
+        <section id="testimonials" className="scroll-mt-16 bg-gradient-to-br from-[#FBF9F4] to-[#EDE2CE] py-16 lg:py-24">
             <div className="mx-auto max-w-[1400px] px-6">
-                <div className="mb-12 text-center">
-                    <p className="text-sm font-medium tracking-[0.3em] text-[#E8830E] uppercase">Testimonials</p>
-                    <h2 className="mt-2 text-4xl font-semibold text-black md:text-5xl">Our Client Reviews</h2>
+                <div className="mb-10 text-center">
+                    <p className="text-sm font-normal tracking-[0.3em] text-[#B8946A] uppercase">Testimonials</p>
+                    <h2 className="mt-3 font-['DM_Serif_Display',serif] text-4xl font-normal text-[#111111] md:text-5xl">Our Client Reviews</h2>
                 </div>
+            </div>
 
-                <div className="flex items-center gap-4 lg:gap-8">
-                    <div className="hidden sm:block">
-                        <ArrowButton direction="prev" onClick={prev} />
-                    </div>
-
-                    <div className="grid flex-1 grid-cols-1 gap-8 md:grid-cols-3">
-                        {visible.map((review, i) => (
-                            <ReviewCard key={review.name} review={review} className={i > 0 ? 'hidden md:block' : undefined} />
+            <div className="relative">
+                {/* Scrollable strip: swipe, trackpad, shift+wheel, arrow keys or click-and-drag all work. py-10 gives the
+                    overlapping avatars and hover glow room, since a scroll container clips whatever sticks out. */}
+                <div
+                    ref={scrollerRef}
+                    tabIndex={0}
+                    aria-label="Client reviews. Scroll sideways to see more."
+                    onScroll={wrap}
+                    onWheel={() => pause()}
+                    onTouchStart={() => pause(60000)}
+                    onTouchEnd={() => pause()}
+                    onPointerEnter={(e) => {
+                        if (e.pointerType === 'mouse') ui.current.hovering = true;
+                    }}
+                    onPointerLeave={() => {
+                        ui.current.hovering = false;
+                    }}
+                    onPointerDown={(e) => {
+                        if (e.pointerType !== 'mouse' || e.button !== 0) return;
+                        const u = ui.current;
+                        u.dragging = true;
+                        u.dragStartX = e.clientX;
+                        u.dragStartScroll = e.currentTarget.scrollLeft;
+                        e.currentTarget.setPointerCapture(e.pointerId);
+                    }}
+                    onPointerMove={(e) => {
+                        const u = ui.current;
+                        if (!u.dragging) return;
+                        e.currentTarget.scrollLeft = u.dragStartScroll - (e.clientX - u.dragStartX);
+                    }}
+                    onPointerUp={(e) => {
+                        ui.current.dragging = false;
+                        pause();
+                        if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+                    }}
+                    onPointerCancel={() => {
+                        ui.current.dragging = false;
+                    }}
+                    className="cursor-grab overflow-x-auto overflow-y-hidden py-10 outline-none select-none active:cursor-grabbing [mask-image:linear-gradient(to_right,transparent,black_6%,black_94%,transparent)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                >
+                    <div className="flex w-max">
+                        {items.map(({ review, copy, key }) => (
+                            <div key={key} className="w-[300px] shrink-0 pr-5 sm:w-[340px]" aria-hidden={copy > 0 ? true : undefined}>
+                                <ReviewCard review={review} />
+                            </div>
                         ))}
                     </div>
-
-                    <div className="hidden sm:block">
-                        <ArrowButton direction="next" onClick={next} />
-                    </div>
-                </div>
-
-                {/* Mobile arrows sit under the single visible card */}
-                <div className="mt-8 flex justify-center gap-4 sm:hidden">
-                    <ArrowButton direction="prev" onClick={prev} />
-                    <ArrowButton direction="next" onClick={next} />
                 </div>
             </div>
         </section>

@@ -1,41 +1,44 @@
-/** Full-screen hero with centered heading, CTA and an upward curved white divider. */
+import { loginButton } from './landing-nav';
+
+/** Hero: photo backdrop faded to white on the left, left-aligned serif heading, subtext and CTA. */
 export default function HeroSection() {
     return (
         <section
             id="home"
-            className="relative flex h-screen min-h-[620px] items-center justify-center overflow-hidden bg-[#F5EDD8]"
+            className="relative flex min-h-[560px] items-center overflow-hidden bg-white md:h-screen md:min-h-[620px]"
         >
             <img
                 src="/images/hero-bg.webp"
                 alt="Balloon arch and floral backdrop styled by GR3AT A's"
-                className="absolute inset-0 h-full w-full object-cover object-center"
+                className="absolute inset-0 h-full w-full object-cover object-[65%_center] md:object-center"
             />
-            {/* Soft white wash so the black heading stays readable */}
-            <div className="absolute inset-0 bg-white/35" />
 
-            <div className="relative z-10 flex flex-col items-center px-6 pb-10 text-center">
-                <h1 className="font-['Montserrat',sans-serif] text-4xl leading-[1.4] font-bold tracking-wide text-black sm:text-5xl lg:text-6xl">
-                    Unforgettable Events,
+            {/* White fade: strong on the left for readable text, clear on the right to show the photo */}
+            <div
+                aria-hidden="true"
+                className="absolute inset-0 bg-gradient-to-r from-white via-white/80 to-transparent md:via-white/55 md:to-transparent"
+            />
+            {/* Mobile: extra wash so text stays readable over the photo */}
+            <div aria-hidden="true" className="absolute inset-0 bg-white/30 md:hidden" />
+
+            <div className="relative z-10 mx-auto w-full max-w-7xl px-6 pt-16 md:px-1">
+                <h1 className="font-['DM_Serif_Display',serif] text-[40px] leading-[1.12] font-normal tracking-tight text-[#111111] sm:text-5xl md:text-6xl lg:text-[72px]">
+                    Your Vision, 
                     <br />
-                    Perfectly Planned
+                    Our Creative Touch
                 </h1>
+
+                <p className="mt-5 max-w-md font-['Poppins',sans-serif] text-base text-[#2A2A2A] md:max-w-none md:text-lg">
+                    Thoughtful styling. Beautifully memorable moments.
+                </p>
 
                 <a
                     href="#services"
-                    className="mt-20 inline-flex min-w-[240px] items-center justify-center rounded-md bg-[#C99A2E] px-12 py-4 text-lg font-semibold text-white shadow-md transition-colors hover:bg-[#B3871F] md:mt-32 md:min-w-[290px]"
+                    className={`mt-8 inline-flex px-10 py-3 text-sm ${loginButton}`}
                 >
-                    Start Project
+                    Start Your Project
                 </a>
             </div>
-
-            <svg
-                aria-hidden="true"
-                viewBox="0 0 1440 100"
-                preserveAspectRatio="none"
-                className="absolute inset-x-0 -bottom-px h-14 w-full md:h-24"
-            >
-                <path d="M0 100 Q720 -30 1440 100 Z" fill="#ffffff" />
-            </svg>
         </section>
     );
 }

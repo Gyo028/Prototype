@@ -16,6 +16,7 @@ use App\Http\Controllers\TechnicalAdmin\DashboardController;
 // Landing Page
 Route::inertia('/', 'public/landing')->name('home');
 Route::inertia('/faq', 'public/faq')->name('faq');
+Route::inertia('/our-works', 'public/our-works')->name('our-works');
 
 // Generic Dashboard of Laravel
 Route::middleware(['auth', 'verified'])->group(function () {
