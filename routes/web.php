@@ -84,6 +84,7 @@ Route::middleware(['auth', 'verified', 'role:design_specialist'])
     ->name('design-specialist.')
     ->group(function () {
         Route::inertia('/', 'design-specialist/dashboard')->name('dashboard');
+        Route::inertia('/projects/{project}', 'design-specialist/Assigned_Projects')->name('projects.show');
     });
 
 Route::middleware(['auth', 'verified', 'role:owner'])
