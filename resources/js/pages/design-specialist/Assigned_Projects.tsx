@@ -1,183 +1,166 @@
+
 import { Head, Link } from '@inertiajs/react';
 import DesignSpecialistLayout from '@/layouts/design-specialist-layout';
 import type { ReactNode } from 'react';
 
-interface QuotationItem {
+type QuotationItem = {
     description: string;
     amount: number | null;
-}
+};
 
-interface AssignedProjectData {
+type Project = {
     id: number;
-    code: string;
+    code?: string;
     name: string;
-    customer: string;
-    assignedDate: string;
-    status: string;
-    eventType: string;
-    theme: string;
-    eventDate: string;
-    venue: string;
-    budget: string;
-    servicePackage: string;
-    consultation: string;
-    revisionVersion: number;
-    revisionDate: string;
-    revisionRemarks: string;
-    layoutImage: string | null;
-    references: string[];
-    quotations: QuotationItem[];
-    ocularReport: string | null;
-    venuePhotos: string[];
-}
+    customer?: string;
+    assignedDate?: string;
+    status?: string | null;
+    eventType?: string;
+    theme?: string;
+    budget?: string;
+    venue?: string;
+    eventDate?: string;
+    servicePackage?: string;
+    consultation?: string;
+    revisionVersion?: number;
+    revisionDate?: string;
+    revisionRemarks?: string;
+    layoutImage?: string | null;
+    references?: string[];
+    referenceCount?: number;
+    quotations?: QuotationItem[];
+    ocularDate?: string;
+    ocularReport?: string | null;
+    venuePhotos?: string[];
+};
 
-interface AssignedProjectProps {
-    project?: AssignedProjectData;
-}
+type Props = {
+    project?: Project | null;
+};
 
-const SAMPLE_PROJECT: AssignedProjectData = {
+const SAMPLE_PROJECT: Project = {
     id: 1,
     code: 'EVP-2026-041',
-    name: 'Mall Event',
-    customer: 'Juan Santos',
-    assignedDate: 'Oct 22, 2026',
-    status: 'Revision requested by customer',
-    eventType: 'Arch Set Up',
-    theme: 'Garden',
-    eventDate: 'Feb 14, 2027',
-    venue: 'Garden pavilion (indoor)',
+    name: 'Hotel Setup – December Getaway',
+    customer: 'December Getaway Hotel',
+    assignedDate: 'Oct 20, 2026',
+    status: 'New assignment',
+    eventType: 'Hotel Setup',
+    theme: 'Christmas getaway, gold & white',
     budget: '₱250,000',
-    servicePackage: 'Package name',
-
+    venue: 'Hotel Function Hall and Lobby',
+    eventDate: 'Dec 10, 2026',
+    servicePackage: 'Holiday Hotel Setup Package',
     consultation:
-        'Customer will proceed. Wants a floral arch at the entrance, and a photo wall near the stage.',
-
+        'The hotel will proceed with a December getaway setup. The design includes a Christmas entrance display, reception decorations, festive lounge seating, dining area styling, and a holiday photo wall.',
     revisionVersion: 2,
     revisionDate: 'Nov 6, 2026',
-
     revisionRemarks:
-        'Change the arch florals to white and sage, and move the photo wall to the left of the stage.',
-
+        'Update the entrance decorations with gold and white accents and reposition the holiday photo wall near the reception area.',
     layoutImage: null,
     references: [],
-
+    referenceCount: 6,
     quotations: [
-        { description: 'Floral arch (entrance)', amount: 18000 },
-        { description: 'Long tables with linens × 15', amount: 18000 },
-        { description: 'Chairs × 150', amount: 18000 },
-        { description: 'Stage backdrop', amount: 22000 },
-        { description: 'Centerpieces × 15', amount: 12750 },
-        { description: 'Photo wall', amount: 9500 },
-        { description: 'Lounge seating × 2', amount: 9000 },
-        { description: 'Ceiling draping and lights', amount: 56200 },
-        { description: 'Hanging greenery (custom item)', amount: null },
+        { description: 'Christmas entrance arch', amount: 25000 },
+        { description: 'Reception counter decorations', amount: 18000 },
+        { description: 'Christmas tree display', amount: 22000 },
+        { description: 'Holiday photo wall', amount: 18000 },
+        { description: 'Lobby decorations', amount: 25000 },
+        { description: 'Dining area styling', amount: 30000 },
+        { description: 'Festive lounge seating', amount: 20000 },
+        { description: 'Ceiling decorations and lights', amount: 35000 },
+        { description: 'Holiday centerpieces', amount: 12000 },
+        { description: 'Additional decorative materials', amount: 15000 },
     ],
-
+    ocularDate: 'Oct 22, 2026',
     ocularReport: null,
     venuePhotos: [],
 };
 
 const WORKFLOW = [
-    { label: 'Assigned', detail: 'Oct 22', status: 'completed' },
-    { label: '2D proposal + quotation', detail: 'Version 2 - Nov 3', status: 'completed' },
-    { label: 'Project Manager review', detail: 'Approved Nov 4', status: 'completed' },
-    { label: 'Customer review', detail: 'Revision requested Nov 6', status: 'revision' },
+    { label: 'Assigned', detail: 'Oct 20, 2026', status: 'completed' },
+    { label: '2D proposal + quotation', detail: 'In progress', status: 'active' },
+    { label: 'Project Manager review', detail: 'Pending', status: 'pending' },
+    { label: 'Customer review', detail: 'Pending', status: 'pending' },
     { label: 'Approved', detail: 'Pending', status: 'pending' },
 ];
 
-function SectionCard({
-    title,
-    children,
-}: {
-    title: string;
-    children: ReactNode;
-}) {
-    return (
-        <section className="rounded-xl border border-neutral-200 bg-white p-4">
-            <h2 className="text-sm font-bold text-ink">
-                {title}
-            </h2>
-            {children}
-        </section>
-    );
-}
-
-function formatCurrency(amount: number) {
+const formatCurrency = (amount: number) => {
     return `₱${amount.toLocaleString('en-PH', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
     })}`;
-}
+};
 
-export default function AssignedProject({
+export default function AssignedProjects({
     project = SAMPLE_PROJECT,
-}: AssignedProjectProps) {
+}: Props) {
+    const currentProject = project ?? SAMPLE_PROJECT;
+    const quotations = currentProject.quotations ?? [];
+    const references = currentProject.references ?? [];
+    const venuePhotos = currentProject.venuePhotos ?? [];
 
-    const estimatedTotal = project.quotations.reduce(
+    const estimatedTotal = quotations.reduce(
         (total, item) => total + (item.amount ?? 0),
         0,
     );
 
     return (
-        <DesignSpecialistLayout>
-            <Head title={`${project.name} - Assigned Project`} />
+        <>
+            <Head title={currentProject.name} />
 
-            <main className="flex flex-col gap-4">
-
-                {/* PROJECT HEADER */}
+            <main className="flex flex-col gap-4 p-6">
                 <header>
                     <p className="text-xs text-neutral-500">
                         <Link
                             href="/design-specialist"
-                            className="hover:text-purple-700"
+                            className="hover:text-purple-800"
                         >
                             Assigned Projects
                         </Link>
                         {' / '}
-                        {project.code}
+                        {currentProject.code ?? 'Project Details'}
                     </p>
 
                     <div className="mt-2 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                         <div>
                             <div className="flex flex-wrap items-center gap-2">
                                 <h1 className="text-xl font-bold text-ink">
-                                    {project.name}
+                                    {currentProject.name}
                                 </h1>
 
-                                <span className="rounded-full bg-orange-100 px-2 py-1 text-[10px] font-semibold text-orange-700">
-                                    {project.status}
+                                <span className="rounded-full bg-blue-100 px-2 py-1 text-[10px] font-semibold text-blue-700">
+                                    {currentProject.status ?? 'New assignment'}
                                 </span>
                             </div>
 
-                            <p className="mt-1 text-xs text-neutral-500">
+                            <p className="mt-1 text-[11px] text-neutral-500">
                                 Assigned by the Project Manager on{' '}
-                                {project.assignedDate}
+                                {currentProject.assignedDate ?? 'Date unavailable'}
                                 {' · '}
-                                Customer: {project.customer}
+                                Customer: {currentProject.customer ?? 'Not specified'}
                             </p>
                         </div>
 
                         <button
                             type="button"
                             disabled
-                            className="rounded-lg bg-purple-800 px-4 py-2.5 text-xs font-semibold text-white opacity-80 disabled:cursor-not-allowed"
+                            className="rounded-lg bg-purple-900 px-4 py-2.5 text-xs font-semibold text-white opacity-90"
                         >
-                            ↑ Submit version {project.revisionVersion + 1}
+                            ↑ Submit version 1
                         </button>
                     </div>
                 </header>
 
-                {/* PROJECT WORKFLOW */}
                 <section className="rounded-xl border border-neutral-200 bg-white p-4">
-
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
                         {WORKFLOW.map((step) => (
                             <div key={step.label}>
                                 <div
                                     className={`mb-2 h-1 rounded-full ${
                                         step.status === 'completed'
-                                            ? 'bg-purple-800'
-                                            : step.status === 'revision'
+                                            ? 'bg-purple-900'
+                                            : step.status === 'active'
                                               ? 'bg-orange-500'
                                               : 'bg-neutral-200'
                                     }`}
@@ -194,107 +177,119 @@ export default function AssignedProject({
                         ))}
                     </div>
 
-                    {/* REVISION REQUEST */}
-                    <div className="mt-4 rounded-lg border border-orange-100 bg-orange-50/50 p-3">
-                        <p className="text-xs font-semibold text-orange-800">
-                            Open revision request · Version{' '}
-                            {project.revisionVersion}
-                            {' · From Customer · '}
-                            {project.revisionDate}
+                    <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50/50 p-3">
+                        <p className="text-[11px] font-semibold text-blue-800">
+                            Project deadline · December 10, 2026
                         </p>
 
                         <p className="mt-1 text-[11px] leading-relaxed text-neutral-600">
-                            Remarks: {project.revisionRemarks}
+                            Complete the hotel setup design proposal, quotation, and required revisions before the project completion date.
                         </p>
                     </div>
                 </section>
 
-                {/* PROJECT CONTENT */}
+                <div className="flex gap-5 border-b border-neutral-200">
+                    <div className="border-b-2 border-purple-800 px-2 pb-2 text-[11px] font-semibold text-purple-900">
+                        Specifications
+                    </div>
+                </div>
+
                 <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-
-                    {/* LEFT COLUMN */}
                     <div className="flex flex-col gap-4 xl:col-span-9">
-
-                        {/* PROJECT SPECIFICATIONS */}
-                        <SectionCard title="Project details">
+                        <section className="rounded-xl border border-neutral-200 bg-white p-4">
+                            <h2 className="text-sm font-bold text-ink">
+                                Project details
+                            </h2>
 
                             <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
+                                <div>
+                                    <p className="text-[10px] text-neutral-400">Event type</p>
+                                    <p className="text-xs font-medium text-ink">
+                                        {currentProject.eventType ?? 'Not specified'}
+                                    </p>
+                                </div>
 
-                                {[
-                                    ['Event type', project.eventType],
-                                    ['Theme', project.theme],
-                                    ['Budget', project.budget],
-                                    ['Venue', project.venue],
-                                    ['Event date', project.eventDate],
-                                    ['Service package', project.servicePackage],
-                                ].map(([label, value]) => (
-                                    <div key={label}>
-                                        <p className="text-[10px] text-neutral-400">
-                                            {label}
-                                        </p>
+                                <div>
+                                    <p className="text-[10px] text-neutral-400">Theme</p>
+                                    <p className="text-xs font-medium text-ink">
+                                        {currentProject.theme ?? 'Not specified'}
+                                    </p>
+                                </div>
 
-                                        <p className="mt-1 text-xs font-medium text-ink">
-                                            {value}
-                                        </p>
-                                    </div>
-                                ))}
+                                <div>
+                                    <p className="text-[10px] text-neutral-400">Budget</p>
+                                    <p className="text-xs font-medium text-ink">
+                                        {currentProject.budget ?? 'Not specified'}
+                                    </p>
+                                </div>
 
+                                <div>
+                                    <p className="text-[10px] text-neutral-400">Venue</p>
+                                    <p className="text-xs font-medium text-ink">
+                                        {currentProject.venue ?? 'Not specified'}
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <p className="text-[10px] text-neutral-400">Project completion date</p>
+                                    <p className="text-xs font-medium text-ink">
+                                        {currentProject.eventDate ?? 'Not specified'}
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <p className="text-[10px] text-neutral-400">Service package</p>
+                                    <p className="text-xs font-medium text-ink">
+                                        {currentProject.servicePackage ?? 'Not specified'}
+                                    </p>
+                                </div>
                             </div>
 
                             <div className="mt-4">
-                                <p className="mb-2 text-[10px] font-semibold text-neutral-500">
+                                <p className="mb-2 text-[10px] font-medium text-neutral-500">
                                     Consultation outcome (recorded by Project Manager)
                                 </p>
 
                                 <div className="rounded-lg bg-neutral-50 p-3 text-[11px] leading-relaxed text-neutral-600">
-                                    {project.consultation}
+                                    {currentProject.consultation ?? 'No consultation details available.'}
                                 </div>
                             </div>
+                        </section>
 
-                        </SectionCard>
-
-                        {/* CUSTOMER 2D LAYOUT */}
-                        <SectionCard title="Customer's preliminary 2D layout">
+                        <section className="rounded-xl border border-neutral-200 bg-white p-4">
+                            <h2 className="text-sm font-bold text-ink">
+                                Customer's preliminary 2D layout
+                            </h2>
 
                             <p className="mt-1 text-[10px] text-neutral-400">
                                 Made by the customer in the 2D Design Layout tool when submitting the service request.
                             </p>
 
                             <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
-
-                                {/* LAYOUT IMAGE */}
                                 <div className="flex min-h-[280px] items-center justify-center overflow-hidden rounded-lg bg-[#f0edf3]">
-
-                                    {project.layoutImage ? (
+                                    {currentProject.layoutImage ? (
                                         <img
-                                            src={project.layoutImage}
-                                            alt="Customer 2D layout"
+                                            src={currentProject.layoutImage}
+                                            alt="Customer layout"
                                             className="h-full max-h-[350px] w-full object-contain"
                                         />
                                     ) : (
-                                        <div className="text-center text-neutral-400">
-                                            <span className="text-3xl">▧</span>
-                                            <p className="mt-2 text-xs">
-                                                Layout snapshot image
-                                            </p>
-                                        </div>
+                                        <p className="text-[10px] text-neutral-400">
+                                            Layout snapshot image
+                                        </p>
                                     )}
-
                                 </div>
 
-                                {/* INITIAL QUOTATION */}
                                 <div>
-
                                     <h3 className="mb-3 text-xs font-semibold text-ink">
                                         Initial quotation
                                     </h3>
 
-                                    <div className="flex flex-col gap-2">
-
-                                        {project.quotations.map((item, index) => (
+                                    <div className="flex flex-col">
+                                        {quotations.map((item, index) => (
                                             <div
                                                 key={index}
-                                                className="flex items-start justify-between gap-2 border-b border-neutral-100 pb-2 text-[10px]"
+                                                className="flex justify-between gap-2 border-b border-neutral-100 py-2 text-[10px]"
                                             >
                                                 <span className="text-neutral-600">
                                                     {item.description}
@@ -307,15 +302,11 @@ export default function AssignedProject({
                                                 </span>
                                             </div>
                                         ))}
-
                                     </div>
 
                                     <div className="mt-3 flex justify-between border-t border-neutral-200 pt-3 text-xs font-bold text-ink">
                                         <span>Estimated total</span>
-
-                                        <span>
-                                            {formatCurrency(estimatedTotal)}
-                                        </span>
+                                        <span>{formatCurrency(estimatedTotal)}</span>
                                     </div>
 
                                     <div className="mt-3 rounded-lg bg-neutral-50 p-2">
@@ -324,30 +315,27 @@ export default function AssignedProject({
                                         </p>
                                     </div>
 
-                                    <button
-                                        type="button"
-                                        disabled
-                                        className="mt-3 text-[10px] font-semibold text-purple-800 underline disabled:cursor-not-allowed"
-                                    >
+                                    <p className="mt-3 text-[10px] font-medium text-purple-900 underline">
                                         Download initial quotation (PDF)
-                                    </button>
-
+                                    </p>
                                 </div>
                             </div>
-
-                        </SectionCard>
-
+                        </section>
                     </div>
+
                     <aside className="flex flex-col gap-4 xl:col-span-3">
-                        <SectionCard title="Reference designs">
+                        <section className="rounded-xl border border-neutral-200 bg-white p-4">
+                            <h2 className="text-sm font-bold text-ink">
+                                Reference designs
+                            </h2>
+
                             <p className="mt-1 text-[10px] text-neutral-400">
-                                Uploaded by the customer · {project.references.length} files
+                                Uploaded by the customer · {currentProject.referenceCount ?? references.length} files
                             </p>
 
-                            {project.references.length > 0 ? (
-                                <div className="mt-3 grid grid-cols-3 gap-2">
-
-                                    {project.references.map((image, index) => (
+                            <div className="mt-3 grid grid-cols-3 gap-2">
+                                {references.length > 0 ? (
+                                    references.slice(0, 3).map((image, index) => (
                                         <a
                                             key={index}
                                             href={image}
@@ -357,33 +345,36 @@ export default function AssignedProject({
                                         >
                                             <img
                                                 src={image}
-                                                alt={`Reference design ${index + 1}`}
+                                                alt={`Reference ${index + 1}`}
                                                 className="h-full w-full object-cover"
                                             />
                                         </a>
-                                    ))}
+                                    ))
+                                ) : (
+                                    <>
+                                        <div className="aspect-square rounded-md bg-[#f0edf3]" />
+                                        <div className="aspect-square rounded-md bg-[#f0edf3]" />
+                                        <div className="flex aspect-square items-center justify-center rounded-md bg-[#f0edf3] text-[10px] text-neutral-500">
+                                            + {Math.max((currentProject.referenceCount ?? 0) - 2, 0)} more
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </section>
 
-                                </div>
-                            ) : (
-                                <div className="mt-3 rounded-lg bg-neutral-50 p-4 text-center text-[10px] text-neutral-400">
-                                    No reference images uploaded.
-                                </div>
-                            )}
-
-                        </SectionCard>
-
-                        {/* OCULAR VISIT */}
-                        <SectionCard title="Ocular visit">
+                        <section className="rounded-xl border border-neutral-200 bg-white p-4">
+                            <h2 className="text-sm font-bold text-ink">
+                                Ocular visit
+                            </h2>
 
                             <p className="mt-1 text-[10px] text-neutral-400">
-                                Recorded by the Project Manager
+                                Recorded by the Project Manager · {currentProject.ocularDate ?? 'Date unavailable'}
                             </p>
 
                             <div className="mt-3 flex flex-col gap-2">
-
-                                {project.ocularReport ? (
+                                {currentProject.ocularReport ? (
                                     <a
-                                        href={project.ocularReport}
+                                        href={currentProject.ocularReport}
                                         target="_blank"
                                         rel="noreferrer"
                                         className="flex items-center justify-between rounded-lg border border-neutral-100 p-2 text-[10px] text-neutral-600 hover:bg-neutral-50"
@@ -392,43 +383,38 @@ export default function AssignedProject({
                                         <span className="text-purple-700">PDF</span>
                                     </a>
                                 ) : (
-                                    <div className="rounded-lg bg-neutral-50 p-3 text-[10px] text-neutral-400">
-                                        No site assessment report available.
+                                    <div className="flex items-center justify-between rounded-lg border border-neutral-100 p-2 text-[10px] text-neutral-600">
+                                        <span>▤ &nbsp; Site assessment report</span>
+                                        <span>PDF</span>
                                     </div>
                                 )}
 
                                 <div className="flex items-center justify-between rounded-lg border border-neutral-100 p-2 text-[10px] text-neutral-600">
                                     <span>▧ &nbsp; Venue photos</span>
-                                    <span>{project.venuePhotos.length} photos</span>
+                                    <span>{venuePhotos.length || 8} photos</span>
                                 </div>
 
-                                {project.venuePhotos.length > 0 && (
+                                {venuePhotos.length > 0 && (
                                     <div className="grid grid-cols-3 gap-2">
-                                        {project.venuePhotos.map((photo, index) => (
-                                            <a
+                                        {venuePhotos.map((photo, index) => (
+                                            <img
                                                 key={index}
-                                                href={photo}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                className="aspect-square overflow-hidden rounded-md"
-                                            >
-                                                <img
-                                                    src={photo}
-                                                    alt={`Venue photo ${index + 1}`}
-                                                    className="h-full w-full object-cover"
-                                                />
-                                            </a>
+                                                src={photo}
+                                                alt={`Venue photo ${index + 1}`}
+                                                className="aspect-square rounded-md object-cover"
+                                            />
                                         ))}
                                     </div>
                                 )}
-
                             </div>
-
-                        </SectionCard>
-
+                        </section>
                     </aside>
                 </div>
             </main>
-        </DesignSpecialistLayout>
+        </>
     );
 }
+
+AssignedProjects.layout = (page: ReactNode) => (
+    <DesignSpecialistLayout>{page}</DesignSpecialistLayout>
+);

@@ -31,7 +31,7 @@ export default defineConfig({
     server: {
         host: '0.0.0.0',
         hmr: {
-            host: 'localhost', 
+            host: '192.168.100.19', // replace with your PC's IPv4 from ipconfig
         },
         watch: {
             ignored: [
