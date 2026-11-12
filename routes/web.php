@@ -16,6 +16,7 @@ use App\Http\Controllers\DesignSpecialist;
 
 Route::inertia('/', 'public/landing')->name('home');
 Route::inertia('/faq', 'public/faq')->name('faq');
+Route::inertia('/our-works', 'public/our-works')->name('our-works');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', function (Request $request) {

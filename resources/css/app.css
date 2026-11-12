@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Poppins:wght@400;500;600&family=Cormorant+Garamond:wght@400;500;600&family=Lora:ital,wght@0,400;0,500;1,400&display=swap');
 @import 'tailwindcss';
 
 @import 'tw-animate-css';
@@ -164,3 +165,39 @@
 
 }
 
+@layer base {
+    html {
+        scroll-behavior: smooth;
+    }
+}
+@keyframes float-y {
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(calc(var(--float-distance, 12px) * -1));
+    }
+}
+
+.float-a {
+    animation: float-y 6s ease-in-out infinite;
+}
+
+.float-b {
+    --float-distance: 16px;
+    animation: float-y 7s ease-in-out -2s infinite;
+}
+
+.float-c {
+    --float-distance: 8px;
+    animation: float-y 8s ease-in-out -4s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .float-a,
+    .float-b,
+    .float-c {
+        animation: none;
+    }
+}
