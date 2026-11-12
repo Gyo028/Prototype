@@ -12,12 +12,12 @@ use App\Http\Controllers\TechnicalAdmin\ServicesAssetsController;
 use App\Http\Controllers\TechnicalAdmin\DesignThemeController;
 use App\Http\Controllers\TechnicalAdmin\LayoutAssetController;
 use App\Http\Controllers\TechnicalAdmin\DashboardController;
+use App\Http\Controllers\DesignSpecialist;
 
-// Landing Page
 Route::inertia('/', 'public/landing')->name('home');
 Route::inertia('/faq', 'public/faq')->name('faq');
+Route::inertia('/our-works', 'public/our-works')->name('our-works');
 
-// Generic Dashboard of Laravel
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', function (Request $request) {
         $home = $request->user()->role->homeRoute();
@@ -88,7 +88,9 @@ Route::middleware(['auth', 'verified', 'role:design_specialist'])
     ->prefix('design-specialist')
     ->name('design-specialist.')
     ->group(function () {
-        Route::inertia('/', 'design-specialist/dashboard')->name('dashboard');
+        Route::get('/', [DesignSpecialist\DashboardController::class, 'index'])->name('dashboard');
+        Route::get('projects', [DesignSpecialist\ProjectController::class, 'index'])->name('projects');
+        Route::get('projects/{project}', [DesignSpecialist\ProjectController::class, 'show'])->name('projects.show');
     });
 
 Route::middleware(['auth', 'verified', 'role:owner'])
