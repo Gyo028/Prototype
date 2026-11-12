@@ -3,22 +3,6 @@ export default function Footer() {
         <footer className="border-t border-gray-200 bg-white">
             <div className="mx-auto max-w-[1400px] px-10 py-8">
                 <div className="flex flex-wrap items-center justify-between gap-8">
-                    <div className="flex items-center gap-4">
-                        <img src="/images/icons/phone.svg" className="footer-icon" alt="" />
-                        <span className="footer-text">+63 0000000000</span>
-                    </div>
-
-                    <div className="flex items-center gap-4">
-                        <img src="/images/icons/email.svg" className="footer-icon" alt="" />
-                        <a href="#" className="footer-text transition hover:text-gold">
-                            gr3ataseventsstyling@gmail.com
-                        </a>
-                    </div>
-
-                    <div className="flex items-center gap-4">
-                        <img src="/images/icons/location.svg" className="footer-icon" alt="" />
-                        <span className="footer-text">Altezza, Deparo, Caloocan City</span>
-                    </div>
 
                     <div className="flex gap-5">
                         <a
