@@ -1,5 +1,5 @@
 import { Form, Head, router } from '@inertiajs/react';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { GoogleButton, OrDivider } from '@/components/auth/google-button';
 import InputError from '@/components/input-error';
 import PasswordInput from '@/components/password-input';
