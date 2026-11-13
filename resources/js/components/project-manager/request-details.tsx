@@ -1,4 +1,4 @@
-import { FileText, ImageIcon } from 'lucide-react';
+import { FileText, ImageIcon, LayoutGrid } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Pill } from '@/components/dashboard/ui';
 import type { PillTone } from '@/components/dashboard/ui';
@@ -135,6 +135,10 @@ export function RequestDetails({ request: r }: { request: ProjectRequest }) {
             </Section>
 
             <div className="md:col-span-2">
+                <PreliminaryLayoutAndQuotation request={r} />
+            </div>
+
+            <div className="md:col-span-2">
                 <Section title="Reference Files">
                     {r.files.length === 0 ? (
                         <p className="text-sm text-ink-soft">No files uploaded.</p>
@@ -164,13 +168,84 @@ export function RequestDetails({ request: r }: { request: ProjectRequest }) {
     );
 }
 
-/* ---------- consultation (backlog #16) ---------- */
+/* ---------- preliminary layout and quotation (Manage Service Request use case) ---------- */
 
-/** The small badge used in the Projects table. */
-export function ConsultationBadge({ consultation }: { consultation: Consultation | null }) {
-    if (!consultation) return <Pill tone="gray">Awaiting</Pill>;
-    return consultation.decision === 'Proceed' ? <Pill tone="blue">Proceed</Pill> : <Pill tone="red">Not proceeding</Pill>;
+/** One line of the preliminary quotation. Per-guest services are multiplied by the guest count. */
+export function quotationLines(r: ProjectRequest) {
+    return r.services.map((s) => {
+        const quantity = s.unit === 'pax' ? (r.guests ?? 0) : 1;
+        return { id: s.id, name: s.name, unitLabel: s.unit ? `${peso(s.price)} / ${s.unit}` : peso(s.price), quantity, total: s.price * quantity };
+    });
 }
+
+/** The preliminary 2D layout and quotation the customer saw when submitting the request. */
+function PreliminaryLayoutAndQuotation({ request: r }: { request: ProjectRequest }) {
+    const lines = quotationLines(r);
+    const total = lines.reduce((sum, line) => sum + line.total, 0);
+
+    return (
+        <Section title="Preliminary Layout and Quotation">
+            <div className="grid gap-4 md:grid-cols-2">
+                {/* Layout snapshot exported by the 2D Layout Designer */}
+                <div className="overflow-hidden rounded-lg border border-black/10 bg-neutral-100">
+                    {r.layoutSnapshotUrl ? (
+                        <a href={r.layoutSnapshotUrl} target="_blank" rel="noreferrer">
+                            <img src={r.layoutSnapshotUrl} alt={`Preliminary layout for ${r.code}`} className="w-full object-contain" />
+                        </a>
+                    ) : (
+                        <div className="flex aspect-video flex-col items-center justify-center gap-2 p-4 text-center">
+                            <LayoutGrid className="size-8 text-ink-soft" />
+                            <p className="text-sm font-semibold text-ink">{r.theme ?? 'No theme selected'}</p>
+                            <p className="text-xs text-ink-soft">
+                                {r.assets.length} layout {r.assets.length === 1 ? 'asset' : 'assets'} · layout snapshot not available
+                            </p>
+                        </div>
+                    )}
+                </div>
+
+                {/* Preliminary quotation */}
+                <div>
+                    {lines.length === 0 ? (
+                        <p className="text-sm text-ink-soft">No services selected.</p>
+                    ) : (
+                        <table className="w-full text-sm">
+                            <thead className="text-xs text-ink-soft">
+                                <tr>
+                                    <th className="pb-2 text-left font-medium">Service</th>
+                                    <th className="pb-2 text-right font-medium">Qty</th>
+                                    <th className="pb-2 text-right font-medium">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-black/10">
+                                {lines.map((line) => (
+                                    <tr key={line.id}>
+                                        <td className="py-2 text-ink">
+                                            {line.name}
+                                            <span className="block text-xs text-ink-soft">{line.unitLabel}</span>
+                                        </td>
+                                        <td className="py-2 text-right text-ink">{line.quantity}</td>
+                                        <td className="py-2 text-right text-ink">{peso(line.total)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                            <tfoot>
+                                <tr className="border-t-2 border-black/20">
+                                    <td colSpan={2} className="pt-2 font-bold text-ink">
+                                        Estimated total
+                                    </td>
+                                    <td className="pt-2 text-right font-bold text-ink">{peso(total)}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    )}
+                    <p className="mt-2 text-xs text-ink-soft">Preliminary only. The final quotation is set after the design proposal.</p>
+                </div>
+            </div>
+        </Section>
+    );
+}
+
+/* ---------- consultation (backlog #16) ---------- */
 
 /** Read-only view of a saved consultation. */
 export function ConsultationSummary({ consultation: c }: { consultation: Consultation }) {
@@ -180,11 +255,7 @@ export function ConsultationSummary({ consultation: c }: { consultation: Consult
         <Section title="Consultation">
             <div className="grid gap-3 sm:grid-cols-3">
                 <Detail label="Outcome">{c.outcome}</Detail>
-                <Detail label="Ocular visit">
-                    {c.ocularVisit.required
-                        ? `Required · ${c.ocularVisit.scheduledAt ? formatDateTime(c.ocularVisit.scheduledAt) : 'date not set'}`
-                        : 'Not required'}
-                </Detail>
+                <Detail label="Ocular visit">{c.ocularVisit.required ? 'Required' : 'Not required'}</Detail>
                 <Detail label="Project decision">
                     <Pill tone={proceed ? 'blue' : 'red'}>{proceed ? 'Proceed' : 'Do not proceed'}</Pill>
                 </Detail>

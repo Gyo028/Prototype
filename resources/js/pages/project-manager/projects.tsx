@@ -1,11 +1,19 @@
 import { Head } from '@inertiajs/react';
+import ProjectList from '@/components/project-manager/project-list';
+import type { Project } from '@/data/project-manager/projects';
 import ProjectManagerLayout from '@/layouts/project-manager-layout';
 
-export default function Projects() {
+type Props = {
+    /** Sent by the controller (approved requests only). While it is missing, the page shows sample data. */
+    projects?: Project[];
+};
+
+export default function Projects({ projects }: Props) {
     return (
         <ProjectManagerLayout>
             <Head title="Projects" />
-            <h1 className="text-2xl font-bold text-ink">Projects</h1>
+
+            <ProjectList projects={projects} />
         </ProjectManagerLayout>
     );
 }

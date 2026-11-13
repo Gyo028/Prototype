@@ -30,7 +30,7 @@ import type { ProjectRequest, RequestStatus } from '@/data/project-manager/proje
  * Backlog #13: Review and manage incoming project requests.
  * The Project Manager opens a request, reads what the customer submitted,
  * then approves or rejects it. A rejection cannot be sent without remarks.
- * Approved requests continue on the Consultations page (backlog #16).
+ * Approved requests become projects on the Projects page.
  */
 
 const REQUESTS_URL = '/project-manager/service-requests';
@@ -150,7 +150,7 @@ export default function ProjectRequestReview({ requests }: Props) {
             },
         );
     };
-    
+
     return (
         <>
             <PageHeader
@@ -273,9 +273,9 @@ export default function ProjectRequestReview({ requests }: Props) {
                                     </p>
                                     {selected.status === 'Approved' && (
                                         <p className="mt-2 text-sm text-ink">
-                                            Next step: record the consultation on the{' '}
-                                            <Link href="/project-manager/consultations" className="font-semibold text-gold-dark underline">
-                                                Consultations
+                                            Next step: this is now a project. Continue its planning on the{' '}
+                                            <Link href="/project-manager/projects" className="font-semibold text-gold-dark underline">
+                                                Projects
                                             </Link>{' '}
                                             page.
                                         </p>

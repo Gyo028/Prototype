@@ -33,8 +33,7 @@ export type Consultation = {
     summary: string; // what was discussed
     additionalNotes: string | null; // extra project details from the consultation
     ocularVisit: {
-        required: boolean;
-        scheduledAt: string | null; // 'YYYY-MM-DDTHH:mm' when required, otherwise null
+        required: boolean; // the customer books the actual date after paying the reservation fee
     };
     decision: ProjectDecision;
     decisionReason: string | null; // required when the decision is "Do not proceed"
@@ -78,6 +77,7 @@ export type ProjectRequest = {
     theme: string | null;
     assets: { id: string; name: string; category: string }[];
     files: ReferenceFile[];
+    layoutSnapshotUrl: string | null; // image of the preliminary 2D layout the customer saw; null if not available
     submittedAt: string; // ISO date-time
     status: RequestStatus;
     decision: {
@@ -119,6 +119,7 @@ export const SAMPLE_PROJECT_REQUESTS: ProjectRequest[] = [
             { id: 1, name: 'arch-inspiration.jpg', type: 'image', url: '#' },
             { id: 2, name: 'seating-plan.pdf', type: 'pdf', url: '#' },
         ],
+        layoutSnapshotUrl: null,
         submittedAt: '2026-11-08T09:24:00+08:00',
         status: 'Pending',
         decision: null,
@@ -148,6 +149,7 @@ export const SAMPLE_PROJECT_REQUESTS: ProjectRequest[] = [
             { id: 'cocktail-table', name: 'Cocktail Tables', category: 'Furniture' },
         ],
         files: [],
+        layoutSnapshotUrl: null,
         submittedAt: '2026-11-09T15:02:00+08:00',
         status: 'Pending',
         decision: null,
@@ -170,6 +172,7 @@ export const SAMPLE_PROJECT_REQUESTS: ProjectRequest[] = [
         theme: null,
         assets: [{ id: 'backdrop-panel', name: 'Backdrop Panel', category: 'Structures' }],
         files: [{ id: 3, name: 'brand-guidelines.pdf', type: 'pdf', url: '#' }],
+        layoutSnapshotUrl: null,
         submittedAt: '2026-11-10T08:45:00+08:00',
         status: 'Pending',
         decision: null,
@@ -195,6 +198,7 @@ export const SAMPLE_PROJECT_REQUESTS: ProjectRequest[] = [
         theme: 'Pastel Garden',
         assets: [{ id: 'entrance-arch', name: 'Entrance Arch', category: 'Structures' }],
         files: [],
+        layoutSnapshotUrl: null,
         submittedAt: '2026-11-03T11:10:00+08:00',
         status: 'Approved',
         decision: {
@@ -224,6 +228,7 @@ export const SAMPLE_PROJECT_REQUESTS: ProjectRequest[] = [
         theme: null,
         assets: [],
         files: [],
+        layoutSnapshotUrl: null,
         submittedAt: '2026-11-01T16:30:00+08:00',
         status: 'Rejected',
         decision: {
@@ -256,6 +261,7 @@ export const SAMPLE_PROJECT_REQUESTS: ProjectRequest[] = [
             { id: 'chiavari-chair', name: 'Chiavari Chairs', category: 'Furniture' },
         ],
         files: [],
+        layoutSnapshotUrl: null,
         submittedAt: '2026-10-20T13:40:00+08:00',
         status: 'Approved',
         decision: {
@@ -267,7 +273,7 @@ export const SAMPLE_PROJECT_REQUESTS: ProjectRequest[] = [
             outcome: 'Completed',
             summary: 'Client confirmed the garden setup and asked for a rain plan with a tent.',
             additionalNotes: 'Add a tent as backup in case of rain. Guest count raised to 180.',
-            ocularVisit: { required: true, scheduledAt: '2026-11-21T10:00' },
+            ocularVisit: { required: true },
             decision: 'Proceed',
             decisionReason: null,
             recordedBy: 'Project Manager',
