@@ -1,7 +1,9 @@
 import { PaymentHistory, PaymentReview } from '@/components/project-manager/payment-review';
+import RecordPaymentForm from '@/components/project-manager/record-payment-form';
 import { Section, peso } from '@/components/project-manager/request-details';
 import { CompletedNotice, StepIntro, WaitingNotice } from '@/components/project-manager/steps/step-ui';
 import type { StepProps } from '@/components/project-manager/steps/step-ui';
+import { verifiedTotal } from '@/data/project-manager/payments';
 import { waitingReason } from '@/data/project-manager/projects';
 
 /*
@@ -42,6 +44,16 @@ export default function ReservationFeeStep(props: StepProps) {
                         {pending.map((payment) => (
                             <PaymentReview key={payment.id} {...props} payment={payment} />
                         ))}
+                                                <RecordPaymentForm
+                            {...props}
+                            targets={[
+                                {
+                                    billingId: null,
+                                    type: 'Reservation Fee',
+                                    balance: project.reservationFee.amount - verifiedTotal(null, project.payments),
+                                },
+                            ]}
+                        />
                     </>
                 )}
 

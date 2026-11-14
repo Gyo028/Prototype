@@ -12,7 +12,11 @@
 
 export type PaymentType = 'Reservation Fee' | 'Down Payment' | 'Final Payment' | 'Additional Charge';
 export type BillingType = Exclude<PaymentType, 'Reservation Fee'>;
-export type PaymentMethod = 'GCash' | 'Maya' | 'Bank Transfer';
+export type PaymentMethod = 'GCash' | 'Maya' | 'Bank Transfer' | 'Cash' | 'Cheque';
+
+/** Paid in person: recorded by the Project Manager and saved as verified right away (backlog #28). */
+export const RECORDED_METHODS = ['Cash', 'Cheque'] as const;
+export type RecordedMethod = (typeof RECORDED_METHODS)[number];
 export type PaymentStatus = 'For Verification' | 'Verified' | 'Rejected';
 
 /** File types accepted as proof of payment. */
@@ -45,6 +49,7 @@ export type Payment = {
     referenceNo: string;
     paidOn: string; // 'YYYY-MM-DD', as entered by the customer
     receipt: { name: string; url: string } | null; // null = no proof of payment uploaded
+    chequeNo?: string | null; // cheque payments only
     submittedAt: string; // ISO date-time
     status: PaymentStatus;
     review: {
@@ -67,18 +72,21 @@ export function receiptProblem(p: Payment): string | null {
 
 export type BillingStatus = 'Paid' | 'For Verification' | 'Unpaid';
 
-/** A billing is paid once a payment for it has been verified. */
+/** Total of the verified payments for one billing (billingId null = the reservation fee). */
+export const verifiedTotal = (billingId: number | null, payments: Payment[]) =>
+    payments.filter((p) => p.billingId === billingId && p.status === 'Verified').reduce((sum, p) => sum + p.amount, 0);
+
+/** A billing is paid once its verified payments cover the full amount. */
 export function billingStatus(billing: Billing, payments: Payment[]): BillingStatus {
-    const forThis = payments.filter((p) => p.billingId === billing.id);
-    if (forThis.some((p) => p.status === 'Verified')) return 'Paid';
-    if (forThis.some((p) => p.status === 'For Verification')) return 'For Verification';
+    if (verifiedTotal(billing.id, payments) >= billing.amount) return 'Paid';
+    if (payments.some((p) => p.billingId === billing.id && p.status === 'For Verification')) return 'For Verification';
     return 'Unpaid';
 }
 
 /** The customer's payment record for the billings: total billed, verified so far, and the balance. */
 export function billingSummary(billings: Billing[], payments: Payment[]) {
     const totalBilled = billings.reduce((sum, b) => sum + b.amount, 0);
-    const paid = billings.filter((b) => billingStatus(b, payments) === 'Paid').reduce((sum, b) => sum + b.amount, 0);
+    const paid = billings.reduce((sum, b) => sum + Math.min(b.amount, verifiedTotal(b.id, payments)), 0);
     return { totalBilled, paid, balance: Math.max(0, totalBilled - paid) };
 }
 

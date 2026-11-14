@@ -272,12 +272,13 @@ export function PaymentHistory({ payments }: { payments: Payment[] }) {
 
     return (
         <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-sm">
+            <table className="w-full min-w-[720px] text-left text-sm">
                 <thead className="text-xs text-ink-soft uppercase">
                     <tr>
                         <th className="pb-2 pr-4 font-medium">Payment No.</th>
                         <th className="pb-2 pr-4 font-medium">Type</th>
                         <th className="pb-2 pr-4 font-medium">Amount</th>
+                        <th className="pb-2 pr-4 font-medium">Method</th>
                         <th className="pb-2 pr-4 font-medium">Reviewed</th>
                         <th className="pb-2 pr-4 font-medium">Status</th>
                     </tr>
@@ -288,6 +289,10 @@ export function PaymentHistory({ payments }: { payments: Payment[] }) {
                             <td className="py-2 pr-4 font-semibold text-ink">{p.code}</td>
                             <td className="py-2 pr-4 text-ink">{p.type}</td>
                             <td className="py-2 pr-4 text-ink">{peso(p.amount)}</td>
+                                                        <td className="py-2 pr-4 text-ink">
+                                {p.method}
+                                {p.chequeNo && <span className="block text-xs text-ink-soft">No. {p.chequeNo}</span>}
+                            </td>
                             <td className="py-2 text-ink-soft">
                                 {p.review ? `${p.review.reviewedBy}, ${formatDateTime(p.review.reviewedAt)}` : '—'}
                                 {p.review?.remarks && <span className="block text-xs">Remarks: {p.review.remarks}</span>}

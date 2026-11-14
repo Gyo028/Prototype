@@ -1,10 +1,11 @@
 import { Pill } from '@/components/dashboard/ui';
 import type { PillTone } from '@/components/dashboard/ui';
 import { PaymentHistory, PaymentReview } from '@/components/project-manager/payment-review';
+import RecordPaymentForm from '@/components/project-manager/record-payment-form';
 import { Detail, Section, formatDateTime, peso } from '@/components/project-manager/request-details';
 import { CompletedNotice, StepIntro, WaitingNotice } from '@/components/project-manager/steps/step-ui';
 import type { StepProps } from '@/components/project-manager/steps/step-ui';
-import { billingStatus, billingSummary } from '@/data/project-manager/payments';
+import { billingStatus, billingSummary, verifiedTotal } from '@/data/project-manager/payments';
 import type { BillingStatus } from '@/data/project-manager/payments';
 import { isStepComplete, waitingReason } from '@/data/project-manager/projects';
 
@@ -95,7 +96,12 @@ export default function PaymentsStep(props: StepProps) {
                         </div>
                     </Section>
                 )}
-
+                    <RecordPaymentForm
+                    {...props}
+                    targets={project.billings
+                        .filter((b) => billingStatus(b, project.payments) !== 'Paid')
+                        .map((b) => ({ billingId: b.id, type: b.type, balance: b.amount - verifiedTotal(b.id, project.payments) }))}
+                />
                 <Section title="Payment History">
                     <PaymentHistory payments={project.payments} />
                 </Section>
