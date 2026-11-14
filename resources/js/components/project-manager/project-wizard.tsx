@@ -8,6 +8,8 @@ import ConsultationStep from '@/components/project-manager/steps/consultation-st
 import ContractStep from '@/components/project-manager/steps/contract-step';
 import DesignAssignmentStep from '@/components/project-manager/steps/design-assignment-step';
 import DesignProposalStep from '@/components/project-manager/steps/design-proposal-step';
+import PaymentsStep from '@/components/project-manager/steps/payments-step';
+import ReservationFeeStep from '@/components/project-manager/steps/reservation-fee-step';
 import SiteAssessmentStep from '@/components/project-manager/steps/site-assessment-step';
 import { PROJECTS_URL } from '@/components/project-manager/steps/step-ui';
 import type { StepProps } from '@/components/project-manager/steps/step-ui';
@@ -195,12 +197,14 @@ export default function ProjectWizard({ project: serverProject, specialists, pro
             {/* Selected step */}
             <Panel>
                 {selected === 'consultation' && <ConsultationStep key={project.id} {...stepProps} />}
+                {selected === 'reservationFee' && <ReservationFeeStep key={project.id} {...stepProps} />}
                 {selected === 'siteAssessment' && <SiteAssessmentStep key={project.id} {...stepProps} />}
                 {selected === 'designAssignment' && (
                     <DesignAssignmentStep key={project.id} {...stepProps} specialists={specialists ?? SAMPLE_SPECIALISTS} />
                 )}
                 {selected === 'designProposal' && <DesignProposalStep key={project.id} {...stepProps} />}
                 {selected === 'contract' && <ContractStep key={project.id} {...stepProps} />}
+                {selected === 'payments' && <PaymentsStep key={project.id} {...stepProps} />}
 
                 {/* Move on once the next step is unlocked */}
                 {canGoNext && (

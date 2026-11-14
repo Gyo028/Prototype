@@ -5,15 +5,19 @@
  * "Plan Project" use case, one step at a time:
  *
  *   1. Consultation        (backlog #16)
- *   2. Site Assessment     (backlog #20)  needs: reservation fee paid + ocular visit booked by the customer
- *   3. Design Assignment   (backlog #21)
- *   4. Design Proposal     (backlog #24, not built yet)
- *   5. Contract            (backlog #18)  needs: the customer's signed contract
+ *   2. Reservation Fee     (backlog #27)  needs: the customer's reservation fee payment
+ *   3. Site Assessment     (backlog #20)  needs: ocular visit booked by the customer
+ *   4. Design Assignment   (backlog #21)
+ *   5. Design Proposal     (backlog #24)
+ *   6. Contract            (backlog #18)  needs: the customer's signed contract
+ *   7. Payments            (backlog #27)  needs: the down payment / final payment billings paid
  *
  * A step stays locked until the step before it is complete.
  * The SAMPLE_PROJECTS list is only used while the backend is not ready yet.
  */
 
+import { billingStatus, samplePayment, verified } from '@/data/project-manager/payments';
+import type { Billing, Payment } from '@/data/project-manager/payments';
 import type { ProjectRequest } from '@/data/project-manager/project-requests';
 
 /* ---------- site assessment (backlog #20) ---------- */
@@ -131,22 +135,26 @@ export type ContractSubmission = {
 
 /** An approved service request plus everything recorded while planning it. */
 export type Project = ProjectRequest & {
-    reservationFee: { amount: number; paid: boolean }; // billed after the consultation, verified in Payments
+    reservationFee: { amount: number; paid: boolean }; // billed after the consultation, verified in step 2
     ocularVisitAt: string | null; // 'YYYY-MM-DDTHH:mm', booked by the customer
     siteAssessment: SiteAssessment | null;
     assignment: Assignment | null;
     designProposal: DesignProposal | null;
     contract: ContractSubmission | null;
+    billings: Billing[]; // issued to the customer after the contract (down payment, final payment, additional charges)
+    payments: Payment[]; // every payment the customer submitted, for the reservation fee and the billings
 };
 
 /* ---------- wizard steps ---------- */
 
 export const STEPS = [
     { key: 'consultation', title: 'Consultation' },
+    { key: 'reservationFee', title: 'Reservation Fee' },
     { key: 'siteAssessment', title: 'Site Assessment' },
     { key: 'designAssignment', title: 'Design Assignment' },
     { key: 'designProposal', title: 'Design Proposal' },
     { key: 'contract', title: 'Contract' },
+    { key: 'payments', title: 'Payments' },
 ] as const;
 
 export type StepKey = (typeof STEPS)[number]['key'];
@@ -172,6 +180,8 @@ export function isStepComplete(p: Project, key: StepKey): boolean {
     switch (key) {
         case 'consultation':
             return p.consultation !== null;
+        case 'reservationFee':
+            return p.reservationFee.paid;
         case 'siteAssessment':
             return !ocularRequired(p) || p.siteAssessment !== null;
         case 'designAssignment':
@@ -180,16 +190,20 @@ export function isStepComplete(p: Project, key: StepKey): boolean {
             return p.designProposal?.status === 'Approved';
         case 'contract':
             return p.contract?.status === 'Approved';
+        case 'payments':
+            return p.billings.length > 0 && p.billings.every((b) => billingStatus(b, p.payments) === 'Paid');
     }
 }
 
 /** Why an open step cannot be worked on yet, or null when the Project Manager can act. */
 export function waitingReason(p: Project, key: StepKey): string | null {
     switch (key) {
+        case 'reservationFee': {
+            const pending = p.payments.some((x) => x.type === 'Reservation Fee' && x.status === 'For Verification');
+            if (!pending) return `Waiting for the customer to pay the reservation fee (${peso(p.reservationFee.amount)}) and upload the receipt.`;
+            return null;
+        }
         case 'siteAssessment':
-            if (!p.reservationFee.paid) {
-                return `Waiting for the customer to pay the reservation fee (${peso(p.reservationFee.amount)}). Verify the payment in Payments.`;
-            }
             if (!p.ocularVisitAt) return 'Waiting for the customer to book the ocular visit.';
             return null;
         case 'designProposal': {
@@ -203,6 +217,12 @@ export function waitingReason(p: Project, key: StepKey): string | null {
             if (!p.contract) return 'Waiting for the customer to sign and upload the project contract.';
             if (p.contract.status === 'Rejected') return 'Waiting for the customer to re-submit the signed contract.';
             return null;
+        case 'payments': {
+            if (p.billings.length === 0) return 'Waiting for the billing to be issued to the customer.';
+            if (p.payments.some((x) => x.billingId !== null && x.status === 'For Verification')) return null;
+            const unpaid = p.billings.filter((b) => billingStatus(b, p.payments) === 'Unpaid');
+            return `Waiting for the customer to pay: ${unpaid.map((b) => `${b.type} (${peso(b.amount)})`).join(', ')}.`;
+        }
         default:
             return null;
     }
@@ -278,6 +298,8 @@ function sample(p: SampleInput): Project {
         assignment: null,
         designProposal: null,
         contract: null,
+        billings: [],
+        payments: [],
         ...p,
     };
 }
@@ -354,7 +376,7 @@ const SAMPLE_PROJECTS: Project[] = [
         guests: 120,
         theme: 'Pastel Garden',
     }),
-    // Step 2: waiting for the reservation fee
+    // Step 2: reservation fee paid, receipt ready to verify
     sample({
         id: 11,
         code: 'REQ-0011',
@@ -365,8 +387,45 @@ const SAMPLE_PROJECTS: Project[] = [
         venueSetting: 'Outdoor',
         guests: 200,
         consultation: consultation(),
+        payments: [
+            samplePayment({ id: 1, type: 'Reservation Fee', amount: 10000, submittedAt: '2026-11-12T19:40:00+08:00', referenceNo: '1009 482 337 1' }),
+        ],
     }),
-    // Step 2: fee paid and ocular visit booked, ready for the site assessment
+    // Step 2: reservation fee receipt is not a valid file (an earlier payment was rejected)
+    sample({
+        id: 16,
+        code: 'REQ-0016',
+        customer: { name: 'Paolo Cruz', email: 'paolo.cruz@example.com', phone: '0915 404 2020' },
+        eventType: 'Birthday',
+        eventDate: '2027-03-20',
+        venue: 'Events Place, Makati City',
+        guests: 80,
+        consultation: consultation(),
+        payments: [
+            samplePayment({
+                id: 2,
+                type: 'Reservation Fee',
+                amount: 10000,
+                submittedAt: '2026-11-09T09:00:00+08:00',
+                status: 'Rejected',
+                review: {
+                    remarks: 'The receipt shows ₱1,000, not ₱10,000. Please upload the correct receipt.',
+                    reviewedBy: 'Project Manager',
+                    reviewedAt: '2026-11-09T13:00:00+08:00',
+                },
+            }),
+            samplePayment({
+                id: 3,
+                type: 'Reservation Fee',
+                amount: 10000,
+                method: 'Bank Transfer',
+                referenceNo: 'BPI-55002871',
+                submittedAt: '2026-11-13T16:22:00+08:00',
+                receipt: { name: 'payment-details.docx', url: '' },
+            }),
+        ],
+    }),
+    // Step 3: fee paid and ocular visit booked, ready for the site assessment
     sample({
         id: 7,
         code: 'REQ-0007',
@@ -380,7 +439,7 @@ const SAMPLE_PROJECTS: Project[] = [
         reservationFee: { amount: 15000, paid: true },
         ocularVisitAt: '2026-11-18T14:00',
     }),
-    // Step 3: ready to assign a Design Specialist
+    // Step 4: ready to assign a Design Specialist
     sample({
         id: 8,
         code: 'REQ-0008',
@@ -395,7 +454,7 @@ const SAMPLE_PROJECTS: Project[] = [
         ocularVisitAt: '2026-11-08T09:30',
         siteAssessment: siteAssessment('2026-11-08'),
     }),
-    // Step 3: no ocular visit needed, so Site Assessment is skipped
+    // Step 4: no ocular visit needed, so Site Assessment is skipped
     sample({
         id: 6,
         code: 'REQ-0006',
@@ -408,7 +467,7 @@ const SAMPLE_PROJECTS: Project[] = [
         consultation: consultation({ ocularVisit: { required: false }, summary: 'Client has used this venue before; layout plans were provided.' }),
         reservationFee: { amount: 10000, paid: true },
     }),
-    // Step 4: design proposal submitted, ready for review
+    // Step 5: design proposal submitted, ready for review
     sample({
         id: 10,
         code: 'REQ-0010',
@@ -424,7 +483,7 @@ const SAMPLE_PROJECTS: Project[] = [
         assignment: assignment(21, 'Camille Ocampo'),
         designProposal: proposal(),
     }),
-    // Step 5: signed contract submitted, for review
+    // Step 6: signed contract submitted, for review
     sample({
         id: 12,
         code: 'REQ-0012',
@@ -450,7 +509,7 @@ const SAMPLE_PROJECTS: Project[] = [
             review: null,
         },
     }),
-    // Step 5: contract rejected, waiting for the customer to re-submit
+    // Step 6: contract rejected, waiting for the customer to re-submit
     sample({
         id: 9,
         code: 'REQ-0009',
@@ -479,7 +538,7 @@ const SAMPLE_PROJECTS: Project[] = [
             },
         },
     }),
-    // Planning completed: contract verified
+    // Planning completed: contract verified and every billing paid
     sample({
         id: 13,
         code: 'REQ-0013',
@@ -507,6 +566,83 @@ const SAMPLE_PROJECTS: Project[] = [
                 reviewedAt: '2026-11-04T10:00:00+08:00',
             },
         },
+        billings: [
+            { id: 1, type: 'Down Payment', amount: 149000, issuedAt: '2026-11-04T10:05:00+08:00' },
+            { id: 2, type: 'Final Payment', amount: 149000, issuedAt: '2026-11-04T10:05:00+08:00' },
+        ],
+        payments: [
+            samplePayment({ id: 4, type: 'Reservation Fee', amount: 15000, submittedAt: '2026-10-05T09:10:00+08:00', status: 'Verified', review: verified('2026-10-05T13:00:00+08:00') }),
+            samplePayment({
+                id: 5,
+                billingId: 1,
+                type: 'Down Payment',
+                amount: 149000,
+                method: 'Bank Transfer',
+                referenceNo: 'BPI-44120933',
+                submittedAt: '2026-11-05T11:00:00+08:00',
+                receipt: { name: 'bpi-downpayment.pdf', url: '' },
+                status: 'Verified',
+                review: verified('2026-11-05T15:30:00+08:00'),
+            }),
+            samplePayment({
+                id: 6,
+                billingId: 2,
+                type: 'Final Payment',
+                amount: 149000,
+                method: 'Bank Transfer',
+                referenceNo: 'BPI-46001288',
+                submittedAt: '2026-11-12T10:00:00+08:00',
+                receipt: { name: 'bpi-finalpayment.pdf', url: '' },
+                status: 'Verified',
+                review: verified('2026-11-12T14:00:00+08:00'),
+            }),
+        ],
+    }),
+    // Step 7: contract approved; down payment submitted without a receipt, final payment not paid yet
+    sample({
+        id: 15,
+        code: 'REQ-0015',
+        customer: { name: 'Mika Santos', email: 'mika.santos@example.com', phone: '0917 515 1515' },
+        eventType: 'Wedding',
+        eventDate: '2027-01-16',
+        venue: 'Shangri-La The Fort, Taguig City',
+        consultation: consultation(),
+        reservationFee: { amount: 10000, paid: true },
+        ocularVisitAt: '2026-10-14T10:00',
+        siteAssessment: siteAssessment('2026-10-14'),
+        assignment: assignment(22, 'Miguel Santiago'),
+        designProposal: approvedProposal(220000),
+        contract: {
+            code: 'CON-0015',
+            version: 1,
+            amount: 220000,
+            file: { name: 'CON-0015_Santos_signed.pdf', url: '' },
+            submittedAt: '2026-11-08T09:00:00+08:00',
+            status: 'Approved',
+            review: {
+                remarks: null,
+                checklist: ['signed', 'details', 'amount', 'complete'],
+                reviewedBy: 'Project Manager',
+                reviewedAt: '2026-11-09T10:00:00+08:00',
+            },
+        },
+        billings: [
+            { id: 3, type: 'Down Payment', amount: 110000, issuedAt: '2026-11-09T10:05:00+08:00' },
+            { id: 4, type: 'Final Payment', amount: 110000, issuedAt: '2026-11-09T10:05:00+08:00' },
+        ],
+        payments: [
+            samplePayment({ id: 7, type: 'Reservation Fee', amount: 10000, submittedAt: '2026-10-08T09:00:00+08:00', status: 'Verified', review: verified('2026-10-08T12:00:00+08:00') }),
+            samplePayment({
+                id: 8,
+                billingId: 3,
+                type: 'Down Payment',
+                amount: 110000,
+                method: 'Bank Transfer',
+                referenceNo: 'BDO-88213409',
+                submittedAt: '2026-11-13T10:05:00+08:00',
+                receipt: null,
+            }),
+        ],
     }),
     // Not proceeding: closed at the consultation
     sample({
