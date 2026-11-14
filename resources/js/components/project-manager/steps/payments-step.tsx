@@ -1,6 +1,7 @@
 import { Pill } from '@/components/dashboard/ui';
 import type { PillTone } from '@/components/dashboard/ui';
 import { PaymentHistory, PaymentReview } from '@/components/project-manager/payment-review';
+import AddChargeForm from '@/components/project-manager/add-charge-form';
 import RecordPaymentForm from '@/components/project-manager/record-payment-form';
 import { Detail, Section, formatDateTime, peso } from '@/components/project-manager/request-details';
 import { CompletedNotice, StepIntro, WaitingNotice } from '@/components/project-manager/steps/step-ui';
@@ -55,7 +56,7 @@ export default function PaymentsStep(props: StepProps) {
                         <div className="mb-4 grid grid-cols-3 gap-3">
                             <Detail label="Total billed">{peso(summary.totalBilled)}</Detail>
                             <Detail label="Paid (verified)">{peso(summary.paid)}</Detail>
-                            <Detail label="Balance">{peso(summary.balance)}</Detail>
+                            <Detail label="Remaining balance">{peso(summary.balance)}</Detail>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full min-w-[480px] text-left text-sm">
@@ -72,7 +73,11 @@ export default function PaymentsStep(props: StepProps) {
                                         const status = billingStatus(b, project.payments);
                                         return (
                                             <tr key={b.id}>
-                                                <td className="py-2 font-semibold text-ink">{b.type}</td>
+                                                <td className="py-2 pr-4 text-ink">
+                                                    <span className="font-semibold">{b.type}</span>
+                                                    {b.description && <span className="block text-xs">{b.description}</span>}
+                                                    {b.reason && <span className="block text-xs text-ink-soft">Reason: {b.reason}</span>}
+                                                </td>
                                                 <td className="py-2 text-ink-soft">{formatDateTime(b.issuedAt)}</td>
                                                 <td className="py-2 text-right text-ink">{peso(b.amount)}</td>
                                                 <td className="py-2 pl-4">
@@ -96,6 +101,7 @@ export default function PaymentsStep(props: StepProps) {
                         </div>
                     </Section>
                 )}
+                <AddChargeForm {...props} />
                     <RecordPaymentForm
                     {...props}
                     targets={project.billings

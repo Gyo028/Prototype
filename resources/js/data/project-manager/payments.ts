@@ -36,6 +36,9 @@ export type Billing = {
     type: BillingType;
     amount: number; // pesos
     issuedAt: string; // ISO date-time
+    description?: string | null; // additional charges only: what the charge is for (backlog #29)
+    reason?: string | null; // additional charges only: why it is outside the approved quotation
+    recordedBy?: string | null; // additional charges only: the Project Manager who recorded it
 };
 
 /** One payment the customer submitted. */

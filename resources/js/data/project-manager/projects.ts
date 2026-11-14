@@ -221,6 +221,7 @@ export function waitingReason(p: Project, key: StepKey): string | null {
             if (p.billings.length === 0) return 'Waiting for the billing to be issued to the customer.';
             if (p.payments.some((x) => x.billingId !== null && x.status === 'For Verification')) return null;
             const unpaid = p.billings.filter((b) => billingStatus(b, p.payments) === 'Unpaid');
+            if (unpaid.length === 0) return null;
             return `Waiting for the customer to pay: ${unpaid.map((b) => `${b.type} (${peso(b.amount)})`).join(', ')}.`;
         }
         default:
