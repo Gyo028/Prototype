@@ -2,6 +2,7 @@ import { Pill } from '@/components/dashboard/ui';
 import type { PillTone } from '@/components/dashboard/ui';
 import { PaymentHistory, PaymentReview } from '@/components/project-manager/payment-review';
 import AddChargeForm from '@/components/project-manager/add-charge-form';
+import BillingDisputes from '@/components/project-manager/billing-disputes';
 import RecordPaymentForm from '@/components/project-manager/record-payment-form';
 import { Detail, Section, formatDateTime, peso } from '@/components/project-manager/request-details';
 import { CompletedNotice, StepIntro, WaitingNotice } from '@/components/project-manager/steps/step-ui';
@@ -101,6 +102,7 @@ export default function PaymentsStep(props: StepProps) {
                         </div>
                     </Section>
                 )}
+                <BillingDisputes {...props} />
                 <AddChargeForm {...props} />
                     <RecordPaymentForm
                     {...props}

@@ -17,7 +17,7 @@
  */
 
 import { billingStatus, samplePayment, verified } from '@/data/project-manager/payments';
-import type { Billing, Payment } from '@/data/project-manager/payments';
+import type { Billing, BillingDispute, Payment } from '@/data/project-manager/payments';
 import type { ProjectRequest } from '@/data/project-manager/project-requests';
 
 /* ---------- site assessment (backlog #20) ---------- */
@@ -143,6 +143,7 @@ export type Project = ProjectRequest & {
     contract: ContractSubmission | null;
     billings: Billing[]; // issued to the customer after the contract (down payment, final payment, additional charges)
     payments: Payment[]; // every payment the customer submitted, for the reservation fee and the billings
+    disputes: BillingDispute[]; // billing disputes raised by the customer (backlog #31)
 };
 
 /* ---------- wizard steps ---------- */
@@ -220,6 +221,7 @@ export function waitingReason(p: Project, key: StepKey): string | null {
         case 'payments': {
             if (p.billings.length === 0) return 'Waiting for the billing to be issued to the customer.';
             if (p.payments.some((x) => x.billingId !== null && x.status === 'For Verification')) return null;
+            if (p.disputes.some((d) => d.status !== 'Resolved')) return null; // a billing dispute needs the Project Manager
             const unpaid = p.billings.filter((b) => billingStatus(b, p.payments) === 'Unpaid');
             if (unpaid.length === 0) return null;
             return `Waiting for the customer to pay: ${unpaid.map((b) => `${b.type} (${peso(b.amount)})`).join(', ')}.`;
@@ -301,6 +303,7 @@ function sample(p: SampleInput): Project {
         contract: null,
         billings: [],
         payments: [],
+        disputes: [],
         ...p,
     };
 }
@@ -598,6 +601,25 @@ const SAMPLE_PROJECTS: Project[] = [
                 review: verified('2026-11-12T14:00:00+08:00'),
             }),
         ],
+                disputes: [
+            {
+                id: 1,
+                code: 'DSP-0001',
+                billingId: 1,
+                reason: 'The down payment should only be 40% of the contract.',
+                submittedAt: '2026-11-04T15:00:00+08:00',
+                status: 'Resolved',
+                reviewedAt: '2026-11-04T16:00:00+08:00',
+                resolution: {
+                    decision: 'Rejected',
+                    remarks: 'The signed contract states a 50% down payment. The bill stays at ₱149,000.',
+                    previousAmount: 149000,
+                    newAmount: 149000,
+                    resolvedBy: 'Project Manager',
+                    resolvedAt: '2026-11-04T16:30:00+08:00',
+                },
+            },
+        ],
     }),
     // Step 7: contract approved; down payment submitted without a receipt, final payment not paid yet
     sample({
@@ -643,6 +665,18 @@ const SAMPLE_PROJECTS: Project[] = [
                 submittedAt: '2026-11-13T10:05:00+08:00',
                 receipt: null,
             }),
+        ],
+                disputes: [
+            {
+                id: 2,
+                code: 'DSP-0002',
+                billingId: 4,
+                reason: 'The final payment should be ₱100,000. We removed the photo booth during the consultation, but it is still included.',
+                submittedAt: '2026-11-13T18:30:00+08:00',
+                status: 'Submitted',
+                reviewedAt: null,
+                resolution: null,
+            },
         ],
     }),
     // Not proceeding: closed at the consultation

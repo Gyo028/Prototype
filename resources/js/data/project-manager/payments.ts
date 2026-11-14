@@ -110,3 +110,34 @@ export const samplePayment = (p: PaymentInput): Payment => ({
 });
 
 export const verified = (reviewedAt: string): Payment['review'] => ({ remarks: null, reviewedBy: 'Project Manager', reviewedAt });
+
+/* ---------- billing disputes (backlog #31) ---------- */
+
+/**
+ * Submitted = the customer raised the dispute, not reviewed yet
+ * Reviewed  = the Project Manager is reviewing it
+ * Resolved  = a decision was recorded and the customer was notified
+ */
+export type DisputeStatus = 'Submitted' | 'Reviewed' | 'Resolved';
+
+/** Upheld and Rejected keep the bill as it is; Adjusted changes the billing amount. */
+export const DISPUTE_DECISIONS = ['Upheld', 'Rejected', 'Adjusted'] as const;
+export type DisputeDecision = (typeof DISPUTE_DECISIONS)[number];
+
+export type BillingDispute = {
+    id: number;
+    code: string; // e.g. "DSP-0001"
+    billingId: number; // the bill being disputed
+    reason: string; // the customer's explanation
+    submittedAt: string; // ISO date-time
+    status: DisputeStatus;
+    reviewedAt: string | null; // when the Project Manager started the review
+    resolution: {
+        decision: DisputeDecision;
+        remarks: string | null;
+        previousAmount: number; // the bill before the resolution
+        newAmount: number; // equal to previousAmount unless Adjusted
+        resolvedBy: string;
+        resolvedAt: string; // ISO date-time = the resolved date
+    } | null;
+};
