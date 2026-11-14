@@ -55,12 +55,47 @@ export type Assignment = {
     assignedAt: string; // ISO date-time
 };
 
-/* ---------- design proposal (backlog #24, placeholder until it is built) ---------- */
+/* ---------- design proposal and quotation (backlog #24) ---------- */
+
+/** One line of the project quotation. */
+export type QuotationItem = {
+    id: string;
+    description: string;
+    quantity: number;
+    unitPrice: number; // pesos
+};
+
+export type Quotation = {
+    items: QuotationItem[];
+    discount: number; // pesos taken off the subtotal
+};
+
+export const quotationSubtotal = (q: Quotation) => q.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+export const quotationTotal = (q: Quotation) => Math.max(0, quotationSubtotal(q) - q.discount);
+
+/**
+ * Submitted             = waiting for the Project Manager's review
+ * Returned for Revision = sent back to the Design Specialist with remarks
+ * Awaiting Customer     = approved by the Project Manager, quotation finalized, waiting for the customer
+ * Approved              = approved by the customer too (the contract comes next)
+ */
+export type ProposalStatus = 'Submitted' | 'Returned for Revision' | 'Awaiting Customer' | 'Approved';
 
 export type DesignProposal = {
-    status: 'Submitted' | 'Approved'; // Approved = approved by both the Project Manager and the customer
-    quotationTotal: number | null;
-    approvedAt: string | null; // ISO date-time
+    version: number; // 2 or more = re-submitted after a revision
+    status: ProposalStatus;
+    submittedBy: string; // the Design Specialist
+    submittedAt: string; // ISO date-time
+    notes: string; // the designer's explanation of the proposal
+    layoutSnapshotUrl: string | null; // image exported from the 2D Layout Designer
+    file: StoredFile | null; // the design proposal document
+    quotation: Quotation | null; // finalized by the Project Manager when approving
+    review: {
+        decision: 'approve' | 'return';
+        remarks: string | null; // required when returned for revision
+        reviewedBy: string;
+        reviewedAt: string; // ISO date-time
+    } | null;
 };
 
 /* ---------- contract (backlog #18) ---------- */
@@ -157,11 +192,13 @@ export function waitingReason(p: Project, key: StepKey): string | null {
             }
             if (!p.ocularVisitAt) return 'Waiting for the customer to book the ocular visit.';
             return null;
-        case 'designProposal':
-            if (!p.designProposal) {
-                return `Waiting for ${p.assignment?.specialistName ?? 'the Design Specialist'} to submit the design proposal.`;
-            }
+        case 'designProposal': {
+            const designer = p.assignment?.specialistName ?? 'the Design Specialist';
+            if (!p.designProposal) return `Waiting for ${designer} to submit the design proposal.`;
+            if (p.designProposal.status === 'Returned for Revision') return `Waiting for ${designer} to revise and re-submit the design proposal.`;
+            if (p.designProposal.status === 'Awaiting Customer') return 'Waiting for the customer to approve the design proposal and quotation.';
             return null;
+        }
         case 'contract':
             if (!p.contract) return 'Waiting for the customer to sign and upload the project contract.';
             if (p.contract.status === 'Rejected') return 'Waiting for the customer to re-submit the signed contract.';
@@ -277,11 +314,32 @@ const assignment = (specialistId: number, specialistName: string): Assignment =>
     assignedAt: '2026-11-05T10:00:00+08:00',
 });
 
-const approvedProposal = (total: number): DesignProposal => ({
-    status: 'Approved',
-    quotationTotal: total,
-    approvedAt: '2026-11-09T14:00:00+08:00',
+const proposal = (overrides: Partial<DesignProposal> = {}): DesignProposal => ({
+    version: 1,
+    status: 'Submitted',
+    submittedBy: 'Camille Ocampo',
+    submittedAt: '2026-11-10T15:30:00+08:00',
+    notes: 'Pastel floral arch at the entrance, a backdrop for the 18 roses, and round tables with chiavari chairs.',
+    layoutSnapshotUrl: null,
+    file: { name: 'design-proposal.pdf', url: '' },
+    quotation: null,
+    review: null,
+    ...overrides,
 });
+
+const approvedProposal = (total: number): DesignProposal =>
+    proposal({
+        status: 'Approved',
+        submittedAt: '2026-11-06T10:00:00+08:00',
+        quotation: {
+            items: [
+                { id: 'styling', description: 'Event styling and design package', quantity: 1, unitPrice: total - 15000 },
+                { id: 'setup', description: 'Setup, logistics and teardown', quantity: 1, unitPrice: 15000 },
+            ],
+            discount: 0,
+        },
+        review: { decision: 'approve', remarks: null, reviewedBy: 'Project Manager', reviewedAt: '2026-11-07T10:00:00+08:00' },
+    });
 
 const SAMPLE_PROJECTS: Project[] = [
     // Step 1: consultation not recorded yet
@@ -350,7 +408,7 @@ const SAMPLE_PROJECTS: Project[] = [
         consultation: consultation({ ocularVisit: { required: false }, summary: 'Client has used this venue before; layout plans were provided.' }),
         reservationFee: { amount: 10000, paid: true },
     }),
-    // Step 4: waiting for the design proposal (#24 not built yet)
+    // Step 4: design proposal submitted, ready for review
     sample({
         id: 10,
         code: 'REQ-0010',
@@ -364,6 +422,7 @@ const SAMPLE_PROJECTS: Project[] = [
         ocularVisitAt: '2026-11-02T10:00',
         siteAssessment: siteAssessment('2026-11-02'),
         assignment: assignment(21, 'Camille Ocampo'),
+        designProposal: proposal(),
     }),
     // Step 5: signed contract submitted, for review
     sample({
