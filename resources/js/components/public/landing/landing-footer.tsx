@@ -1,4 +1,4 @@
-import { Facebook, Instagram, Twitter } from 'lucide-react';
+import { Facebook, Instagram } from 'lucide-react';
 
 const linkColumns = [
     { title: 'Services', links: ['Corporate Events', 'Special Occasions', 'Custom Fabrication'] },
@@ -6,7 +6,6 @@ const linkColumns = [
 
 const socials = [
     { label: 'Facebook', href: 'https://www.facebook.com/share/17uj5e738o/', Icon: Facebook },
-    { label: 'Twitter', href: '#', Icon: Twitter },
     { label: 'Instagram', href: '#', Icon: Instagram },
 ];
 
@@ -25,11 +24,11 @@ export default function LandingFooter() {
 
                     {linkColumns.map((column, index) => (
                         <div key={index}>
-                            <h4 className="text-lg text-[#F28C28]">{column.title}</h4>
+                            <h4 className="text-lg text-[#C99A2E]">{column.title}</h4>
                             <ul className="mt-6 space-y-4 text-base text-neutral-800">
                                 {column.links.map((link) => (
                                     <li key={link}>
-                                        <a href="/#services" className="transition-colors hover:text-[#F28C28]">
+                                        <a href="/#services" className="transition-colors hover:text-[#C99A2E]">
                                             {link}
                                         </a>
                                     </li>
@@ -39,7 +38,7 @@ export default function LandingFooter() {
                     ))}
 
                     <div>
-                        <h4 className="text-lg text-[#F28C28]">Follow Us</h4>
+                        <h4 className="text-lg text-[#C99A2E]">Follow Us</h4>
                         <ul className="mt-6 space-y-4 text-base text-neutral-800">
                             {socials.map(({ label, href, Icon }) => (
                                 <li key={label}>
@@ -47,7 +46,7 @@ export default function LandingFooter() {
                                         href={href}
                                         target={href.startsWith('http') ? '_blank' : undefined}
                                         rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-4 transition-colors hover:text-[#F28C28]"
+                                        className="inline-flex items-center gap-4 transition-colors hover:text-[#C99A2E]"
                                     >
                                         <Icon className="h-6 w-6" />
                                         {label}

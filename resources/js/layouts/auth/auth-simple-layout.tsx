@@ -16,9 +16,9 @@ type Props = AuthLayoutProps & {
 };
 
 const cardStyles: Record<AuthLayoutVariant, string> = {
-    default: 'max-w-md border border-cream-dark shadow-sm',
-    login: 'max-w-lg border border-transparent shadow-lg',
-    register: 'max-w-3xl border border-cream-dark shadow-none',
+    default: 'max-w-md border border-cream-dark bg-white shadow-sm',
+    login: 'max-w-md border border-[#C99A2E] bg-white/85 shadow-[0_0_60px_12px_rgba(201,154,46,0.16),0_30px_90px_-20px_rgba(0,0,0,0.22)] backdrop-blur-md',
+    register: 'max-w-3xl border border-[#C99A2E] bg-white/85 shadow-[0_0_60px_12px_rgba(201,154,46,0.16),0_30px_90px_-20px_rgba(0,0,0,0.22)] backdrop-blur-md',
 };
 
 export default function AuthSimpleLayout({
@@ -27,11 +27,30 @@ export default function AuthSimpleLayout({
     description,
     variant = 'default',
 }: Props) {
+    // Login and register share the same gold-framed look.
+    const isFramed = variant === 'login' || variant === 'register';
+
     return (
-        <div className="flex min-h-svh flex-col items-center justify-center bg-cream p-6 md:p-10">
-            <div
-                className={`w-full rounded-2xl bg-white p-8 md:p-10 ${cardStyles[variant]}`}
-            >
+        <div
+            className={`relative isolate flex min-h-svh flex-col items-center justify-center overflow-hidden p-6 md:p-10 ${isFramed ? 'bg-[#F6F1E6]' : 'bg-cream'}`}
+        >
+            {/* Login / register: soft blurred photo behind the frosted card */}
+            {isFramed && (
+                <>
+                    <img
+                        src="/images/hero-bg.webp"
+                        alt=""
+                        aria-hidden="true"
+                        className="absolute inset-0 -z-20 size-full scale-110 object-cover blur-md"
+                    />
+                    <div
+                        aria-hidden="true"
+                        className="absolute inset-0 -z-10 bg-white/65"
+                    />
+                </>
+            )}
+
+            <div className={`w-full rounded-2xl p-8 md:p-10 ${cardStyles[variant]}`}>
                 <div className="flex flex-col gap-8">
                     {variant === 'default' && (
                         <div className="flex flex-col items-center gap-6">
@@ -50,26 +69,24 @@ export default function AuthSimpleLayout({
                         </div>
                     )}
 
-                    {variant === 'login' && (
+                    {isFramed && (
                         <div className="flex flex-col items-center gap-3">
-                            <div className="flex size-16 items-center justify-center rounded-full bg-gold/20">
+                            <div className="flex size-16 items-center justify-center rounded-full border border-[#C99A2E] bg-[#C99A2E]/10">
                                 <UserRound
-                                    className="size-8 text-gold"
+                                    className="size-8 text-[#C99A2E]"
                                     strokeWidth={1.75}
                                 />
                             </div>
-                            <p className="text-center text-sm text-ink-soft">
-                                {description}
-                            </p>
-                        </div>
-                    )}
-
-                    {variant === 'register' && (
-                        <div className="space-y-2">
-                            <h1 className="text-2xl font-bold text-ink">
-                                {title}
-                            </h1>
-                            <p className="text-sm text-ink">{description}</p>
+                            <div className="space-y-1.5 text-center">
+                                {title && (
+                                    <h1 className="font-['DM_Serif_Display',serif] text-3xl font-normal tracking-wide text-ink">
+                                        {title}
+                                    </h1>
+                                )}
+                                <p className="text-center text-sm text-ink-soft">
+                                    {description}
+                                </p>
+                            </div>
                         </div>
                     )}
 

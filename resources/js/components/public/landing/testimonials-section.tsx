@@ -8,7 +8,6 @@ type Review = {
     role: string;
     quote: string;
     rating: number;
-    /** Optional avatar photo. Falls back to initials. */
     avatar?: string;
     avatarColor: string;
 };
@@ -45,7 +44,6 @@ const reviews: Review[] = [
     },
 ];
 
-// Italic quote font (DM Serif Display has no italic)
 const quoteSerif = "font-['Lora',serif]";
 
 function Stars({ rating }: { rating: number }) {
@@ -100,12 +98,9 @@ function ReviewCard({ review }: { review: Review }) {
     );
 }
 
-// The strip holds COPIES copies of the reviews. It auto-scrolls left and, whenever the scroll position
-// leaves the middle band (1 to 3 copy-widths), jumps by exactly 2 copy-widths. The copies are identical,
-// so the jump is invisible and the loop works in both directions, for auto-scroll and manual scrolling.
 const COPIES = 6;
-const SPEED = 40; // px per second
-const RESUME_DELAY = 2500; // ms of calm after the visitor stops touching before auto-scroll restarts
+const SPEED = 40; 
+const RESUME_DELAY = 2500; 
 
 export default function TestimonialsSection() {
     const scrollerRef = useRef<HTMLDivElement>(null);
@@ -120,7 +115,6 @@ export default function TestimonialsSection() {
         ui.current.resumeAt = performance.now() + ms;
     };
 
-    /** Keep the scroll position inside the middle band; returns how far it jumped. */
     const wrap = () => {
         const el = scrollerRef.current;
         const W = copyWidth.current;
@@ -147,7 +141,7 @@ export default function TestimonialsSection() {
             copyWidth.current = el.scrollWidth / COPIES;
         };
         measure();
-        el.scrollLeft = copyWidth.current; // start in the middle band so we can scroll both ways
+        el.scrollLeft = copyWidth.current; 
 
         const onResize = () => {
             measure();
@@ -165,9 +159,9 @@ export default function TestimonialsSection() {
             const u = ui.current;
 
             if (u.hovering || u.dragging || now < u.resumeAt || reduceMotion) {
-                pos = el.scrollLeft; // follow wherever the visitor took it
+                pos = el.scrollLeft; 
             } else {
-                pos += (SPEED * dt) / 1000; // float accumulator keeps slow speeds smooth
+                pos += (SPEED * dt) / 1000; 
                 el.scrollLeft = pos;
             }
             raf = requestAnimationFrame(tick);
@@ -184,14 +178,12 @@ export default function TestimonialsSection() {
         <section id="testimonials" className="scroll-mt-16 bg-gradient-to-br from-[#FBF9F4] to-[#EDE2CE] py-16 lg:py-24">
             <div className="mx-auto max-w-[1400px] px-6">
                 <div className="mb-10 text-center">
-                    <p className="text-sm font-normal tracking-[0.3em] text-[#B8946A] uppercase">Testimonials</p>
                     <h2 className="mt-3 font-['DM_Serif_Display',serif] text-4xl font-normal text-[#111111] md:text-5xl">Our Client Reviews</h2>
                 </div>
             </div>
 
             <div className="relative">
-                {/* Scrollable strip: swipe, trackpad, shift+wheel, arrow keys or click-and-drag all work. py-10 gives the
-                    overlapping avatars and hover glow room, since a scroll container clips whatever sticks out. */}
+               
                 <div
                     ref={scrollerRef}
                     tabIndex={0}
