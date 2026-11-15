@@ -8,11 +8,14 @@ import ConsultationStep from '@/components/project-manager/steps/consultation-st
 import ContractStep from '@/components/project-manager/steps/contract-step';
 import DesignAssignmentStep from '@/components/project-manager/steps/design-assignment-step';
 import DesignProposalStep from '@/components/project-manager/steps/design-proposal-step';
+import ExecutionStep from '@/components/project-manager/steps/execution-step';
 import PaymentsStep from '@/components/project-manager/steps/payments-step';
 import ReservationFeeStep from '@/components/project-manager/steps/reservation-fee-step';
 import SiteAssessmentStep from '@/components/project-manager/steps/site-assessment-step';
 import { PROJECTS_URL } from '@/components/project-manager/steps/step-ui';
 import type { StepProps } from '@/components/project-manager/steps/step-ui';
+import { SAMPLE_SET_UP_HEADS } from '@/data/project-manager/execution';
+import type { SetUpHead } from '@/data/project-manager/execution';
 import {
     SAMPLE_SPECIALISTS,
     STEPS,
@@ -51,11 +54,12 @@ type Props = {
     /** Sent by the controller. Leave it out to use the sample data. */
     project?: Project;
     specialists?: DesignSpecialist[];
+    setUpHeads?: SetUpHead[];
     /** Used to find the sample project while the backend is not ready. */
     projectId: number;
 };
 
-export default function ProjectWizard({ project: serverProject, specialists, projectId }: Props) {
+export default function ProjectWizard({ project: serverProject, specialists, setUpHeads, projectId }: Props) {
     const { props } = usePage();
     const managerName = props.auth?.user?.name ?? 'Project Manager';
 
@@ -137,7 +141,7 @@ export default function ProjectWizard({ project: serverProject, specialists, pro
 
             {/* Stepper */}
             <Panel className="mb-5 overflow-x-auto p-4">
-                <ol className="flex min-w-[720px] items-start">
+                <ol className="flex min-w-[1080px] items-start">
                     {STEPS.map((step, index) => {
                         const state = states[step.key];
                         const open = canOpen(state);
@@ -205,6 +209,7 @@ export default function ProjectWizard({ project: serverProject, specialists, pro
                 {selected === 'designProposal' && <DesignProposalStep key={project.id} {...stepProps} />}
                 {selected === 'contract' && <ContractStep key={project.id} {...stepProps} />}
                 {selected === 'payments' && <PaymentsStep key={project.id} {...stepProps} />}
+                {selected === 'execution' && <ExecutionStep key={project.id} {...stepProps} setUpHeads={setUpHeads ?? SAMPLE_SET_UP_HEADS} />}
 
                 {/* Move on once the next step is unlocked */}
                 {canGoNext && (

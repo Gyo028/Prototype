@@ -18,6 +18,7 @@
 
 import { billingStatus, samplePayment, verified } from '@/data/project-manager/payments';
 import type { Billing, BillingDispute, Payment } from '@/data/project-manager/payments';
+import type { ExecutionSchedule } from '@/data/project-manager/execution';
 import type { ProjectRequest } from '@/data/project-manager/project-requests';
 
 /* ---------- site assessment (backlog #20) ---------- */
@@ -144,6 +145,7 @@ export type Project = ProjectRequest & {
     billings: Billing[]; // issued to the customer after the contract (down payment, final payment, additional charges)
     payments: Payment[]; // every payment the customer submitted, for the reservation fee and the billings
     disputes: BillingDispute[]; // billing disputes raised by the customer (backlog #31)
+    execution: ExecutionSchedule | null; // fabrication and installation schedule (backlog #32)
 };
 
 /* ---------- wizard steps ---------- */
@@ -156,6 +158,7 @@ export const STEPS = [
     { key: 'designProposal', title: 'Design Proposal' },
     { key: 'contract', title: 'Contract' },
     { key: 'payments', title: 'Payments' },
+    { key: 'execution', title: 'Execution' },
 ] as const;
 
 export type StepKey = (typeof STEPS)[number]['key'];
@@ -193,6 +196,8 @@ export function isStepComplete(p: Project, key: StepKey): boolean {
             return p.contract?.status === 'Approved';
         case 'payments':
             return p.billings.length > 0 && p.billings.every((b) => billingStatus(b, p.payments) === 'Paid');
+        case 'execution':
+            return p.execution !== null;
     }
 }
 
@@ -240,8 +245,11 @@ export function stepStates(p: Project): Record<StepKey, StepState> {
     STEPS.forEach(({ key }, index) => {
         const complete = isStepComplete(p, key);
 
+        // Execution opens once the Contract is approved; it does not wait for Payments (Use Case).
+        const ready = key === 'execution' ? states.contract === 'done' : previousComplete;
+
         if (closed && index > 0) states[key] = 'closed';
-        else if (!previousComplete) states[key] = 'locked';
+        else if (!ready) states[key] = 'locked';
         else if (complete) states[key] = key === 'siteAssessment' && !ocularRequired(p) ? 'skipped' : 'done';
         else states[key] = waitingReason(p, key) ? 'waiting' : 'current';
 
@@ -304,6 +312,7 @@ function sample(p: SampleInput): Project {
         billings: [],
         payments: [],
         disputes: [],
+        execution: null,
         ...p,
     };
 }
@@ -620,6 +629,23 @@ const SAMPLE_PROJECTS: Project[] = [
                 },
             },
         ],
+        execution: {
+            fabrication: {
+                headId: 31,
+                headName: 'Mark Reyes',
+                activities: [
+                    { id: 'fab-1', activity: 'Build the floral entrance arch', scheduledDate: '2026-12-14', targetDate: '2026-12-18' },
+                    { id: 'fab-2', activity: 'Paint and assemble the stage backdrop', scheduledDate: '2026-12-16', targetDate: '2026-12-22' },
+                ],
+            },
+            installation: {
+                headId: 41,
+                headName: 'Jun Cruz',
+                activities: [{ id: 'ins-1', activity: 'Venue set-up and styling', scheduledDate: '2026-12-27', targetDate: '2026-12-28' }],
+            },
+            savedBy: 'Project Manager',
+            savedAt: '2026-11-06T10:00:00+08:00',
+        },
     }),
     // Step 7: contract approved; down payment submitted without a receipt, final payment not paid yet
     sample({
