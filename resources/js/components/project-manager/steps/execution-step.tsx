@@ -6,9 +6,11 @@ import { Field, GoldButton, OutlineButton, cx, inputClass, selectClass } from '@
 import { Section, formatDate, formatDateTime } from '@/components/project-manager/request-details';
 import { CompletedNotice, PROJECTS_URL, StepIntro } from '@/components/project-manager/steps/step-ui';
 import WorkOrderPanel from '@/components/project-manager/work-order';
+import ProjectStatusPanel, { PhaseCompletion } from '@/components/project-manager/project-status';
 import type { StepProps } from '@/components/project-manager/steps/step-ui';
 import { EXECUTION_PHASES, hasScheduleErrors, validateSchedule } from '@/data/project-manager/execution';
 import type { ExecutionSchedule, PhaseKey, PhaseSchedule, ScheduleErrors, SetUpHead } from '@/data/project-manager/execution';
+import { executionStatus } from '@/data/project-manager/projects';
 
 /*
  * Step 8 · Execution (backlog #32).
@@ -36,6 +38,11 @@ export default function ExecutionStep({ project, usingSample, managerName, onSav
     const [saving, setSaving] = useState(false);
 
     const tried = hasScheduleErrors(errors);
+
+        // The schedule is locked once work is recorded as done or the project is completed / cancelled (backlog #35).
+    const locked =
+        Boolean(saved?.fabrication.completion || saved?.installation.completion) ||
+        ['Completed', 'Cancelled'].includes(executionStatus(project));
 
     // Re-check as the Project Manager types, but only after a failed save.
     const change = (next: Draft) => {
@@ -128,6 +135,14 @@ export default function ExecutionStep({ project, usingSample, managerName, onSav
                                     title={title}
                                     setUpHeads={setUpHeads}
                                 />
+                                <PhaseCompletion
+                                    project={project}
+                                    usingSample={usingSample}
+                                    managerName={managerName}
+                                    onSaved={onSaved}
+                                    phaseKey={key}
+                                    title={title}
+                                />
                             </div>
                         )
                     ),
@@ -151,12 +166,24 @@ export default function ExecutionStep({ project, usingSample, managerName, onSav
                                 <Send className="size-4" /> {saving ? 'Saving...' : saved ? 'Save Changes' : 'Save Schedule'}
                             </GoldButton>
                         </>
-                    ) : (
-                        <OutlineButton onClick={() => setEditing(true)}>
-                            <Pencil className="size-4" /> Edit Schedule
-                        </OutlineButton>
+                                        ) : (
+                        !locked && (
+                            <OutlineButton onClick={() => setEditing(true)}>
+                                <Pencil className="size-4" /> Edit Schedule
+                            </OutlineButton>
+                        )
                     )}
                 </div>
+
+                {!editing && (
+                    <ProjectStatusPanel
+                        project={project}
+                        usingSample={usingSample}
+                        managerName={managerName}
+                        onSaved={onSaved}
+                        setUpHeads={setUpHeads}
+                    />
+                )}
             </div>
         </>
     );

@@ -14,11 +14,13 @@ import type { Project, ProjectStatus } from '@/data/project-manager/projects';
 
 type Filter = ProjectStatus | 'All';
 
-const FILTERS: Filter[] = ['In Progress', 'Completed', 'Not Proceeding', 'All'];
+const FILTERS: Filter[] = ['In Progress', 'Rescheduled', 'Completed', 'Cancelled', 'Not Proceeding', 'All'];
 
 const statusTone: Record<ProjectStatus, PillTone> = {
     'In Progress': 'yellow',
+    Rescheduled: 'blue',
     Completed: 'green',
+    Cancelled: 'red',
     'Not Proceeding': 'red',
 };
 

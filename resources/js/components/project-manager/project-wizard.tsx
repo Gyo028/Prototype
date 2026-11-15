@@ -35,7 +35,9 @@ import type { DesignSpecialist, Project, ProjectStatus, StepKey, StepState } fro
 
 const statusTone: Record<ProjectStatus, PillTone> = {
     'In Progress': 'yellow',
+    Rescheduled: 'blue',
     Completed: 'green',
+    Cancelled: 'red',
     'Not Proceeding': 'red',
 };
 
@@ -48,7 +50,8 @@ const stateLabel: Record<StepState, string> = {
     closed: 'Closed',
 };
 
-const canOpen = (state: StepState) => state !== 'locked' && state !== 'closed';
+// A cancelled project's Execution step stays open so its status history can be seen.
+const canOpen = (state: StepState, key?: StepKey) => state !== 'locked' && (state !== 'closed' || key === 'execution');
 
 type Props = {
     /** Sent by the controller. Leave it out to use the sample data. */
@@ -133,6 +136,11 @@ export default function ProjectWizard({ project: serverProject, specialists, set
                 </Panel>
             )}
 
+            {status === 'Cancelled' && (
+                <div role="status" className="mb-5 rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-ink">
+                    <b>This project was cancelled.</b> {project.statusUpdates.at(-1)?.remarks ?? ''} The remaining steps are closed.
+                </div>
+            )}
             {status === 'Not Proceeding' && (
                 <div role="status" className="mb-5 rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-ink">
                     <b>This project will not proceed.</b> {project.consultation?.decisionReason ?? ''} The remaining steps are closed.
@@ -144,7 +152,7 @@ export default function ProjectWizard({ project: serverProject, specialists, set
                 <ol className="flex min-w-[1080px] items-start">
                     {STEPS.map((step, index) => {
                         const state = states[step.key];
-                        const open = canOpen(state);
+                        const open = canOpen(state, step.key) && !(state === 'closed' && status === 'Not Proceeding');
                         const isSelected = step.key === selected;
                         const finished = state === 'done' || state === 'skipped';
 

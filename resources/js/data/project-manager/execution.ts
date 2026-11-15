@@ -45,6 +45,7 @@ export type PhaseSchedule = {
     headName: string | null;
     activities: ScheduleActivity[];
     workOrder?: WorkOrder | null; // null = not sent yet (or the schedule changed since)
+    completion?: { completedBy: string; completedAt: string } | null; // the assignment's completion (backlog #35)
 };
 
 export type ExecutionSchedule = Record<PhaseKey, PhaseSchedule> & {
@@ -106,6 +107,21 @@ export function workOrderProblems(phase: PhaseSchedule, head: SetUpHead | undefi
     return problems;
 }
 
+/* ---------- project status (backlog #35) ---------- */
+
+/** The project's execution status. Completed and Cancelled are final. */
+export const EXECUTION_STATUSES = ['In Progress', 'Rescheduled', 'Completed', 'Cancelled'] as const;
+export type ExecutionStatus = (typeof EXECUTION_STATUSES)[number];
+
+/** Acceptance criterion 1: these statuses cannot be saved without remarks. */
+export const STATUSES_NEEDING_REMARKS: ExecutionStatus[] = ['Rescheduled', 'Cancelled'];
+
+export type StatusUpdate = {
+    status: ExecutionStatus;
+    remarks: string | null; // required for Rescheduled and Cancelled
+    updatedBy: string;
+    updatedAt: string; // ISO date-time
+};
 /* ---------- sample data ---------- */
 
 export const SAMPLE_SET_UP_HEADS: SetUpHead[] = [

@@ -18,7 +18,7 @@
 
 import { billingStatus, samplePayment, verified } from '@/data/project-manager/payments';
 import type { Billing, BillingDispute, Payment } from '@/data/project-manager/payments';
-import type { ExecutionSchedule } from '@/data/project-manager/execution';
+import type { ExecutionSchedule, ExecutionStatus, StatusUpdate } from '@/data/project-manager/execution';
 import type { ProjectRequest } from '@/data/project-manager/project-requests';
 
 /* ---------- site assessment (backlog #20) ---------- */
@@ -146,6 +146,7 @@ export type Project = ProjectRequest & {
     payments: Payment[]; // every payment the customer submitted, for the reservation fee and the billings
     disputes: BillingDispute[]; // billing disputes raised by the customer (backlog #31)
     execution: ExecutionSchedule | null; // fabrication and installation schedule (backlog #32)
+    statusUpdates: StatusUpdate[]; // project status history, oldest first (backlog #35)
 };
 
 /* ---------- wizard steps ---------- */
@@ -177,6 +178,9 @@ const peso = (n: number) => `₱${n.toLocaleString('en-PH')}`;
 
 export const isNotProceeding = (p: Project) => p.consultation?.decision === 'Do not proceed';
 
+/** The latest execution status (backlog #35). Projects start In Progress. */
+export const executionStatus = (p: Project): ExecutionStatus => p.statusUpdates.at(-1)?.status ?? 'In Progress';
+
 const ocularRequired = (p: Project) => p.consultation?.ocularVisit.required ?? true;
 
 /** Whether a step's work is finished. */
@@ -197,7 +201,7 @@ export function isStepComplete(p: Project, key: StepKey): boolean {
         case 'payments':
             return p.billings.length > 0 && p.billings.every((b) => billingStatus(b, p.payments) === 'Paid');
         case 'execution':
-            return p.execution !== null;
+            return executionStatus(p) === 'Completed';
     }
 }
 
@@ -249,6 +253,7 @@ export function stepStates(p: Project): Record<StepKey, StepState> {
         const ready = key === 'execution' ? states.contract === 'done' : previousComplete;
 
         if (closed && index > 0) states[key] = 'closed';
+        else if (executionStatus(p) === 'Cancelled' && !complete) states[key] = 'closed'; // a cancelled project stops here
         else if (!ready) states[key] = 'locked';
         else if (complete) states[key] = key === 'siteAssessment' && !ocularRequired(p) ? 'skipped' : 'done';
         else states[key] = waitingReason(p, key) ? 'waiting' : 'current';
@@ -261,15 +266,16 @@ export function stepStates(p: Project): Record<StepKey, StepState> {
 
 /** The first step that is not finished yet, or null when planning is complete or closed. */
 export function activeStep(p: Project): StepKey | null {
-    if (isNotProceeding(p)) return null;
+    if (isNotProceeding(p) || executionStatus(p) === 'Cancelled') return null;
     return STEPS.find(({ key }) => !isStepComplete(p, key))?.key ?? null;
 }
 
-export type ProjectStatus = 'In Progress' | 'Completed' | 'Not Proceeding';
+export type ProjectStatus = ExecutionStatus | 'Not Proceeding';
 
+/** Completion and payment are tracked separately: a project can be Completed with an unpaid balance (Use Case). */
 export function projectStatus(p: Project): ProjectStatus {
     if (isNotProceeding(p)) return 'Not Proceeding';
-    return activeStep(p) === null ? 'Completed' : 'In Progress';
+    return executionStatus(p);
 }
 
 /* ---------- sample data ---------- */
@@ -313,6 +319,7 @@ function sample(p: SampleInput): Project {
         payments: [],
         disputes: [],
         execution: null,
+        statusUpdates: [],
         ...p,
     };
 }
@@ -645,15 +652,33 @@ const SAMPLE_PROJECTS: Project[] = [
                     sentBy: 'Project Manager',
                     sentAt: '2026-11-06T10:05:00+08:00',
                 },
+                completion: { completedBy: 'Project Manager', completedAt: '2026-12-22T17:00:00+08:00' },
             },
-            installation: {
+                        installation: {
                 headId: 41,
                 headName: 'Jun Cruz',
                 activities: [{ id: 'ins-1', activity: 'Venue set-up and styling', scheduledDate: '2026-12-27', targetDate: '2026-12-28' }],
+                workOrder: {
+                    code: 'WO-0013-I',
+                    instructions: 'Ingress at 6:00 AM. Coordinate with the church and the Bayleaf events team before setting up.',
+                    sentTo: 'Jun Cruz',
+                    sentToEmail: 'jun.cruz@gr3ats.com',
+                    sentBy: 'Project Manager',
+                    sentAt: '2026-11-06T10:06:00+08:00',
+                },
+                completion: { completedBy: 'Project Manager', completedAt: '2026-12-28T12:00:00+08:00' },
             },
             savedBy: 'Project Manager',
             savedAt: '2026-11-06T10:00:00+08:00',
         },
+        statusUpdates: [
+            {
+                status: 'Completed',
+                remarks: 'Event styling delivered. Teardown finished on Dec 28.',
+                updatedBy: 'Project Manager',
+                updatedAt: '2026-12-28T18:00:00+08:00',
+            },
+        ],
     }),
     // Step 7: contract approved; down payment submitted without a receipt, final payment not paid yet
     sample({
