@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { Field, GoldButton, OutlineButton, cx, inputClass, selectClass } from '@/components/dashboard/ui';
 import { Section, formatDate, formatDateTime } from '@/components/project-manager/request-details';
 import { CompletedNotice, PROJECTS_URL, StepIntro } from '@/components/project-manager/steps/step-ui';
+import WorkOrderPanel from '@/components/project-manager/work-order';
 import type { StepProps } from '@/components/project-manager/steps/step-ui';
 import { EXECUTION_PHASES, hasScheduleErrors, validateSchedule } from '@/data/project-manager/execution';
 import type { ExecutionSchedule, PhaseKey, PhaseSchedule, ScheduleErrors, SetUpHead } from '@/data/project-manager/execution';
@@ -53,14 +54,22 @@ export default function ExecutionStep({ project, usingSample, managerName, onSav
         const wasSaved = saved !== null;
         const finish = () => {
             toast.success(
-                `${wasSaved ? 'Schedule updated' : 'Schedule saved'}. Work orders were emailed to ${draft.fabrication.headName} (Fabrication) and ${draft.installation.headName} (Installation).`,
+                `${wasSaved ? 'Schedule updated' : 'Schedule saved'}. Send the work orders to ${draft.fabrication.headName} (Fabrication) and ${draft.installation.headName} (Installation) below.`,
             );
             setEditing(false);
         };
 
         // Acceptance criterion 1: the schedule is saved with every required detail.
         if (usingSample) {
-            onSaved({ ...project, execution: { ...draft, savedBy: managerName, savedAt: new Date().toISOString() } });
+            onSaved({
+                ...project,
+                execution: {
+                    fabrication: { ...draft.fabrication, workOrder: null },
+                    installation: { ...draft.installation, workOrder: null },
+                    savedBy: managerName,
+                    savedAt: new Date().toISOString(),
+                },
+            });
             finish();
             return;
         }
@@ -107,7 +116,20 @@ export default function ExecutionStep({ project, usingSample, managerName, onSav
                             onChange={(changes) => updatePhase(key, changes)}
                         />
                     ) : (
-                        saved && <PhaseSummary key={key} title={title} headLabel={head} phase={saved[key]} />
+                        saved && (
+                            <div key={key} className="grid gap-3">
+                                <PhaseSummary title={title} headLabel={head} phase={saved[key]} />
+                                <WorkOrderPanel
+                                    project={project}
+                                    usingSample={usingSample}
+                                    managerName={managerName}
+                                    onSaved={onSaved}
+                                    phaseKey={key}
+                                    title={title}
+                                    setUpHeads={setUpHeads}
+                                />
+                            </div>
+                        )
                     ),
                 )}
 
@@ -126,7 +148,7 @@ export default function ExecutionStep({ project, usingSample, managerName, onSav
                                 </OutlineButton>
                             )}
                             <GoldButton onClick={save} disabled={saving}>
-                                <Send className="size-4" /> {saving ? 'Saving...' : saved ? 'Save Changes and Notify Heads' : 'Save Schedule and Send Work Orders'}
+                                <Send className="size-4" /> {saving ? 'Saving...' : saved ? 'Save Changes' : 'Save Schedule'}
                             </GoldButton>
                         </>
                     ) : (

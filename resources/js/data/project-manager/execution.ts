@@ -18,6 +18,7 @@ export type SetUpHead = {
     id: number;
     name: string;
     phase: PhaseKey;
+    email: string | null; // from the employee records; needed to email the work order (backlog #33)
     activeAssignments: number; // how many projects they are currently assigned to
 };
 
@@ -29,10 +30,21 @@ export type ScheduleActivity = {
     targetDate: string; // 'YYYY-MM-DD', target completion date
 };
 
+/** The work order emailed to a phase's Head (backlog #33). */
+export type WorkOrder = {
+    code: string; // e.g. "WO-0013-F"
+    instructions: string; // the project instructions written by the Project Manager
+    sentTo: string; // the Head's name
+    sentToEmail: string;
+    sentBy: string;
+    sentAt: string; // ISO date-time
+};
+
 export type PhaseSchedule = {
     headId: number | null;
     headName: string | null;
     activities: ScheduleActivity[];
+    workOrder?: WorkOrder | null; // null = not sent yet (or the schedule changed since)
 };
 
 export type ExecutionSchedule = Record<PhaseKey, PhaseSchedule> & {
@@ -80,11 +92,25 @@ export function validateSchedule(s: Pick<ExecutionSchedule, PhaseKey>): Schedule
 export const hasScheduleErrors = (e: ScheduleErrors) =>
     EXECUTION_PHASES.some(({ key }) => Boolean(e[key].head || e[key].general || Object.keys(e[key].activities).length));
 
+/* ---------- work order (backlog #33) ---------- */
+
+/** Acceptance criterion 2: what is missing before a work order can be sent. Empty list = ready. */
+export function workOrderProblems(phase: PhaseSchedule, head: SetUpHead | undefined, instructions: string): string[] {
+    const problems: string[] = [];
+    if (!phase.headId || !head) problems.push('No Head is assigned to this phase.');
+    else if (!head.email) problems.push(`${head.name} has no email address in the employee records.`);
+    if (phase.activities.length === 0) problems.push('The schedule has no activities.');
+    else if (phase.activities.some((a) => !a.activity.trim() || !a.scheduledDate || !a.targetDate))
+        problems.push('An activity is missing its name, scheduled date or target completion date.');
+    if (!instructions.trim()) problems.push('Write the project instructions for the Head.');
+    return problems;
+}
+
 /* ---------- sample data ---------- */
 
 export const SAMPLE_SET_UP_HEADS: SetUpHead[] = [
-    { id: 31, name: 'Mark Reyes', phase: 'fabrication', activeAssignments: 2 },
-    { id: 32, name: 'Paolo Garcia', phase: 'fabrication', activeAssignments: 0 },
-    { id: 41, name: 'Jun Cruz', phase: 'installation', activeAssignments: 1 },
-    { id: 42, name: 'Liza Ramos', phase: 'installation', activeAssignments: 3 },
+    { id: 31, name: 'Mark Reyes', phase: 'fabrication', email: 'mark.reyes@gr3ats.com', activeAssignments: 2 },
+    { id: 32, name: 'Paolo Garcia', phase: 'fabrication', email: 'paolo.garcia@gr3ats.com', activeAssignments: 0 },
+    { id: 41, name: 'Jun Cruz', phase: 'installation', email: 'jun.cruz@gr3ats.com', activeAssignments: 1 },
+    { id: 42, name: 'Liza Ramos', phase: 'installation', email: null, activeAssignments: 3 }, // no email on record (criterion 2)
 ];

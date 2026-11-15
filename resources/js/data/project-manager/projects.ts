@@ -637,6 +637,14 @@ const SAMPLE_PROJECTS: Project[] = [
                     { id: 'fab-1', activity: 'Build the floral entrance arch', scheduledDate: '2026-12-14', targetDate: '2026-12-18' },
                     { id: 'fab-2', activity: 'Paint and assemble the stage backdrop', scheduledDate: '2026-12-16', targetDate: '2026-12-22' },
                 ],
+                workOrder: {
+                    code: 'WO-0013-F',
+                    instructions: 'Use the white and gold palette from the approved design. Deliver all pieces to the warehouse by Dec 22.',
+                    sentTo: 'Mark Reyes',
+                    sentToEmail: 'mark.reyes@gr3ats.com',
+                    sentBy: 'Project Manager',
+                    sentAt: '2026-11-06T10:05:00+08:00',
+                },
             },
             installation: {
                 headId: 41,
