@@ -10,7 +10,7 @@ import { Field, GoldButton, OutlineButton, Panel, cx, inputClass, selectClass, t
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 /*
- * Customer > Request New Project (backlog story 12, Figure 15).
+ * Customer > Request New Project.
  *
  * First the customer picks the request type:
  *  - Standard Event Styling: Project Details → Services & Assets → Description & Files

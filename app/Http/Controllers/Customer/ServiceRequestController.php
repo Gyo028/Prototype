@@ -21,7 +21,7 @@ use Inertia\Response;
 use Throwable;
 
 /**
- * Customer > Request New Project (backlog story 12).
+ * Customer > Request New Project.
  *
  * create() sends the form what the Technical Admin has switched on; store()
  * saves a submitted request. Prices are read here, on the server, and copied

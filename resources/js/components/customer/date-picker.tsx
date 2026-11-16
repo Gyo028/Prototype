@@ -68,6 +68,10 @@ type Props = {
     /** How many months ahead a request must be; sets the earliest day when minDate is not given, and the tooltip text. */
     leadMonths?: number;
     disabledDates?: string[];
+    /** Days that can't be picked for other reasons, shown grey with this reason as the tooltip (e.g. Sundays, fully booked days). */
+    unavailableDates?: Record<string, string>;
+    /** Replaces the "too soon" tooltip, which by default talks about the request lead time. */
+    tooSoonText?: string;
     hasError?: boolean;
     className?: string;
 };
@@ -127,6 +131,8 @@ export default function DatePicker({
     minDate,
     leadMonths = 1,
     disabledDates = sampleBookedDates,
+    unavailableDates,
+    tooSoonText,
     hasError,
     className,
 }: Props) {
@@ -248,7 +254,8 @@ export default function DatePicker({
                         const tooSoon = !past && !booked && startOfDay(d) < min;
                         // While picking the last day, days before the earliest or after the latest allowed one are out.
                         const outOfRun = !past && !booked && !tooSoon && picking && iso > value && (iso < firstEnd || (!!lastEnd && iso > lastEnd));
-                        const unavailable = past || booked || tooSoon || outOfRun;
+                        const otherReason = !past && !booked && !tooSoon ? unavailableDates?.[iso] : undefined;
+                        const unavailable = past || booked || tooSoon || outOfRun || !!otherReason;
 
                         // Why the day can't be picked, shown in the tooltip. Days of another month only say where to go.
                         const runText = maxDays ? `A project runs ${minDays} to ${maxDays} days.` : `A project runs at least ${minDays} days.`;
@@ -259,8 +266,10 @@ export default function DatePicker({
                               : booked
                                 ? 'This date is already booked.'
                                 : tooSoon
-                                  ? `Requests need at least ${leadText}' notice.`
-                                  : outOfRun
+                                  ? (tooSoonText ?? `Requests need at least ${leadText}' notice.`)
+                                  : otherReason
+                                    ? otherReason
+                                    : outOfRun
                                     ? runText
                                     : '';
                         const blocked = unavailable || outside;

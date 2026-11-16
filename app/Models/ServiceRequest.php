@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * @property int $service_request_id
@@ -92,6 +93,20 @@ class ServiceRequest extends Model
         return $type === self::TYPE_CUSTOM ? array_slice($labels, 1) : $labels;
     }
 
+    /** The reservation fee is this share of the budget range the customer chose. */
+    public const RESERVATION_FEE_RATE = 0.10;
+
+    /**
+     * 10% of the budget range's maximum, or of its minimum for "Above ₱500,000"
+     * (no maximum). Below ₱50,000 → ₱5,000; Above ₱500,000 → ₱50,000.
+     */
+    public function reservationFee(): float
+    {
+        $base = $this->budget_max ?? $this->budget_min;
+
+        return round((float) $base * self::RESERVATION_FEE_RATE, 2);
+    }
+
     public function isCustom(): bool
     {
         return $this->request_type === self::TYPE_CUSTOM;
@@ -119,5 +134,11 @@ class ServiceRequest extends Model
     public function services(): HasMany
     {
         return $this->hasMany(ServiceRequestService::class, 'service_request_id');
+    }
+
+    /** The project created when this request was approved. @return HasOne<Project, $this> */
+    public function project(): HasOne
+    {
+        return $this->hasOne(Project::class, 'service_request_id');
     }
 }

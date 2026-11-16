@@ -10,8 +10,8 @@ use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 
 /**
- * Submitting a service request (backlog story 12, use case Manage Service
- * Request). Field names match the customer form (camelCase).
+ * Submitting a service request 
+ * Field names match the customer form (camelCase).
  *
  * Two request types:
  *  - standard: eventTypeId, eventDate, eventStartTime, eventEndTime, guests, serviceIds
@@ -19,7 +19,7 @@ use Illuminate\Validation\Rule;
  * Both:        requestType, venue, budget, description (optional), files (optional)
  *
  * Theme and asset choices are not validated or saved yet; they come with the
- * preliminary layout (story 14).
+ * preliminary layout.
  */
 class ServiceRequestRequest extends FormRequest
 {
