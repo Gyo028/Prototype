@@ -1,9 +1,15 @@
-
-import { Head } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import BookkeeperLayout from '@/layouts/bookkeeper-layout';
 import { useState } from 'react';
 
 type ProjectStatus = 'Ongoing' | 'Completed';
+
+type ExpenseCategory =
+    | 'Materials'
+    | 'Fabrication'
+    | 'Equipment rental'
+    | 'Labor'
+    | 'Transportation';
 
 interface Project {
     id: number;
@@ -22,38 +28,151 @@ interface Transaction {
     date: string;
     description: string;
     project: string;
-    type: string;
+    type: ExpenseCategory | 'Payment';
     amount: number;
     category: 'income' | 'expense';
 }
 
 const projects: Project[] = [
-    { id: 1, name: 'Games Event', code: 'EVP-2026-025', eventDate: 'Sept 17, 2026', status: 'Ongoing', billed: 335000, paid: 160000, expenses: 96400, net: 63600 },
-    { id: 2, name: 'Christmas Launch', code: 'EVP-2026-030', eventDate: 'Nov 12, 2026', status: 'Ongoing', billed: 128500, paid: 88000, expenses: 64300, net: 23700 },
-    { id: 3, name: 'Bay Board', code: 'EVP-2026-033', eventDate: 'Aug 7, 2026', status: 'Ongoing', billed: 68000, paid: 34000, expenses: 12100, net: 21900 },
-    { id: 4, name: 'Independence Day Event', code: 'EVP-2026-020', eventDate: 'July 12, 2026', status: 'Completed', billed: 210000, paid: 210000, expenses: 78950, net: 131050 },
-    { id: 5, name: 'Plants and Pots', code: 'EVP-2026-022', eventDate: 'July 11, 2026', status: 'Completed', billed: 95000, paid: 95000, expenses: 58200, net: 36800 },
+    {
+        id: 1,
+        name: 'SM Mall Grand Opening',
+        code: 'EVP-2027-025',
+        eventDate: 'Feb 15, 2027',
+        status: 'Ongoing',
+        billed: 335000,
+        paid: 160000,
+        expenses: 96400,
+        net: 63600,
+    },
+    {
+        id: 2,
+        name: 'Ayala Shopping Festival',
+        code: 'EVP-2027-030',
+        eventDate: 'Mar 12, 2027',
+        status: 'Ongoing',
+        billed: 128500,
+        paid: 88000,
+        expenses: 64300,
+        net: 23700,
+    },
+    {
+        id: 3,
+        name: 'Robinsons Mega Mall Expo',
+        code: 'EVP-2027-033',
+        eventDate: 'Apr 7, 2027',
+        status: 'Ongoing',
+        billed: 210000,
+        paid: 110000,
+        expenses: 78950,
+        net: 31050,
+    },
+    {
+        id: 4,
+        name: 'Quezon City Trade and Convention Fair',
+        code: 'EVP-2027-020',
+        eventDate: 'May 12, 2027',
+        status: 'Completed',
+        billed: 250000,
+        paid: 250000,
+        expenses: 125600,
+        net: 124400,
+    },
 ];
 
+const categoryColors: Record<ExpenseCategory, string> = {
+    Materials: '#171717',
+    Fabrication: '#facc15',
+    'Equipment rental': '#3b82f6',
+    Labor: '#16a34a',
+    Transportation: '#dc2626',
+};
+
 const transactions: Transaction[] = [
-    { id: 1, date: 'May 8, 2026', description: 'LED', project: 'Cruz 25th Anniversary', type: 'Equipment rental', amount: -12000, category: 'expense' },
-    { id: 2, date: 'May 5, 2026', description: 'Plants', project: 'Del Rosario Christening', type: 'Materials', amount: -12900, category: 'expense' },
-    { id: 3, date: 'May 11, 2026', description: 'Table SetUp', project: 'Harbor Point Mall 5th Anniversary', type: 'Equipment rental', amount: -22000, category: 'expense' },
-    { id: 4, date: 'May 13, 2026', description: 'Backdrop arch', project: 'Cruz 25th Anniversary', type: 'Fabrication', amount: -21000, category: 'expense' },
-    { id: 5, date: 'May 18, 2026', description: 'Reservation fee and down payment', project: 'Del Rosario Christening', type: 'Payment', amount: 34000, category: 'income' },
-    { id: 6, date: 'May 20, 2026', description: 'Print and props', project: 'Harbor Point Mall 5th Anniversary', type: 'Materials', amount: -28400, category: 'expense' },
+    {
+        id: 1,
+        date: 'Feb 8, 2027',
+        description: 'LED lighting equipment',
+        project: 'SM Mall Grand Opening',
+        type: 'Equipment rental',
+        amount: -12000,
+        category: 'expense',
+    },
+    {
+        id: 2,
+        date: 'Feb 10, 2027',
+        description: 'Stage and event materials',
+        project: 'SM Mall Grand Opening',
+        type: 'Materials',
+        amount: -12900,
+        category: 'expense',
+    },
+    {
+        id: 3,
+        date: 'Feb 11, 2027',
+        description: 'Tables and chairs setup',
+        project: 'Ayala Shopping Festival',
+        type: 'Equipment rental',
+        amount: -22000,
+        category: 'expense',
+    },
+    {
+        id: 4,
+        date: 'Feb 13, 2027',
+        description: 'Mall entrance backdrop',
+        project: 'Robinsons Mega Mall Expo',
+        type: 'Fabrication',
+        amount: -21000,
+        category: 'expense',
+    },
+    {
+        id: 5,
+        date: 'Feb 15, 2027',
+        description: 'Reservation fee and down payment',
+        project: 'Quezon City Trade and Convention Fair',
+        type: 'Payment',
+        amount: 34000,
+        category: 'income',
+    },
+    {
+        id: 6,
+        date: 'Feb 18, 2027',
+        description: 'Printed event materials and props',
+        project: 'Ayala Shopping Festival',
+        type: 'Materials',
+        amount: -28400,
+        category: 'expense',
+    },
 ];
 
 const cashFlow = [
-    { month: 'May', cashIn: 140000, cashOut: 18000 },
-    { month: 'June', cashIn: 340000, cashOut: 224000 },
-    { month: 'July', cashIn: 109000, cashOut: 125600 },
+    { month: 'January', cashIn: 140000, cashOut: 18000 },
+    { month: 'February', cashIn: 340000, cashOut: 224000 },
+    { month: 'March', cashIn: 109000, cashOut: 125600 },
 ];
 
 const outstandingBalances = [
-    { id: 1, name: 'Games Event', balance: 1335000, paid: '48%', due: 'Oct 30' },
-    { id: 2, name: 'Mall Event', balance: 800500, paid: '69%', due: 'Jan 5' },
-    { id: 3, name: 'Arch Setup', balance: 34000, paid: '50%', due: 'Nov 2' },
+    {
+        id: 1,
+        name: 'SM Mall Grand Opening',
+        balance: 175000,
+        paid: '48%',
+        due: 'Feb 28',
+    },
+    {
+        id: 2,
+        name: 'Ayala Shopping Festival',
+        balance: 40500,
+        paid: '69%',
+        due: 'Mar 5',
+    },
+    {
+        id: 3,
+        name: 'Robinsons Mega Mall Expo',
+        balance: 100000,
+        paid: '52%',
+        due: 'Apr 2',
+    },
 ];
 
 const formatCurrency = (amount: number) =>
@@ -64,19 +183,23 @@ export default function Dashboard() {
     const [showAll, setShowAll] = useState(false);
 
     const filteredProjects = projects.filter(
-        (project) => activeFilter === 'All' || project.status === activeFilter,
+        (project) =>
+            activeFilter === 'All' || project.status === activeFilter,
     );
 
-    const displayedTransactions = showAll ? transactions : transactions.slice(0, 4);
+    const displayedTransactions = showAll
+        ? transactions
+        : transactions.slice(0, 4);
 
     return (
         <BookkeeperLayout>
             <Head title="Bookkeeper Dashboard" />
 
             <main className="flex flex-col gap-5">
-
                 <header>
-                    <p className="text-xs text-neutral-500">Bookkeeper / Dashboard</p>
+                    <p className="text-xs text-neutral-500">
+                        Bookkeeper / Dashboard
+                    </p>
                     <h1 className="mt-1 text-2xl font-bold text-neutral-900">
                         Dashboard
                     </h1>
@@ -86,18 +209,49 @@ export default function Dashboard() {
                 </header>
 
                 <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    <StatCard label="Cash In" value="₱109,000" description="November 2026" />
-                    <StatCard label="Cash Out" value="₱125,600" description="November 2026" />
-                    <StatCard label="Net Cash Flow" value="−₱16,600" description="Current monthly balance" />
-                    <StatCard label="Outstanding Balance" value="₱245,500" description="3 projects with unpaid balances" />
+                    <StatCard
+                        label="Cash In"
+                        value="₱109,000"
+                        description="February 2027"
+                        color="#facc15"
+                        href="/bookkeeper/expenses"
+                    />
+
+                    <StatCard
+                        label="Cash Out"
+                        value="₱125,600"
+                        description="February 2027"
+                        color="#171717"
+                        href="/bookkeeper/expenses"
+                    />
+
+                    <StatCard
+                        label="Net Cash Flow"
+                        value="−₱16,600"
+                        description="Current monthly balance"
+                        color="#171717"
+                        href="#cash-flow"
+                    />
+
+                    <StatCard
+                        label="Outstanding Balance"
+                        value="₱315,500"
+                        description="3 projects with unpaid balances"
+                        color="#facc15"
+                        href="#outstanding-balances"
+                    />
                 </section>
 
                 <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-
-                    <section className="rounded-xl border border-neutral-200 bg-white p-4 xl:col-span-8">
+                    <section
+                        id="cash-flow"
+                        className="scroll-mt-6 rounded-xl border border-neutral-200 bg-white p-4 xl:col-span-8"
+                    >
                         <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
                             <div>
-                                <h2 className="text-sm font-bold text-neutral-900">Cash flow</h2>
+                                <h2 className="text-sm font-bold text-neutral-900">
+                                    Cash flow
+                                </h2>
                                 <p className="mt-1 text-xs text-neutral-500">
                                     Monthly customer payments and recorded expenses
                                 </p>
@@ -105,11 +259,11 @@ export default function Dashboard() {
 
                             <div className="flex gap-3 text-[10px] text-neutral-600">
                                 <span className="flex items-center gap-1">
-                                    <span className="size-2 rounded-sm bg-yellow-400" />
+                                    <span className="size-2 rounded-full bg-yellow-400" />
                                     Cash In
                                 </span>
                                 <span className="flex items-center gap-1">
-                                    <span className="size-2 rounded-sm bg-neutral-900" />
+                                    <span className="size-2 rounded-full bg-neutral-900" />
                                     Cash Out
                                 </span>
                             </div>
@@ -117,14 +271,19 @@ export default function Dashboard() {
 
                         <div className="flex h-52 items-end justify-around gap-3 border-b border-neutral-100 px-2">
                             {cashFlow.map((item) => (
-                                <div key={item.month} className="flex h-full flex-1 items-end justify-center gap-2">
+                                <div
+                                    key={item.month}
+                                    className="flex h-full flex-1 items-end justify-center gap-2"
+                                >
                                     <div className="flex flex-col items-center gap-1">
                                         <span className="text-[9px] text-neutral-500">
                                             ₱{(item.cashIn / 1000).toFixed(0)}k
                                         </span>
                                         <div
                                             className="w-8 rounded-t-md bg-yellow-400"
-                                            style={{ height: `${(item.cashIn / 350000) * 145}px` }}
+                                            style={{
+                                                height: `${(item.cashIn / 350000) * 145}px`,
+                                            }}
                                         />
                                     </div>
 
@@ -134,11 +293,11 @@ export default function Dashboard() {
                                         </span>
                                         <div
                                             className="w-8 rounded-t-md bg-neutral-900"
-                                            style={{ height: `${(item.cashOut / 350000) * 145}px` }}
+                                            style={{
+                                                height: `${(item.cashOut / 350000) * 145}px`,
+                                            }}
                                         />
                                     </div>
-
-                                    <span className="absolute" />
                                 </div>
                             ))}
                         </div>
@@ -154,17 +313,35 @@ export default function Dashboard() {
                         <h2 className="text-sm font-bold text-neutral-900">
                             Expenses by category
                         </h2>
-                        <p className="mt-1 text-xs text-neutral-500">August 2025</p>
+                        <p className="mt-1 text-xs text-neutral-500">
+                            February 2027
+                        </p>
 
                         <div className="mt-5 flex flex-col gap-4">
-                            <CategoryItem label="Materials" amount="₱70,336" percentage="56%" />
-                            <CategoryItem label="Equipment rental" amount="₱33,912" percentage="27%" />
-                            <CategoryItem label="Fabrication" amount="₱21,352" percentage="17%" />
+                            <CategoryItem
+                                label="Materials"
+                                amount="₱70,336"
+                                percentage="56%"
+                            />
+                            <CategoryItem
+                                label="Equipment rental"
+                                amount="₱33,912"
+                                percentage="27%"
+                            />
+                            <CategoryItem
+                                label="Fabrication"
+                                amount="₱21,352"
+                                percentage="17%"
+                            />
                         </div>
 
                         <div className="mt-5 rounded-lg bg-yellow-50 p-3">
-                            <p className="text-xs text-neutral-600">Total expenses</p>
-                            <p className="mt-1 text-xl font-bold text-neutral-900">₱125,600</p>
+                            <p className="text-xs text-neutral-600">
+                                Total expenses
+                            </p>
+                            <p className="mt-1 text-xl font-bold text-neutral-900">
+                                ₱125,600
+                            </p>
                         </div>
                     </section>
                 </div>
@@ -172,7 +349,9 @@ export default function Dashboard() {
                 <section className="rounded-xl border border-neutral-200 bg-white p-4">
                     <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                         <div>
-                            <h2 className="text-sm font-bold text-neutral-900">Project finances</h2>
+                            <h2 className="text-sm font-bold text-neutral-900">
+                                Project finances
+                            </h2>
                             <p className="mt-1 text-xs text-neutral-500">
                                 Financial records for assigned projects
                             </p>
@@ -211,26 +390,49 @@ export default function Dashboard() {
                                         <th className="px-3 py-3 font-medium">Net</th>
                                     </tr>
                                 </thead>
+
                                 <tbody>
                                     {filteredProjects.map((project) => (
-                                        <tr key={project.id} className="border-b border-neutral-100 last:border-0 hover:bg-neutral-50">
+                                        <tr
+                                            key={project.id}
+                                            className="border-b border-neutral-100 last:border-0 hover:bg-neutral-50"
+                                        >
                                             <td className="px-3 py-3">
-                                                <p className="text-xs font-semibold text-neutral-900">{project.name}</p>
-                                                <p className="mt-1 text-[10px] text-neutral-500">{project.code} · {project.eventDate}</p>
+                                                <p className="text-xs font-semibold text-neutral-900">
+                                                    {project.name}
+                                                </p>
+                                                <p className="mt-1 text-[10px] text-neutral-500">
+                                                    {project.code} · {project.eventDate}
+                                                </p>
                                             </td>
+
                                             <td className="px-3 py-3">
-                                                <span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${
-                                                    project.status === 'Ongoing'
-                                                        ? 'bg-yellow-100 text-yellow-800'
-                                                        : 'bg-neutral-100 text-neutral-700'
-                                                }`}>
+                                                <span
+                                                    className={`rounded-full px-2 py-1 text-[10px] font-semibold ${
+                                                        project.status === 'Ongoing'
+                                                            ? 'bg-yellow-100 text-yellow-800'
+                                                            : 'bg-neutral-100 text-neutral-700'
+                                                    }`}
+                                                >
                                                     {project.status}
                                                 </span>
                                             </td>
-                                            <td className="px-3 py-3 text-xs text-neutral-600">{formatCurrency(project.billed)}</td>
-                                            <td className="px-3 py-3 text-xs text-neutral-600">{formatCurrency(project.paid)}</td>
-                                            <td className="px-3 py-3 text-xs text-neutral-600">{formatCurrency(project.expenses)}</td>
-                                            <td className="px-3 py-3 text-xs font-semibold text-neutral-900">{formatCurrency(project.net)}</td>
+
+                                            <td className="px-3 py-3 text-xs text-neutral-600">
+                                                {formatCurrency(project.billed)}
+                                            </td>
+
+                                            <td className="px-3 py-3 text-xs text-neutral-600">
+                                                {formatCurrency(project.paid)}
+                                            </td>
+
+                                            <td className="px-3 py-3 text-xs text-neutral-600">
+                                                {formatCurrency(project.expenses)}
+                                            </td>
+
+                                            <td className="px-3 py-3 text-xs font-semibold text-neutral-900">
+                                                {formatCurrency(project.net)}
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -240,7 +442,10 @@ export default function Dashboard() {
                 </section>
 
                 <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-                    <section className="rounded-xl border border-neutral-200 bg-white p-4 xl:col-span-5">
+                    <section
+                        id="outstanding-balances"
+                        className="scroll-mt-6 rounded-xl border border-neutral-200 bg-white p-4 xl:col-span-5"
+                    >
                         <h2 className="text-sm font-bold text-neutral-900">
                             Outstanding balances
                         </h2>
@@ -252,11 +457,16 @@ export default function Dashboard() {
                             {outstandingBalances.map((item) => (
                                 <div key={item.id}>
                                     <div className="flex justify-between gap-2">
-                                        <p className="text-xs font-semibold text-neutral-800">{item.name}</p>
-                                        <p className="whitespace-nowrap text-xs font-bold text-neutral-900">{formatCurrency(item.balance)}</p>
+                                        <p className="text-xs font-semibold text-neutral-800">
+                                            {item.name}
+                                        </p>
+                                        <p className="whitespace-nowrap text-xs font-bold text-neutral-900">
+                                            {formatCurrency(item.balance)}
+                                        </p>
                                     </div>
+
                                     <p className="mt-1 text-[10px] text-neutral-500">
-                                        {item.paid} paid · Due {item.due}, 2026
+                                        {item.paid} paid · Due {item.due}, 2027
                                     </p>
                                 </div>
                             ))}
@@ -266,39 +476,57 @@ export default function Dashboard() {
                     <section className="rounded-xl border border-neutral-200 bg-white p-4 xl:col-span-7">
                         <div className="mb-4 flex items-center justify-between">
                             <div>
-                                <h2 className="text-sm font-bold text-neutral-900">Recent transactions</h2>
+                                <h2 className="text-sm font-bold text-neutral-900">
+                                    Recent transactions
+                                </h2>
                                 <p className="mt-1 text-xs text-neutral-500">
                                     Latest recorded payments and expenses
                                 </p>
                             </div>
-                            <button
-                                type="button"
-                                onClick={() => setShowAll(!showAll)}
-                                className="text-xs font-semibold text-neutral-800 underline decoration-yellow-500 underline-offset-4"
+
+                            <Link
+                                href="/bookkeeper/expenses"
+                                className="text-xs font-semibold text-neutral-800 underline decoration-yellow-500 underline-offset-4 hover:text-yellow-700"
                             >
-                                {showAll ? 'Show less' : 'View all'}
-                            </button>
+                                View all
+                            </Link>
                         </div>
 
                         <div className="flex flex-col">
                             {displayedTransactions.map((transaction) => (
-                                <div key={transaction.id} className="flex flex-col gap-2 border-b border-neutral-100 py-3 last:border-0 sm:flex-row sm:items-center sm:justify-between">
+                                <div
+                                    key={transaction.id}
+                                    className="flex flex-col gap-2 border-b border-neutral-100 py-3 last:border-0 sm:flex-row sm:items-center sm:justify-between"
+                                >
                                     <div className="min-w-0">
-                                        <p className="text-xs font-semibold text-neutral-800">{transaction.description}</p>
+                                        <p className="text-xs font-semibold text-neutral-800">
+                                            {transaction.description}
+                                        </p>
                                         <p className="mt-1 text-[10px] text-neutral-500">
                                             {transaction.project} · {transaction.date}
                                         </p>
                                     </div>
+
                                     <div className="flex items-center justify-between gap-3 sm:justify-end">
-                                        <span className="rounded-full bg-neutral-100 px-2 py-1 text-[9px] text-neutral-600">
+                                        <span
+                                            className="rounded-full px-2 py-1 text-[9px] font-medium"
+                                            style={{
+                                                backgroundColor:
+                                                    transaction.category === 'income'
+                                                        ? '#fef3c7'
+                                                        : `${categoryColors[transaction.type as ExpenseCategory]}20`,
+                                                color:
+                                                    transaction.category === 'income'
+                                                        ? '#854d0e'
+                                                        : categoryColors[transaction.type as ExpenseCategory],
+                                            }}
+                                        >
                                             {transaction.type}
                                         </span>
-                                        <span className={`text-xs font-bold ${
-                                            transaction.category === 'income'
-                                                ? 'text-green-700'
-                                                : 'text-neutral-900'
-                                        }`}>
-                                            {transaction.amount < 0 ? '−' : '+'}{formatCurrency(transaction.amount)}
+
+                                        <span className="text-xs font-bold text-red-600">
+                                            {transaction.amount < 0 ? '−' : '+'}
+                                            {formatCurrency(transaction.amount)}
                                         </span>
                                     </div>
                                 </div>
@@ -315,18 +543,32 @@ function StatCard({
     label,
     value,
     description,
+    color,
+    href,
 }: {
     label: string;
     value: string;
     description: string;
+    color: string;
+    href: string;
 }) {
     return (
-        <div className="rounded-xl border border-neutral-200 bg-white p-4">
+        <a
+            href={href}
+            className="block rounded-xl border border-neutral-200 bg-white p-4 transition-all duration-200 hover:-translate-y-1 hover:border-yellow-400 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-yellow-400"
+        >
             <p className="text-xs text-neutral-500">{label}</p>
-            <p className="mt-3 text-2xl font-bold text-neutral-900">{value}</p>
-            <p className="mt-2 text-[10px] text-neutral-500">{description}</p>
-            <div className="mt-3 h-1 w-10 rounded-full bg-yellow-400" />
-        </div>
+            <p className="mt-3 text-2xl font-bold text-neutral-900">
+                {value}
+            </p>
+            <p className="mt-2 text-[10px] text-neutral-500">
+                {description}
+            </p>
+            <div
+                className="mt-3 h-1 w-10 rounded-full"
+                style={{ backgroundColor: color }}
+            />
+        </a>
     );
 }
 
@@ -335,21 +577,34 @@ function CategoryItem({
     amount,
     percentage,
 }: {
-    label: string;
+    label: ExpenseCategory;
     amount: string;
     percentage: string;
 }) {
     return (
         <div>
             <div className="flex items-center justify-between">
-                <p className="text-xs font-medium text-neutral-700">{label}</p>
-                <p className="text-xs font-semibold text-neutral-900">{amount}</p>
+                <p className="text-xs font-medium text-neutral-700">
+                    {label}
+                </p>
+                <p className="text-xs font-semibold text-neutral-900">
+                    {amount}
+                </p>
             </div>
+
             <div className="mt-2 flex items-center gap-2">
                 <div className="h-1.5 flex-1 rounded-full bg-neutral-100">
-                    <div className="h-full rounded-full bg-yellow-400" style={{ width: percentage }} />
+                    <div
+                        className="h-full rounded-full"
+                        style={{
+                            width: percentage,
+                            backgroundColor: categoryColors[label],
+                        }}
+                    />
                 </div>
-                <span className="w-8 text-right text-[10px] text-neutral-500">{percentage}</span>
+                <span className="w-8 text-right text-[10px] text-neutral-500">
+                    {percentage}
+                </span>
             </div>
         </div>
     );
