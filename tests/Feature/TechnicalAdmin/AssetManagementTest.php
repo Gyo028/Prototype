@@ -64,8 +64,8 @@ test('the screen sends themes, event types, styles, assets and their variants', 
         ->get(route('technical-admin.services-assets'))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
-            ->has('themes', 9)
-            ->has('eventTypes', 5)
+            ->has('themes', 8)
+            ->has('eventTypes', 4)
             ->where('styles', DesignTheme::STYLES)
             ->has('assets', 8)
             ->where('assetCategories', LayoutAsset::CATEGORIES)
@@ -112,7 +112,7 @@ test('incomplete or invalid themes are not saved', function (array $override, st
         ->post(route('technical-admin.services-assets.themes.store'), validTheme($override))
         ->assertSessionHasErrors($error);
 
-    expect(DesignTheme::count())->toBe(9);
+    expect(DesignTheme::count())->toBe(8);
 })->with([
     'missing name' => [['name' => ''], 'name'],
     'duplicate name, other case' => [['name' => 'garden romance'], 'name'],
@@ -139,7 +139,7 @@ test('a theme can be switched off and on', function () {
 
     $this->actingAs($this->admin)->patch(route('technical-admin.services-assets.themes.status', $theme), ['active' => true]);
     expect($theme->fresh()->status)->toBe('active')
-        ->and(DesignTheme::count())->toBe(9);
+        ->and(DesignTheme::count())->toBe(8);
 });
 
 /* ---------------- Layout assets and variants ---------------- */

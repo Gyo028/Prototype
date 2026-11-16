@@ -28,5 +28,8 @@ class DatabaseSeeder extends Seeder
         }
         $this->call(WebsiteContentSeeder::class);
         $this->call(ServiceAssetSeeder::class);
+        $this->call(CustomerSeeder::class);
+        $this->call(StaffEmployeeSeeder::class);
+        $this->call(ProjectSeeder::class);
     }
 }
