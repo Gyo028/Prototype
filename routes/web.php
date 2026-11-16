@@ -12,7 +12,9 @@ use App\Http\Controllers\TechnicalAdmin\ServicesAssetsController;
 use App\Http\Controllers\TechnicalAdmin\DesignThemeController;
 use App\Http\Controllers\TechnicalAdmin\LayoutAssetController;
 use App\Http\Controllers\TechnicalAdmin\DashboardController;
+use App\Http\Controllers\Customer\ServiceRequestController;
 use App\Http\Controllers\DesignSpecialist;
+
 
 Route::inertia('/', 'public/landing')->name('home');
 Route::inertia('/faq', 'public/faq')->name('faq');
@@ -68,7 +70,8 @@ Route::middleware(['auth', 'verified', 'role:customer'])
     ->name('customer.')
     ->group(function () {
         Route::inertia('/', 'customer/dashboard')->name('dashboard');
-        Route::inertia('new-request', 'customer/project-request')->name('new-request');
+        Route::get('new-request', [ServiceRequestController::class, 'create'])->name('new-request');
+        Route::post('new-request', [ServiceRequestController::class, 'store'])->name('new-request.store');
     });
 
 Route::middleware(['auth', 'verified', 'role:project_manager'])

@@ -5,7 +5,7 @@ use App\Models\EmployeePosition;
 use App\Models\User;
 use Illuminate\Database\QueryException;
 
-function makeEmployee(array $overrides = []): Employee
+function makeSchemaEmployee(array $overrides = []): Employee
 {
     return Employee::create(array_merge([
         'position_id' => EmployeePosition::where('position_name', 'Fabrication Head')->value('position_id'),
@@ -22,7 +22,7 @@ test('the five starting positions exist', function () {
 });
 
 test('a field employee can be saved without a user account', function () {
-    $employee = makeEmployee();
+    $employee = makeSchemaEmployee();
 
     expect($employee->fresh()->user_id)->toBeNull()
         ->and($employee->fresh()->employee_status)->toBe(Employee::STATUS_ACTIVE)
@@ -32,26 +32,26 @@ test('a field employee can be saved without a user account', function () {
 test('an employee can be linked to a user account, but only one employee per account', function () {
     $user = User::factory()->create();
 
-    makeEmployee(['user_id' => $user->id]);
+    makeSchemaEmployee(['user_id' => $user->id]);
 
-    expect(fn () => makeEmployee(['user_id' => $user->id, 'email' => 'other@email.com']))
+    expect(fn () => makeSchemaEmployee(['user_id' => $user->id, 'email' => 'other@email.com']))
         ->toThrow(QueryException::class);
 });
 
 test('an incomplete employee record is not saved', function () {
-    expect(fn () => makeEmployee(['contact_number' => null]))->toThrow(QueryException::class);
-    expect(fn () => makeEmployee(['first_name' => null]))->toThrow(QueryException::class);
+    expect(fn () => makeSchemaEmployee(['contact_number' => null]))->toThrow(QueryException::class);
+    expect(fn () => makeSchemaEmployee(['first_name' => null]))->toThrow(QueryException::class);
 });
 
 test('a position that still has employees cannot be deleted', function () {
-    $employee = makeEmployee();
+    $employee = makeSchemaEmployee();
 
     expect(fn () => $employee->position->delete())->toThrow(QueryException::class);
 });
 
 test('deleting a user account keeps the employee record', function () {
     $user = User::factory()->create();
-    $employee = makeEmployee(['user_id' => $user->id]);
+    $employee = makeSchemaEmployee(['user_id' => $user->id]);
 
     $user->delete();
 
