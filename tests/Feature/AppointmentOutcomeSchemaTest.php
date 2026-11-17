@@ -76,3 +76,36 @@ test('the outcome seeder runs only once', function () {
 
     expect(AppointmentOutcome::count())->toBe($count);
 });
+
+test('the design proposal tables have the agreed columns', function () {
+    expect(Schema::getColumnListing('design_proposals'))->toEqualCanonicalizing([
+        'design_proposal_id', 'project_id', 'design_specialist_id', 'version_number', 'quotation_amount', 'status',
+        'submitted_at', 'external_link', 'pm_review_decision', 'pm_remarks', 'pm_reviewed_at', 'owner_review_decision',
+        'owner_remarks', 'owner_reviewed_at', 'customer_decision', 'customer_remarks', 'decision_date', 'created_at', 'updated_at',
+    ]);
+    expect(Schema::getColumnListing('design_proposal_files'))->toEqualCanonicalizing([
+        'proposal_file_id', 'design_proposal_id', 'file_category', 'file_name', 'file_path', 'uploaded_at', 'is_current',
+    ]);
+    expect(Schema::getColumnListing('design_proposal_items'))->toEqualCanonicalizing([
+        'item_id', 'design_proposal_id', 'item_name', 'description', 'quantity', 'unit', 'unit_price', 'subtotal', 'sort_order',
+    ]);
+});
+
+test('sample design proposals: a revision and a pending version for Designing, approved ones after', function () {
+    $this->seed(DatabaseSeeder::class);
+
+    $designing = \App\Models\Project::query()
+        ->where('current_status_id', \App\Models\ProjectStatus::idFor(\App\Models\ProjectStatus::DESIGNING))
+        ->first();
+    $versions = \App\Models\DesignProposal::where('project_id', $designing->project_id)->orderBy('version_number')->get();
+
+    expect($versions->pluck('customer_decision')->all())->toBe(['revision_requested', 'pending'])
+        ->and((float) $versions[1]->quotation_amount)->toBe((float) $versions[1]->items()->sum('subtotal'));
+
+    $contract = \App\Models\Project::query()
+        ->where('current_status_id', \App\Models\ProjectStatus::idFor(\App\Models\ProjectStatus::CONTRACT))
+        ->first();
+    expect(\App\Models\DesignProposal::where('project_id', $contract->project_id)->value('customer_decision'))->toBe('approved');
+
+    \App\Models\DesignProposalFile::all()->each(fn ($f) => Storage::assertExists($f->file_path));
+});

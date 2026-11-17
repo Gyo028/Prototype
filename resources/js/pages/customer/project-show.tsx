@@ -3,6 +3,7 @@ import ProjectFolder from '@/components/customer/project-folder';
 import type {
     ConsultationInfo,
     ConsultationRules,
+    DesignInfo,
     NextAction,
     OcularVisitInfo,
     ProjectDetail,
@@ -20,6 +21,7 @@ type Props = {
     consultation: ConsultationInfo;
     reservationFee: ReservationFeeInfo;
     ocularVisit: OcularVisitInfo;
+    design: DesignInfo;
     availableSlots: Record<string, string[]>;
     rules: ConsultationRules;
 };

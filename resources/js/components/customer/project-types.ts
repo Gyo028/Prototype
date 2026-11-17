@@ -183,6 +183,43 @@ export type ProjectDetail = {
     decision: 'proceed' | 'hold' | 'cancelled' | null;
 };
 
+/* ---------- design proposal (Plan Project step 4) ---------- */
+
+export type DesignDecision = 'pending' | 'approved' | 'revision_requested';
+
+export type DesignFile = {
+    id: number;
+    name: string;
+    extension: string;
+    viewable: boolean; // PDF and images open in the browser; others download
+    url: string;
+};
+
+export type DesignProposalVersion = {
+    id: number;
+    version: number;
+    submittedAt: string | null;
+    quotationAmount: number;
+    items: { id: number; name: string; description: string | null; quantity: number; unit: string | null; unitPrice: number; subtotal: number }[];
+    designFiles: DesignFile[]; // 2D design proposal
+    visualizationFiles: DesignFile[]; // optional 3D output
+    otherFiles: DesignFile[];
+    externalLink: string | null; // 3D files over 50 MB
+    decision: DesignDecision; // the customer's
+    comments: string | null; // the customer's revision comments
+    decidedAt: string | null;
+};
+
+export type DesignInfo = {
+    latest: DesignProposalVersion | null; // newest version approved by the PM and the Owner
+    history: DesignProposalVersion[]; // earlier versions, newest first
+    canDecide: boolean;
+    revisionInProgress: boolean;
+    designerAssigned: boolean;
+    reservationFeePaid: number | null;
+    remarksMax: number;
+};
+
 /* ---------- reservation fee (Plan Project step 2) ---------- */
 
 export type ReservationPayment = {

@@ -121,4 +121,10 @@ class Project extends Model
     {
         return $this->hasMany(SiteAccessDocument::class, 'project_id')->orderByDesc('document_id');
     }
+
+    /** Design proposal versions, oldest first. @return HasMany<DesignProposal, $this> */
+    public function designProposals(): HasMany
+    {
+        return $this->hasMany(DesignProposal::class, 'project_id')->orderBy('version_number');
+    }
 }

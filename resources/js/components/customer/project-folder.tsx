@@ -2,12 +2,14 @@ import { Link } from '@inertiajs/react';
 import { AlertCircle, ArrowLeft, ArrowRight, Check, Clock, FileText, Lock, SkipForward, X, XCircle } from 'lucide-react';
 import { useState } from 'react';
 import ConsultationPanel from '@/components/customer/consultation-panel';
+import DesignProposalPanel from '@/components/customer/design-proposal-panel';
 import OcularVisitPanel from '@/components/customer/ocular-visit-panel';
 import ReservationFeePanel from '@/components/customer/reservation-fee-panel';
 import { PHASE_LABELS, formatWhen, statusText, statusTone } from '@/components/customer/project-types';
 import type {
     ConsultationInfo,
     ConsultationRules,
+    DesignInfo,
     NextAction,
     OcularVisitInfo,
     ProjectDetail,
@@ -20,11 +22,16 @@ import { Pill, cx } from '@/components/dashboard/ui';
 /*
  * Customer > My Projects > one project: the Plan Project progress page.
  *
- * One container, two sides:
- *  - left:  the 8-step timeline (a horizontal strip on small screens)
- *  - right: the selected step's details, opening on the current step
+ * One container, stacked:
+ *  - header: project code, title, date, status
+ *  - progress: the 8 steps in a row under the header, grouped by phase
+ *    (a compact scrollable strip on small screens)
+ *  - body: the selected step's details at full width, opening on the current step
  *
- * "Where things stand" sits at the top of the right side, on the current
+ * The progress row sits above the body rather than beside it, so a long step
+ * (many design revisions, say) doesn't leave an empty column next to it.
+ *
+ * "Where things stand" sits at the top of the body, on the current
  * step only. Other steps show a thin "Now at" line that leads back to it.
  * Done, skipped and cancelled steps can be opened; locked steps can't.
  *
@@ -40,6 +47,7 @@ type Props = {
     consultation: ConsultationInfo;
     reservationFee: ReservationFeeInfo;
     ocularVisit: OcularVisitInfo;
+    design: DesignInfo;
     availableSlots: Record<string, string[]>;
     rules: ConsultationRules;
 };
@@ -52,7 +60,7 @@ const STATE_LABEL: Record<Step['state'], string> = {
     locked: 'Locked',
 };
 
-export default function ProjectFolder({ project, steps, currentStep, nextAction, consultation, reservationFee, ocularVisit, availableSlots, rules }: Props) {
+export default function ProjectFolder({ project, steps, currentStep, nextAction, consultation, reservationFee, ocularVisit, design, availableSlots, rules }: Props) {
     const [selected, setSelected] = useState<StepKey>(currentStep);
     const step = steps.find((s) => s.key === selected) ?? steps[0];
     const number = steps.indexOf(step) + 1;
@@ -65,7 +73,7 @@ export default function ProjectFolder({ project, steps, currentStep, nextAction,
                 <ArrowLeft className="size-4" /> My Projects
             </Link>
 
-            {/* One container: header on top, then timeline | selected step. */}
+            {/* One container: header, then the progress row, then the selected step. */}
             <section className="overflow-hidden rounded-2xl border border-black/10 bg-white shadow-sm">
                 {/* Compact header: the full request is on its own page. */}
                 <div className="flex flex-wrap items-end justify-between gap-3 border-b border-black/10 px-5 py-4 lg:px-6">
@@ -90,46 +98,46 @@ export default function ProjectFolder({ project, steps, currentStep, nextAction,
                     </div>
                 </div>
 
-                <div className="lg:grid lg:grid-cols-[260px_minmax(0,1fr)]">
-                    <aside className="border-b border-black/10 bg-black/[0.015] lg:border-r lg:border-b-0">
-                        <TimelineStrip steps={steps} selected={step.key} onSelect={setSelected} />
-                        <Timeline steps={steps} selected={step.key} onSelect={setSelected} />
-                    </aside>
+                <div className="border-b border-black/10 bg-black/[0.015]">
+                    <TimelineStrip steps={steps} selected={step.key} onSelect={setSelected} />
+                    <Stepper steps={steps} selected={step.key} onSelect={setSelected} />
+                </div>
 
-                    <div className="min-w-0 p-5 lg:p-6">
-                        {onCurrent ? (
-                            <NextActionBanner action={nextAction} cancelled={project.status.name === 'Cancelled'} />
-                        ) : (
-                            <button
-                                type="button"
-                                onClick={() => setSelected(currentStep)}
-                                className="mb-5 flex w-full items-center justify-between gap-3 rounded-lg border border-black/10 px-3 py-2 text-left text-sm hover:border-gold"
-                            >
-                                <span className="text-ink-soft">
-                                    Now at: <span className="font-bold text-ink">{steps.indexOf(current) + 1}. {current.label}</span>
-                                </span>
-                                <ArrowRight className="size-4 shrink-0 text-gold-dark" />
-                            </button>
-                        )}
+                <div className="min-w-0 p-5 lg:p-6">
+                    {onCurrent ? (
+                        <NextActionBanner action={nextAction} cancelled={project.status.name === 'Cancelled'} />
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => setSelected(currentStep)}
+                            className="mb-5 flex w-full items-center justify-between gap-3 rounded-lg border border-black/10 px-3 py-2 text-left text-sm hover:border-gold"
+                        >
+                            <span className="text-ink-soft">
+                                Now at: <span className="font-bold text-ink">{steps.indexOf(current) + 1}. {current.label}</span>
+                            </span>
+                            <ArrowRight className="size-4 shrink-0 text-gold-dark" />
+                        </button>
+                    )}
 
-                        <StepHeader step={step} number={number} />
+                    <StepHeader step={step} number={number} />
 
-                        {step.key === 'consultation' ? (
-                            <ConsultationPanel
-                                projectId={project.id}
-                                consultation={consultation}
-                                availableSlots={availableSlots}
-                                rules={rules}
-                                decision={project.decision}
-                            />
-                        ) : step.key === 'reservation_fee' ? (
-                            <ReservationFeePanel projectId={project.id} fee={reservationFee} stepState={step.state} />
-                        ) : step.key === 'ocular_visit' && step.state !== 'skipped' && step.state !== 'cancelled' ? (
-                            <OcularVisitPanel projectId={project.id} venue={project.venue} ocularVisit={ocularVisit} />
-                        ) : (
-                            <StepBody step={step} />
-                        )}
-                    </div>
+                    {step.key === 'consultation' ? (
+                        <ConsultationPanel
+                            projectId={project.id}
+                            consultation={consultation}
+                            availableSlots={availableSlots}
+                            rules={rules}
+                            decision={project.decision}
+                        />
+                    ) : step.key === 'reservation_fee' ? (
+                        <ReservationFeePanel projectId={project.id} fee={reservationFee} stepState={step.state} />
+                    ) : step.key === 'ocular_visit' && step.state !== 'skipped' && step.state !== 'cancelled' ? (
+                        <OcularVisitPanel projectId={project.id} venue={project.venue} ocularVisit={ocularVisit} />
+                    ) : step.key === 'design' && step.state !== 'cancelled' && (step.state === 'current' || design.latest) ? (
+                        <DesignProposalPanel projectId={project.id} design={design} />
+                    ) : (
+                        <StepBody step={step} />
+                    )}
                 </div>
             </section>
         </div>
@@ -157,64 +165,72 @@ function NextActionBanner({ action, cancelled }: { action: NextAction; cancelled
     );
 }
 
-/** Large screens: the vertical timeline, grouped by phase. */
-function Timeline({ steps, selected, onSelect }: { steps: Step[]; selected: StepKey; onSelect: (k: StepKey) => void }) {
+/** Medium screens and up: the steps in a row under the header, with their phase above each group. */
+function Stepper({ steps, selected, onSelect }: { steps: Step[]; selected: StepKey; onSelect: (k: StepKey) => void }) {
+    const columns = { gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` };
+    const groups = (['planning', 'execution', 'closed'] as const)
+        .map((phase) => ({ phase, count: steps.filter((s) => s.phase === phase).length }))
+        .filter((g) => g.count > 0);
+    // A connector is green once the step on its left is behind the customer.
+    const passed = (s: Step | undefined) => s?.state === 'done' || s?.state === 'skipped';
+
     return (
-        <nav aria-label="Project steps" className="hidden p-4 lg:block">
-            {(['planning', 'execution', 'closed'] as const).map((phase) => (
-                <div key={phase} className="mb-2 last:mb-0">
-                    <p className="px-2 pt-1 pb-2 text-[11px] font-bold tracking-wide text-ink-soft uppercase">{PHASE_LABELS[phase]}</p>
-                    <ol>
-                        {steps
-                            .filter((s) => s.phase === phase)
-                            .map((s) => {
-                                const number = steps.indexOf(s) + 1;
-                                // steps[number] is the next step (number is 1-based).
-                                const joinsNext = steps[number]?.phase === s.phase;
-                                const locked = s.state === 'locked';
-                                const active = s.key === selected;
-                                return (
-                                    <li key={s.key} className="relative">
-                                        {joinsNext && (
-                                            <span
-                                                aria-hidden
-                                                className="absolute w-0.5"
-                                                // Inline position: from under this icon to the next one (icon centre is 24px from the left).
-                                                style={{
-                                                    top: 40,
-                                                    bottom: -8,
-                                                    left: 23,
-                                                    backgroundColor: s.state === 'done' || s.state === 'skipped' ? '#86EFAC' : 'rgba(0, 0, 0, 0.1)',
-                                                }}
-                                            />
-                                        )}
-                                        <button
-                                            type="button"
-                                            disabled={locked}
-                                            aria-current={s.state === 'current' ? 'step' : undefined}
-                                            aria-pressed={active}
-                                            onClick={() => onSelect(s.key)}
-                                            className={cx(
-                                                'relative flex w-full items-start gap-3 rounded-xl px-2 py-2 text-left transition',
-                                                active && 'bg-gold/15 ring-1 ring-gold/60',
-                                                !active && !locked && 'hover:bg-black/[0.04]',
-                                                locked && 'cursor-not-allowed',
-                                            )}
-                                        >
-                                            <StepIcon step={s} number={number} />
-                                            <span className="min-w-0 pt-0.5">
-                                                <span className={cx('block text-sm font-bold', locked ? 'text-ink-soft/70' : 'text-ink')}>{s.label}</span>
-                                                {s.note && (
-                                                    <span className={cx('block text-xs', s.state === 'cancelled' ? 'text-red-700' : 'text-ink-soft')}>{s.note}</span>
-                                                )}
-                                            </span>
-                                        </button>
-                                    </li>
-                                );
-                            })}
-                    </ol>
-                </div>
-            ))}
+        <nav aria-label="Project steps" className="hidden px-3 pt-3 pb-2 md:block lg:px-4">
+            <div className="grid" style={columns}>
+                {groups.map((g) => (
+                    <p
+                        key={g.phase}
+                        style={{ gridColumn: `span ${g.count}` }}
+                        className="mx-2 mb-1 border-b border-black/10 pb-1 text-center text-[11px] font-bold tracking-wide text-ink-soft uppercase"
+                    >
+                        {PHASE_LABELS[g.phase]}
+                    </p>
+                ))}
+            </div>
+            <ol className="grid" style={columns}>
+                {steps.map((s, i) => {
+                    const locked = s.state === 'locked';
+                    const active = s.key === selected;
+                    return (
+                        <li key={s.key} className="relative">
+                            {/* Connector halves, through the middle of the icon (button pt-2 + half of size-8 = 24px). */}
+                            {i > 0 && (
+                                <span
+                                    aria-hidden
+                                    className={cx('absolute left-0 h-0.5 w-1/2', passed(steps[i - 1]) ? 'bg-green-300' : 'bg-black/10')}
+                                    style={{ top: 23 }}
+                                />
+                            )}
+                            {i < steps.length - 1 && (
+                                <span
+                                    aria-hidden
+                                    className={cx('absolute right-0 h-0.5 w-1/2', passed(s) ? 'bg-green-300' : 'bg-black/10')}
+                                    style={{ top: 23 }}
+                                />
+                            )}
+                            <button
+                                type="button"
+                                disabled={locked}
+                                aria-current={s.state === 'current' ? 'step' : undefined}
+                                aria-pressed={active}
+                                onClick={() => onSelect(s.key)}
+                                className={cx(
+                                    'relative mx-auto flex w-full flex-col items-center gap-1 rounded-xl px-1 pt-2 pb-2 text-center transition',
+                                    active && 'bg-gold/15 ring-1 ring-gold/60',
+                                    !active && !locked && 'hover:bg-black/[0.04]',
+                                    locked && 'cursor-not-allowed',
+                                )}
+                            >
+                                <StepIcon step={s} number={i + 1} />
+                                <span className={cx('text-sm leading-tight font-bold', locked ? 'text-ink-soft/70' : 'text-ink')}>{s.label}</span>
+                                {s.note && (
+                                    <span className={cx('text-xs leading-tight', s.state === 'cancelled' ? 'text-red-700' : 'text-ink-soft')}>{s.note}</span>
+                                )}
+                            </button>
+                        </li>
+                    );
+                })}
+            </ol>
         </nav>
     );
 }
@@ -222,7 +238,7 @@ function Timeline({ steps, selected, onSelect }: { steps: Step[]; selected: Step
 /** Small screens: the steps as a scrollable row of icons, with the selected step's name. */
 function TimelineStrip({ steps, selected, onSelect }: { steps: Step[]; selected: StepKey; onSelect: (k: StepKey) => void }) {
     return (
-        <nav aria-label="Project steps" className="overflow-x-auto p-3 lg:hidden">
+        <nav aria-label="Project steps" className="overflow-x-auto p-3 md:hidden">
             <ol className="flex min-w-max items-center gap-1">
                 {steps.map((s, i) => {
                     const locked = s.state === 'locked';

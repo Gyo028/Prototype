@@ -15,6 +15,7 @@ use App\Http\Controllers\TechnicalAdmin\DashboardController;
 use App\Http\Controllers\Customer\ServiceRequestController;
 use App\Http\Controllers\Customer\ProjectController as CustomerProjectController;
 use App\Http\Controllers\Customer\ConsultationController;
+use App\Http\Controllers\Customer\DesignProposalController;
 use App\Http\Controllers\Customer\OcularVisitController;
 use App\Http\Controllers\Customer\PaymentController as CustomerPaymentController;
 use App\Http\Controllers\Customer\RequestController as CustomerRequestController;
@@ -89,6 +90,9 @@ Route::middleware(['auth', 'verified', 'role:customer'])
         Route::post('projects/{project}/site-access-documents', [OcularVisitController::class, 'uploadDocument'])->name('projects.site-access-documents.store');
         Route::get('projects/{project}/site-access-documents/{document}', [OcularVisitController::class, 'document'])->name('projects.site-access-documents.show');
         Route::get('projects/{project}/site-assessment/files/{file}', [OcularVisitController::class, 'file'])->name('projects.site-assessment.files.show');
+        Route::post('projects/{project}/design-proposals/{proposal}/approve', [DesignProposalController::class, 'approve'])->name('projects.design.approve');
+        Route::post('projects/{project}/design-proposals/{proposal}/revision', [DesignProposalController::class, 'requestRevision'])->name('projects.design.revision');
+        Route::get('projects/{project}/design-files/{file}', [DesignProposalController::class, 'file'])->name('projects.design.files.show');
         Route::post('projects/{project}/reservation-fee/payments', [CustomerPaymentController::class, 'store'])->name('projects.reservation-fee.pay');
         Route::get('payments/{payment}/receipt', [CustomerPaymentController::class, 'receipt'])->name('payments.receipt');
     });

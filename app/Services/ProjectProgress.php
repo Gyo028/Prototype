@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Billing;
+use App\Models\DesignProposal;
 use App\Models\Payment;
 use App\Models\Project;
 use App\Models\ProjectSchedule;
@@ -60,7 +61,7 @@ class ProjectProgress
      */
     public function for(Project $project): array
     {
-        $project->loadMissing(['status', 'serviceRequest', 'schedules.outcome', 'reservationFee.payments', 'siteAccessDocuments']);
+        $project->loadMissing(['status', 'serviceRequest', 'schedules.outcome', 'reservationFee.payments', 'siteAccessDocuments', 'designProposals']);
         $schedules = $project->schedules;
         $keys = array_keys(self::STEPS);
 
@@ -155,12 +156,38 @@ class ProjectProgress
             'ocular_visit' => ($s = $this->latest($schedules, ProjectSchedule::TYPE_OCULAR_VISIT, ProjectSchedule::STATUS_COMPLETED))
                 ? 'Visited '.$this->day($s->start_datetime)
                 : (($s = $this->active($schedules, ProjectSchedule::TYPE_OCULAR_VISIT)) ? 'Booked for '.$this->day($s->start_datetime) : null),
-            'design' => $done ? 'Approved' : null,
+            'design' => $this->designNote($project, $done),
             'contract' => $done ? 'Signed' : null,
             'fabrication', 'installation' => ($s = $this->latest($schedules, $key))
                 ? ($done ? 'Done '.$this->day($s->end_datetime) : $this->range($s))
                 : null,
             'completed' => ($event = $this->latest($schedules, ProjectSchedule::TYPE_EVENT)) ? 'Event on '.$this->day($event->start_datetime) : null,
+            default => null,
+        };
+    }
+
+    /** The version the customer approved, if any. */
+    private function approvedProposal(Project $project): ?DesignProposal
+    {
+        return $project->designProposals->firstWhere('customer_decision', DesignProposal::APPROVED);
+    }
+
+    /** Timeline note for the design step: approved version, ready for review, or revision requested. */
+    private function designNote(Project $project, bool $done): ?string
+    {
+        if ($approved = $this->approvedProposal($project)) {
+            return 'Approved v'.$approved->version_number;
+        }
+
+        if ($done) {
+            return 'Approved';
+        }
+
+        $latest = $project->designProposals->filter->isVisibleToCustomer()->sortBy('version_number')->last();
+
+        return match ($latest?->customer_decision) {
+            DesignProposal::PENDING => 'Ready for review · v'.$latest->version_number,
+            DesignProposal::REVISION_REQUESTED => 'Revision requested',
             default => null,
         };
     }
@@ -270,6 +297,16 @@ class ProjectProgress
                 return $rows;
 
             case 'design':
+                $approved = $this->approvedProposal($project);
+
+                if ($approved) {
+                    return [
+                        $row('Version', 'Version '.$approved->version_number),
+                        $row('Quotation', $this->peso((float) $approved->quotation_amount)),
+                        $row('Approved on', $approved->decision_date ? $this->day($approved->decision_date, true) : '—'),
+                    ];
+                }
+
                 return $done ? [$row('Status', 'Design proposal and quotation approved')] : [];
 
             case 'contract':
@@ -397,6 +434,20 @@ class ProjectProgress
                 return $action('Book your ocular visit', 'Pick a date and time for our team to visit your venue.', true);
 
             case 'design':
+                $latest = $project->designProposals->filter->isVisibleToCustomer()->sortBy('version_number')->last();
+
+                if ($latest?->customer_decision === DesignProposal::PENDING) {
+                    return $action(
+                        'Review your design proposal',
+                        'Version '.$latest->version_number.' is ready, with a quotation of '.$this->peso((float) $latest->quotation_amount).'. Approve it or ask for changes.',
+                        true,
+                    );
+                }
+
+                if ($latest?->customer_decision === DesignProposal::REVISION_REQUESTED) {
+                    return $action('Revision in progress', 'Our Design Specialist is updating your design based on your comments.');
+                }
+
                 return $action(
                     'Waiting for your design proposal',
                     $project->design_specialist_id ? 'Our Design Specialist is working on it.' : 'A Design Specialist will be assigned to your project.',

@@ -7,12 +7,15 @@ use App\Http\Requests\Customer\ConsultationRequest;
 use App\Models\AppointmentOutcomeFile;
 use App\Models\Billing;
 use App\Models\Customer;
+use App\Models\DesignProposal;
+use App\Models\DesignProposalFile;
 use App\Models\Payment;
 use App\Models\Project;
 use App\Models\ProjectSchedule;
 use App\Models\ServiceRequest;
 use App\Models\SiteAccessDocument;
 use App\Services\ConsultationScheduler;
+use App\Services\DesignProposals;
 use App\Services\OcularVisitScheduler;
 use App\Services\ProjectProgress;
 use App\Services\ReservationFees;
@@ -39,6 +42,7 @@ class ProjectController extends Controller
         private ProjectProgress $progress,
         private ReservationFees $fees,
         private SiteAccessDocuments $documents,
+        private DesignProposals $proposals,
     ) {}
 
     public function index(Request $request): Response
@@ -51,7 +55,7 @@ class ProjectController extends Controller
         }
 
         $requests = $customer === null ? collect() : $customer->serviceRequests()
-            ->with(['eventType', 'project.status', 'project.schedules.outcome', 'project.serviceRequest', 'project.reservationFee.payments', 'project.siteAccessDocuments'])
+            ->with(['eventType', 'project.status', 'project.schedules.outcome', 'project.serviceRequest', 'project.reservationFee.payments', 'project.siteAccessDocuments', 'project.designProposals'])
             ->latest('service_request_id')
             ->get();
 
@@ -127,9 +131,76 @@ class ProjectController extends Controller
             ],
             'reservationFee' => $this->reservationFeeData($project),
             'ocularVisit' => $this->ocularVisitData($project, $request),
+            'design' => $this->designData($project),
             'availableSlots' => $needsSlots ? $this->scheduler->availableSlots($project) : (object) [],
             'rules' => $this->scheduler->rules($project) + ['reasonMax' => ConsultationRequest::REASON_MAX],
         ]);
+    }
+
+    /**
+     * The design proposal (Plan Project step 4): the newest version approved by
+     * the Project Manager and the Owner, earlier versions, and what the customer
+     * can do with it.
+     *
+     * @return array<string, mixed>
+     */
+    private function designData(Project $project): array
+    {
+        $project->load(['designProposals.items', 'designProposals.files']);
+        $visible = $this->proposals->visible($project);
+        $latest = $visible->last();
+        $awaiting = $this->proposals->awaitingCustomer($project);
+
+        $bill = $project->reservationFee;
+        $feePaid = $bill && ($bill->status === Billing::STATUS_PAID || $bill->payments->contains('status', Payment::STATUS_VERIFIED))
+            ? (float) $bill->amount
+            : null;
+
+        return [
+            'latest' => $latest ? $this->proposalData($project, $latest) : null,
+            'history' => $visible->slice(0, -1)->reverse()->map(fn (DesignProposal $p) => $this->proposalData($project, $p))->values(),
+            'canDecide' => $awaiting !== null,
+            'revisionInProgress' => $this->proposals->revisionInProgress($project),
+            'designerAssigned' => $project->design_specialist_id !== null,
+            'reservationFeePaid' => $feePaid,
+            'remarksMax' => DesignProposals::REMARKS_MAX,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function proposalData(Project $project, DesignProposal $p): array
+    {
+        $file = fn (DesignProposalFile $f) => [
+            'id' => $f->proposal_file_id,
+            'name' => $f->file_name,
+            'extension' => $f->extension(),
+            'viewable' => $f->isViewable(),
+            'url' => "/customer/projects/{$project->project_id}/design-files/{$f->proposal_file_id}",
+        ];
+        $current = $p->files->where('is_current', true);
+
+        return [
+            'id' => $p->design_proposal_id,
+            'version' => $p->version_number,
+            'submittedAt' => $p->submitted_at?->toDateString(),
+            'quotationAmount' => (float) $p->quotation_amount,
+            'items' => $p->items->map(fn ($i) => [
+                'id' => $i->item_id,
+                'name' => $i->item_name,
+                'description' => $i->description,
+                'quantity' => $i->quantity,
+                'unit' => $i->unit,
+                'unitPrice' => (float) $i->unit_price,
+                'subtotal' => (float) $i->subtotal,
+            ])->values(),
+            'designFiles' => $current->where('file_category', DesignProposalFile::CATEGORY_2D)->map($file)->values(),
+            'visualizationFiles' => $current->where('file_category', DesignProposalFile::CATEGORY_3D)->map($file)->values(),
+            'otherFiles' => $current->where('file_category', DesignProposalFile::CATEGORY_OTHER)->map($file)->values(),
+            'externalLink' => $p->external_link,
+            'decision' => $p->customer_decision,
+            'comments' => $p->customer_remarks,
+            'decidedAt' => $p->decision_date?->toDateString(),
+        ];
     }
 
     /**

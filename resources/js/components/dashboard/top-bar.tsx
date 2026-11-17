@@ -1,5 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
-import { Bell, Menu, Search, UserRound } from 'lucide-react';
+import { Bell, Menu, UserRound } from 'lucide-react';
 import BrandLogo from '@/components/brand-logo';
 
 type Props = {
@@ -37,18 +37,8 @@ export default function TopBar({
                 </Link>
             </div>
 
-            {/* Right: search, notifications, user */}
+            {/* Right: notifications, user */}
             <div className="flex items-center gap-4">
-                <label className="hidden h-11 w-72 items-center gap-3 rounded-full bg-neutral-200 px-4 md:flex lg:w-80">
-                    <Menu className="size-4 text-ink-soft" />
-                    <input
-                        type="search"
-                        placeholder="Search"
-                        className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-ink-soft"
-                    />
-                    <Search className="size-4 text-ink-soft" />
-                </label>
-
                 <Link
                     href={notificationsHref ?? '#'}
                     aria-label="Notifications"

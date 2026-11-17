@@ -140,8 +140,8 @@ test('the pages send the steps, and My Projects flags the project that needs act
         ->assertInertia(fn (Assert $page) => $page
             ->component('customer/projects')
             ->has('items', 13) // 12 projects + 1 pending request
-            // Book the consultation, pay the reservation fee, and book the ocular visit.
-            ->where('items', fn ($items) => collect($items)->where('nextAction.actionNeeded', true)->count() === 3
+            // Book the consultation, pay the reservation fee, book the ocular visit, and review the design.
+            ->where('items', fn ($items) => collect($items)->where('nextAction.actionNeeded', true)->count() === 4
                 && collect($items)->firstWhere('projectId', null)['nextAction']['title'] === 'Waiting for review'));
 });
 
