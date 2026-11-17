@@ -38,10 +38,11 @@ test('a pending request shows as Request Details, with its services and reservat
             ->component('customer/request-show')
             ->where('project', null)
             ->where('request.requestStatus', 'pending')
-            ->where('request.reservationFee', $r->reservationFee())
+            // JSON sends whole numbers without ".0", so compare by value.
+            ->where('request.reservationFee', fn ($v) => (float) $v === $r->reservationFee())
             ->has('request.services', 1) // the Event Styling base fee
             ->where('request.services.0.name', 'Event Styling')
-            ->where('request.servicesTotal', 45000.0));
+            ->where('request.servicesTotal', fn ($v) => (float) $v === 45000.0));
 });
 
 test('an approved request shows as Project Details, linked to its project', function () {

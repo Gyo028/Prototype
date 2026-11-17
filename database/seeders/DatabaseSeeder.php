@@ -31,5 +31,8 @@ class DatabaseSeeder extends Seeder
         $this->call(CustomerSeeder::class);
         $this->call(StaffEmployeeSeeder::class);
         $this->call(ProjectSeeder::class);
+        $this->call(ReservationFeeSeeder::class);
+        $this->call(SiteAccessDocumentSeeder::class);
+        $this->call(SiteAssessmentSeeder::class);
     }
 }

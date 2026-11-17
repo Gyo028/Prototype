@@ -2,8 +2,19 @@ import { Link } from '@inertiajs/react';
 import { AlertCircle, ArrowLeft, ArrowRight, Check, Clock, FileText, Lock, SkipForward, X, XCircle } from 'lucide-react';
 import { useState } from 'react';
 import ConsultationPanel from '@/components/customer/consultation-panel';
+import OcularVisitPanel from '@/components/customer/ocular-visit-panel';
+import ReservationFeePanel from '@/components/customer/reservation-fee-panel';
 import { PHASE_LABELS, formatWhen, statusText, statusTone } from '@/components/customer/project-types';
-import type { ConsultationInfo, ConsultationRules, NextAction, ProjectDetail, Step, StepKey } from '@/components/customer/project-types';
+import type {
+    ConsultationInfo,
+    ConsultationRules,
+    NextAction,
+    OcularVisitInfo,
+    ProjectDetail,
+    ReservationFeeInfo,
+    Step,
+    StepKey,
+} from '@/components/customer/project-types';
 import { Pill, cx } from '@/components/dashboard/ui';
 
 /*
@@ -27,6 +38,8 @@ type Props = {
     currentStep: StepKey;
     nextAction: NextAction;
     consultation: ConsultationInfo;
+    reservationFee: ReservationFeeInfo;
+    ocularVisit: OcularVisitInfo;
     availableSlots: Record<string, string[]>;
     rules: ConsultationRules;
 };
@@ -39,7 +52,7 @@ const STATE_LABEL: Record<Step['state'], string> = {
     locked: 'Locked',
 };
 
-export default function ProjectFolder({ project, steps, currentStep, nextAction, consultation, availableSlots, rules }: Props) {
+export default function ProjectFolder({ project, steps, currentStep, nextAction, consultation, reservationFee, ocularVisit, availableSlots, rules }: Props) {
     const [selected, setSelected] = useState<StepKey>(currentStep);
     const step = steps.find((s) => s.key === selected) ?? steps[0];
     const number = steps.indexOf(step) + 1;
@@ -109,6 +122,10 @@ export default function ProjectFolder({ project, steps, currentStep, nextAction,
                                 rules={rules}
                                 decision={project.decision}
                             />
+                        ) : step.key === 'reservation_fee' ? (
+                            <ReservationFeePanel projectId={project.id} fee={reservationFee} stepState={step.state} />
+                        ) : step.key === 'ocular_visit' && step.state !== 'skipped' && step.state !== 'cancelled' ? (
+                            <OcularVisitPanel projectId={project.id} venue={project.venue} ocularVisit={ocularVisit} />
                         ) : (
                             <StepBody step={step} />
                         )}

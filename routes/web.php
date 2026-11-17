@@ -15,6 +15,8 @@ use App\Http\Controllers\TechnicalAdmin\DashboardController;
 use App\Http\Controllers\Customer\ServiceRequestController;
 use App\Http\Controllers\Customer\ProjectController as CustomerProjectController;
 use App\Http\Controllers\Customer\ConsultationController;
+use App\Http\Controllers\Customer\OcularVisitController;
+use App\Http\Controllers\Customer\PaymentController as CustomerPaymentController;
 use App\Http\Controllers\Customer\RequestController as CustomerRequestController;
 use App\Http\Controllers\DesignSpecialist;
 
@@ -82,6 +84,13 @@ Route::middleware(['auth', 'verified', 'role:customer'])
         Route::post('projects/{project}/consultation', [ConsultationController::class, 'store'])->name('projects.consultation.store');
         Route::patch('projects/{project}/consultation/reschedule', [ConsultationController::class, 'reschedule'])->name('projects.consultation.reschedule');
         Route::patch('projects/{project}/consultation/cancel', [ConsultationController::class, 'cancel'])->name('projects.consultation.cancel');
+        Route::post('projects/{project}/ocular-visit', [OcularVisitController::class, 'store'])->name('projects.ocular-visit.store');
+        Route::patch('projects/{project}/ocular-visit/reschedule', [OcularVisitController::class, 'reschedule'])->name('projects.ocular-visit.reschedule');
+        Route::post('projects/{project}/site-access-documents', [OcularVisitController::class, 'uploadDocument'])->name('projects.site-access-documents.store');
+        Route::get('projects/{project}/site-access-documents/{document}', [OcularVisitController::class, 'document'])->name('projects.site-access-documents.show');
+        Route::get('projects/{project}/site-assessment/files/{file}', [OcularVisitController::class, 'file'])->name('projects.site-assessment.files.show');
+        Route::post('projects/{project}/reservation-fee/payments', [CustomerPaymentController::class, 'store'])->name('projects.reservation-fee.pay');
+        Route::get('payments/{payment}/receipt', [CustomerPaymentController::class, 'receipt'])->name('payments.receipt');
     });
 
 Route::middleware(['auth', 'verified', 'role:project_manager'])

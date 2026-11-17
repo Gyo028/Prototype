@@ -25,6 +25,8 @@ test('the project tables follow the ERD column names', function () {
     ]);
     expect(Schema::getColumnListing('project_schedules'))->toEqualCanonicalizing([
         'schedule_id', 'project_id', 'schedule_type', 'start_datetime', 'end_datetime', 'schedule_status', 'remarks',
+        'meeting_mode', 'changed_by', // added for consultation bookings (Slice 1)
+        'venue_ownership', // added for ocular visits (Slice 3)
     ]);
 });
 
@@ -45,8 +47,9 @@ test('the seeder creates a sample project for every status, both request types',
 
     $projects = Project::with(['status', 'serviceRequest', 'eventSchedule'])->get();
 
-    // One per status, plus a second Consultation project that is on hold.
-    expect($projects)->toHaveCount(10);
+    // One per status, plus a Consultation project on hold (ProjectSeeder) and two
+    // Consultation projects waiting on the reservation fee (ReservationFeeSeeder).
+    expect($projects)->toHaveCount(12);
     expect($projects->pluck('status.status_name')->unique()->sort()->values()->all())
         ->toEqualCanonicalizing(ProjectStatus::query()->pluck('status_name')->all());
     expect($projects->pluck('serviceRequest.request_type')->unique()->sort()->values()->all())
@@ -99,5 +102,5 @@ test('running the seeders again adds no duplicates', function () {
     $this->seed(DatabaseSeeder::class);
     $this->seed(ProjectSeeder::class);
 
-    expect(Project::query()->count())->toBe(10);
+    expect(Project::query()->count())->toBe(12);
 });

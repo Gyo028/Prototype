@@ -104,7 +104,7 @@ class ServiceRequest extends Model
     {
         $base = $this->budget_max ?? $this->budget_min;
 
-        return round((float) $base * self::RESERVATION_FEE_RATE, 2);
+        return round((float) $base * (float) config('payments.reservation_fee.rate', self::RESERVATION_FEE_RATE), 2);
     }
 
     public function isCustom(): bool

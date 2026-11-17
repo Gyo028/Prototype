@@ -1,6 +1,15 @@
 import { Head } from '@inertiajs/react';
 import ProjectFolder from '@/components/customer/project-folder';
-import type { ConsultationInfo, ConsultationRules, NextAction, ProjectDetail, Step, StepKey } from '@/components/customer/project-types';
+import type {
+    ConsultationInfo,
+    ConsultationRules,
+    NextAction,
+    OcularVisitInfo,
+    ProjectDetail,
+    ReservationFeeInfo,
+    Step,
+    StepKey,
+} from '@/components/customer/project-types';
 import CustomerLayout from '@/layouts/customer-layout';
 
 type Props = {
@@ -9,6 +18,8 @@ type Props = {
     currentStep: StepKey;
     nextAction: NextAction;
     consultation: ConsultationInfo;
+    reservationFee: ReservationFeeInfo;
+    ocularVisit: OcularVisitInfo;
     availableSlots: Record<string, string[]>;
     rules: ConsultationRules;
 };

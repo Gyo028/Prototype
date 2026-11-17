@@ -96,10 +96,29 @@ class Project extends Model
         return $this->hasMany(ProjectSchedule::class, 'project_id');
     }
 
+    /** @return HasMany<Billing, $this> */
+    public function billings(): HasMany
+    {
+        return $this->hasMany(Billing::class, 'project_id');
+    }
+
+    /** The reservation fee bill, once issued. @return HasOne<Billing, $this> */
+    public function reservationFee(): HasOne
+    {
+        return $this->hasOne(Billing::class, 'project_id')
+            ->ofMany(['billing_id' => 'max'], fn ($q) => $q->where('billing_type', Billing::TYPE_RESERVATION_FEE));
+    }
+
     /** The event date (or the custom project's date range). @return HasOne<ProjectSchedule, $this> */
     public function eventSchedule(): HasOne
     {
         return $this->hasOne(ProjectSchedule::class, 'project_id')
             ->where('schedule_type', ProjectSchedule::TYPE_EVENT);
+    }
+
+    /** Authorization letters and venue permits, including replaced ones. @return HasMany<SiteAccessDocument, $this> */
+    public function siteAccessDocuments(): HasMany
+    {
+        return $this->hasMany(SiteAccessDocument::class, 'project_id')->orderByDesc('document_id');
     }
 }

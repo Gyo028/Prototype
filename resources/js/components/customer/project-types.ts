@@ -63,16 +63,27 @@ export const PHASE_LABELS: Record<Step['phase'], string> = {
 
 export type MeetingMode = 'online' | 'face_to_face';
 
-export type ConsultationSchedule = {
+export type VenueOwnership = 'own_property' | 'third_party';
+
+export const VENUE_OWNERSHIPS: { value: VenueOwnership; label: string; hint: string }[] = [
+    { value: 'own_property', label: 'My own property', hint: 'Your home or a place you own. No documents needed.' },
+    { value: 'third_party', label: 'Rented or third-party venue', hint: 'Hotel, mall, events place or any venue you rent.' },
+];
+
+/** A booked, held or earlier consultation or ocular visit. */
+export type AppointmentSchedule = {
     id: number;
     date: string;
     startTime: string;
     endTime: string;
     meetingMode: MeetingMode | null;
+    venueOwnership: VenueOwnership | null; // ocular visits only
     status: 'pending' | 'tentative' | 'confirmed' | 'completed' | 'cancelled';
     remarks: string | null;
     changedBy: string | null; // "You", "Project Manager", ...
 };
+
+export type ConsultationSchedule = AppointmentSchedule;
 
 export type ConsultationInfo = {
     current: ConsultationSchedule | null;
@@ -83,12 +94,74 @@ export type ConsultationInfo = {
     changeBlockedReason: string | null;
 };
 
-export type ConsultationRules = {
+/** Booking rules for an appointment (AppointmentScheduler::rules on the server). */
+export type AppointmentRules = {
     earliestDate: string;
     latestDate: string;
     leadDays: number;
     changeCutoffDays: number;
+    slotTimes: string[]; // start times, e.g. ['09:00', '10:00', …] or ['09:00', '11:00', …]
+    slotMinutes: number;
     reasonMax: number;
+};
+
+export type ConsultationRules = AppointmentRules;
+
+/* ---------- ocular visit (Plan Project step 3) ---------- */
+
+export type OutcomeFile = {
+    id: number;
+    name: string;
+    extension: string;
+    viewable: boolean; // PDF and images open in the browser; DOCX/XLSX download
+    url: string;
+};
+
+/** The site assessment the Project Manager recorded after the visit. */
+export type SiteAssessment = {
+    visitDate: string;
+    notes: string | null;
+    recordedAt: string;
+    recordedBy: string;
+    report: OutcomeFile | null;
+    photos: OutcomeFile[];
+    attachments: OutcomeFile[];
+};
+
+export type SiteAccessFile = {
+    id: number;
+    name: string;
+    viewable: boolean;
+    url: string;
+    status: 'submitted' | 'approved' | 'rejected';
+    remarks: string | null; // the reason, when rejected
+    uploadedAt: string; // 'YYYY-MM-DD HH:mm'
+    reviewedAt: string | null;
+    replacedAt: string | null;
+};
+
+/** The authorization letter or the venue permit: the current file and the ones it replaced. */
+export type SiteAccessDocument = {
+    type: 'authorization_letter' | 'venue_permit';
+    label: string;
+    current: SiteAccessFile | null;
+    history: SiteAccessFile[];
+};
+
+export type OcularVisitInfo = {
+    required: boolean | null; // from the consultation outcome
+    current: AppointmentSchedule | null;
+    history: AppointmentSchedule[];
+    canBook: boolean;
+    bookingBlockedReason: string | null;
+    canChange: boolean;
+    changeBlockedReason: string | null;
+    assessment: SiteAssessment | null;
+    documents: SiteAccessDocument[];
+    canUploadDocuments: boolean;
+    documentRules: { maxMb: number; types: string[] };
+    availableSlots: Record<string, string[]>;
+    rules: AppointmentRules;
 };
 
 export type ProjectDetail = {
@@ -108,6 +181,40 @@ export type ProjectDetail = {
     budgetMax: number | null;
     status: ProjectStatusInfo;
     decision: 'proceed' | 'hold' | 'cancelled' | null;
+};
+
+/* ---------- reservation fee (Plan Project step 2) ---------- */
+
+export type ReservationPayment = {
+    id: number;
+    amount: number;
+    reference: string;
+    paymentDate: string;
+    submittedAt: string; // 'YYYY-MM-DD HH:mm'
+    method: 'gcash' | 'cash' | 'cheque';
+    status: 'submitted' | 'verified' | 'rejected';
+    remarks: string | null; // the reason, when rejected
+    verifiedAt: string | null;
+    receiptName: string | null;
+    receiptUrl: string | null;
+};
+
+export type ReservationFeeInfo = {
+    billing: {
+        id: number;
+        amount: number;
+        issuedAt: string;
+        dueDate: string;
+        status: 'issued' | 'paid' | 'overdue';
+        pastDue: boolean;
+    } | null;
+    payments: ReservationPayment[]; // newest first
+    canPay: boolean;
+    payBlockedReason: string | null;
+    expectedAmount: number; // 10% of the budget, shown before the bill is issued
+    dueDays: number;
+    gcash: { account_name: string; account_number: string; qr_image: string; is_sample: boolean };
+    receipt: { maxMb: number; types: string[] };
 };
 
 /** Everything the customer submitted (Request Details / Project Details page). */
@@ -135,9 +242,6 @@ export type RequestDetail = {
     servicesTotal: number;
     files: { id: number; name: string; isImage: boolean; url: string }[];
 };
-
-/** Start times offered: 9:00 AM to 4:00 PM (each slot is 1 hour). */
-export const SLOT_TIMES = ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00'];
 
 export const MEETING_MODES: { value: MeetingMode; label: string; hint: string }[] = [
     { value: 'online', label: 'Online', hint: 'Video call; the link is sent before the meeting' },

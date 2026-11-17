@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * @property int $schedule_id
@@ -13,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property \Illuminate\Support\Carbon $end_datetime
  * @property string $schedule_status pending | tentative | confirmed | completed | cancelled
  * @property string|null $meeting_mode online | face_to_face (appointments only)
+ * @property string|null $venue_ownership own_property | third_party (ocular visits only)
  * @property string|null $remarks
  * @property int|null $changed_by user who rescheduled or cancelled it
  */
@@ -45,6 +47,12 @@ class ProjectSchedule extends Model
 
     public const MODE_FACE_TO_FACE = 'face_to_face';
 
+    /** Ocular visit at the customer's own property: no site access documents needed. */
+    public const VENUE_OWN_PROPERTY = 'own_property';
+
+    /** Ocular visit at a rented or third-party venue: needs approved site access documents. */
+    public const VENUE_THIRD_PARTY = 'third_party';
+
     protected $primaryKey = 'schedule_id';
 
     public $timestamps = false;
@@ -56,6 +64,7 @@ class ProjectSchedule extends Model
         'end_datetime',
         'schedule_status',
         'meeting_mode',
+        'venue_ownership',
         'remarks',
         'changed_by',
     ];
@@ -78,5 +87,11 @@ class ProjectSchedule extends Model
     public function changedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'changed_by');
+    }
+
+    /** What came out of a held consultation or ocular visit. @return HasOne<AppointmentOutcome, $this> */
+    public function outcome(): HasOne
+    {
+        return $this->hasOne(AppointmentOutcome::class, 'schedule_id');
     }
 }

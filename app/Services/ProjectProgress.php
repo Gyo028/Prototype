@@ -2,9 +2,12 @@
 
 namespace App\Services;
 
+use App\Models\Billing;
+use App\Models\Payment;
 use App\Models\Project;
 use App\Models\ProjectSchedule;
 use App\Models\ProjectStatus;
+use App\Models\SiteAccessDocument;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 
@@ -57,7 +60,7 @@ class ProjectProgress
      */
     public function for(Project $project): array
     {
-        $project->loadMissing(['status', 'serviceRequest', 'schedules']);
+        $project->loadMissing(['status', 'serviceRequest', 'schedules.outcome', 'reservationFee.payments', 'siteAccessDocuments']);
         $schedules = $project->schedules;
         $keys = array_keys(self::STEPS);
 
@@ -121,8 +124,9 @@ class ProjectProgress
             ProjectStatus::FABRICATING => 5,
             ProjectStatus::INSTALLING => 6,
             ProjectStatus::COMPLETED => 7,
-            // Cancelled: at the design step if a designer was already assigned, otherwise at the consultation.
-            default => $project->design_specialist_id ? 3 : 0,
+            // Cancelled: at the reservation fee if it went unpaid, at the design step if a
+            // designer was already assigned, otherwise at the consultation.
+            default => $project->reservationFee?->status === Billing::STATUS_OVERDUE ? 1 : ($project->design_specialist_id ? 3 : 0),
         };
     }
 
@@ -147,7 +151,7 @@ class ProjectProgress
             'consultation' => ($s = $this->latest($schedules, ProjectSchedule::TYPE_CONSULTATION, ProjectSchedule::STATUS_COMPLETED))
                 ? 'Held '.$this->day($s->start_datetime)
                 : (($s = $this->active($schedules, ProjectSchedule::TYPE_CONSULTATION)) ? 'Booked for '.$this->day($s->start_datetime) : null),
-            'reservation_fee' => $done ? 'Verified' : $this->peso($project->serviceRequest->reservationFee()),
+            'reservation_fee' => $this->feeNote($project, $done),
             'ocular_visit' => ($s = $this->latest($schedules, ProjectSchedule::TYPE_OCULAR_VISIT, ProjectSchedule::STATUS_COMPLETED))
                 ? 'Visited '.$this->day($s->start_datetime)
                 : (($s = $this->active($schedules, ProjectSchedule::TYPE_OCULAR_VISIT)) ? 'Booked for '.$this->day($s->start_datetime) : null),
@@ -159,6 +163,30 @@ class ProjectProgress
             'completed' => ($event = $this->latest($schedules, ProjectSchedule::TYPE_EVENT)) ? 'Event on '.$this->day($event->start_datetime) : null,
             default => null,
         };
+    }
+
+    /** Timeline note for the reservation fee: due date, sent, or paid. */
+    private function feeNote(Project $project, bool $done): ?string
+    {
+        $bill = $project->reservationFee;
+
+        if ($bill === null) {
+            return $done ? 'Verified' : $this->peso($project->serviceRequest->reservationFee());
+        }
+
+        if ($paid = $bill->payments->firstWhere('status', Payment::STATUS_VERIFIED)) {
+            return 'Paid '.$this->day($paid->payment_date);
+        }
+
+        if ($done) {
+            return 'Verified';
+        }
+
+        if ($bill->payments->contains('status', Payment::STATUS_SUBMITTED)) {
+            return 'Payment sent';
+        }
+
+        return $this->peso((float) $bill->amount).' · due '.$this->day($bill->due_date);
     }
 
     /** The folded card's line: the note, plus the decision for the consultation. */
@@ -194,10 +222,28 @@ class ProjectProgress
 
         switch ($key) {
             case 'reservation_fee':
-                return [
-                    $row('Amount', $this->peso($project->serviceRequest->reservationFee()).' (10% of your budget)'),
-                    $row('Status', $done ? 'Paid and verified' : 'To be billed'),
-                ];
+                $bill = $project->reservationFee;
+
+                if ($bill === null) {
+                    return [
+                        $row('Amount', $this->peso($project->serviceRequest->reservationFee()).' (10% of your budget)'),
+                        $row('Status', $done ? 'Paid and verified' : 'To be billed'),
+                    ];
+                }
+
+                $paid = $bill->payments->firstWhere('status', Payment::STATUS_VERIFIED);
+
+                return array_values(array_filter([
+                    $row('Amount', $this->peso((float) $bill->amount).' (10% of your budget)'),
+                    $row('Due date', $this->day($bill->due_date, true)),
+                    $row('Status', match (true) {
+                        $done || $paid !== null => 'Paid and verified',
+                        $bill->status === Billing::STATUS_OVERDUE => 'Not paid by the due date',
+                        $bill->payments->contains('status', Payment::STATUS_SUBMITTED) => 'Payment sent, waiting for verification',
+                        default => 'Waiting for your payment',
+                    }),
+                    $paid ? $row('Paid on', $this->day($paid->payment_date, true).' · GCash ref. '.$paid->payment_reference) : null,
+                ]));
 
             case 'ocular_visit':
                 if ($state === self::SKIPPED) {
@@ -207,7 +253,21 @@ class ProjectProgress
                 $visit = $this->latest($schedules, ProjectSchedule::TYPE_OCULAR_VISIT, ProjectSchedule::STATUS_COMPLETED)
                     ?? $this->active($schedules, ProjectSchedule::TYPE_OCULAR_VISIT);
 
-                return $visit ? $this->scheduleRows($visit, $visit->schedule_status === ProjectSchedule::STATUS_COMPLETED ? 'Visited' : 'Booked') : [];
+                if ($visit === null) {
+                    return [];
+                }
+
+                $rows = $this->scheduleRows($visit, match ($visit->schedule_status) {
+                    ProjectSchedule::STATUS_COMPLETED => 'Visited',
+                    ProjectSchedule::STATUS_PENDING => 'Pending document review',
+                    default => 'Booked',
+                });
+
+                if ($visit->outcome) {
+                    $rows[] = $row('Site assessment', 'Recorded '.$this->day($visit->outcome->recorded_at, true));
+                }
+
+                return $rows;
 
             case 'design':
                 return $done ? [$row('Status', 'Design proposal and quotation approved')] : [];
@@ -257,7 +317,14 @@ class ProjectProgress
         $action = fn (string $title, string $detail, bool $needed = false) => ['title' => $title, 'detail' => $detail, 'actionNeeded' => $needed];
 
         if ($project->status->status_name === ProjectStatus::CANCELLED) {
-            return $action('This project was cancelled', 'Contact us if you would like to start a new request.');
+            $bill = $project->reservationFee;
+
+            return $action(
+                'This project was cancelled',
+                $bill?->status === Billing::STATUS_OVERDUE
+                    ? 'The reservation fee was not paid by '.$this->day($bill->due_date, true).'. Contact us if you would like to start a new request.'
+                    : 'Contact us if you would like to start a new request.',
+            );
         }
 
         if ($project->isOnHold()) {
@@ -279,21 +346,55 @@ class ProjectProgress
                 return $action('Book your consultation', 'Pick a date and time to meet our Project Manager.', true);
 
             case 'reservation_fee':
-                return $action(
-                    'Your reservation fee bill is being prepared',
-                    $this->peso($project->serviceRequest->reservationFee()).' (10% of your budget). You will be able to pay it here.',
-                );
+                $bill = $project->reservationFee;
+
+                if ($bill === null) {
+                    return $action(
+                        'Your reservation fee bill is being prepared',
+                        $this->peso($project->serviceRequest->reservationFee()).' (10% of your budget). You will be able to pay it here.',
+                    );
+                }
+
+                $latest = $bill->payments->sortByDesc('payment_id')->first();
+                $due = $this->day($bill->due_date, true);
+
+                if ($latest?->status === Payment::STATUS_SUBMITTED) {
+                    return $action('Waiting for payment verification', 'We received your GCash payment. Our Project Manager will verify it soon.');
+                }
+
+                if ($latest?->status === Payment::STATUS_REJECTED) {
+                    return $action(
+                        'Your payment was not accepted',
+                        ($latest->remarks ? "Reason: {$latest->remarks}. " : '').'Please submit your payment again by '.$due.'.',
+                        true,
+                    );
+                }
+
+                return $action('Pay your reservation fee', $this->peso((float) $bill->amount)." by GCash, due {$due}. Your event date is confirmed once it is verified.", true);
 
             case 'ocular_visit':
+                if ($project->ocular_visit_required !== true) {
+                    return $action('Waiting for the Project Manager', 'We are confirming whether a site visit is needed for your venue.');
+                }
+
                 if ($s = $this->active($schedules, ProjectSchedule::TYPE_OCULAR_VISIT)) {
-                    return $action('Attend your ocular visit', $this->day($s->start_datetime, true).' at '.$s->start_datetime->format('g:i A').', at your venue.');
+                    if ($s->schedule_status === ProjectSchedule::STATUS_PENDING) {
+                        return $this->documentsAction($project, $s);
+                    }
+
+                    return $action(
+                        'Attend your ocular visit',
+                        $this->day($s->start_datetime, true).', '.$s->start_datetime->format('g:i A').' – '.$s->end_datetime->format('g:i A').', at '.$project->serviceRequest->venue.'.',
+                    );
                 }
 
-                if ($this->latest($schedules, ProjectSchedule::TYPE_OCULAR_VISIT, ProjectSchedule::STATUS_COMPLETED)) {
-                    return $action('Waiting for the site assessment', 'Our team is writing up what they found at your venue.');
+                if ($held = $this->latest($schedules, ProjectSchedule::TYPE_OCULAR_VISIT, ProjectSchedule::STATUS_COMPLETED)) {
+                    return $held->outcome
+                        ? $action('Your site assessment is ready', 'See the report and venue photos below. A Design Specialist will be assigned next.')
+                        : $action('Waiting for the site assessment', 'Our team is writing up what they found at your venue.');
                 }
 
-                return $action('Your ocular visit is next', 'Booking the visit will open here soon.');
+                return $action('Book your ocular visit', 'Pick a date and time for our team to visit your venue.', true);
 
             case 'design':
                 return $action(
@@ -317,6 +418,50 @@ class ProjectProgress
             default:
                 return $action('Your project is complete', 'Thank you! Ratings and reviews will open here soon.');
         }
+    }
+
+    /**
+     * A pending visit at a third-party venue: upload the documents, or wait for
+     * the Project Manager to review them.
+     *
+     * @return array{title: string, detail: string, actionNeeded: bool}
+     */
+    private function documentsAction(Project $project, ProjectSchedule $visit): array
+    {
+        $when = $this->day($visit->start_datetime, true).', '.$visit->start_datetime->format('g:i A');
+        $current = $project->siteAccessDocuments->whereNull('replaced_at');
+
+        $missing = [];
+        $rejected = [];
+
+        foreach (SiteAccessDocument::TYPES as $type => $label) {
+            $doc = $current->firstWhere('document_type', $type);
+
+            if ($doc === null) {
+                $missing[] = strtolower($label);
+            } elseif ($doc->status === SiteAccessDocument::STATUS_REJECTED) {
+                $rejected[] = strtolower($label).($doc->remarks ? " ({$doc->remarks})" : '');
+            }
+        }
+
+        if ($missing !== [] || $rejected !== []) {
+            $parts = array_filter([
+                $missing ? 'Still needed: '.implode(' and ', $missing).'.' : null,
+                $rejected ? 'Not accepted: '.implode('; ', $rejected).'.' : null,
+            ]);
+
+            return [
+                'title' => 'Upload your site access documents',
+                'detail' => "Your visit on {$when} is pending until our Project Manager approves them. ".implode(' ', $parts),
+                'actionNeeded' => true,
+            ];
+        }
+
+        return [
+            'title' => 'Waiting for document review',
+            'detail' => "Our Project Manager is checking your authorization letter and venue permit. Your visit on {$when} is confirmed once they are approved.",
+            'actionNeeded' => false,
+        ];
     }
 
     /** The latest schedule of a type (optionally with a status). */
