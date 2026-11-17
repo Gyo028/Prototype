@@ -15,6 +15,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property \Carbon\CarbonInterface $due_date
  * @property string $status issued | paid | overdue
  * @property string|null $description
+ * @property string|null $dispute_details the customer's reason
+ * @property string|null $dispute_proof_file_path
+ * @property string|null $dispute_proof_file_name
+ * @property string|null $dispute_status pending | reviewed | resolved
+ * @property string|null $dispute_resolution upheld | rejected | adjusted
+ * @property string|null $dispute_remarks the Project Manager's explanation
+ * @property \Carbon\CarbonInterface|null $dispute_submitted_at
+ * @property \Carbon\CarbonInterface|null $dispute_resolved_at
  */
 class Billing extends Model
 {
@@ -30,6 +38,18 @@ class Billing extends Model
 
     public const STATUS_OVERDUE = 'overdue';
 
+    public const DISPUTE_PENDING = 'pending';
+
+    public const DISPUTE_REVIEWED = 'reviewed';
+
+    public const DISPUTE_RESOLVED = 'resolved';
+
+    public const RESOLUTION_UPHELD = 'upheld';
+
+    public const RESOLUTION_REJECTED = 'rejected';
+
+    public const RESOLUTION_ADJUSTED = 'adjusted';
+
     protected $primaryKey = 'billing_id';
 
     public $timestamps = false;
@@ -44,8 +64,10 @@ class Billing extends Model
         'description',
         'dispute_details',
         'dispute_proof_file_path',
+        'dispute_proof_file_name',
         'dispute_status',
         'dispute_resolution',
+        'dispute_remarks',
         'dispute_submitted_at',
         'dispute_resolved_at',
     ];
@@ -59,6 +81,12 @@ class Billing extends Model
             'dispute_submitted_at' => 'datetime',
             'dispute_resolved_at' => 'datetime',
         ];
+    }
+
+    /** True while a dispute waits for the Project Manager (pending or reviewed). */
+    public function hasOpenDispute(): bool
+    {
+        return in_array($this->dispute_status, [self::DISPUTE_PENDING, self::DISPUTE_REVIEWED], true);
     }
 
     /** @return BelongsTo<Project, $this> */

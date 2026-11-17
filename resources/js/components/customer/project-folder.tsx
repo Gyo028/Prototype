@@ -1,19 +1,21 @@
 import { Link } from '@inertiajs/react';
 import { AlertCircle, ArrowLeft, ArrowRight, Check, Clock, FileText, Lock, SkipForward, X, XCircle } from 'lucide-react';
 import { useState } from 'react';
+import BillCard from '@/components/customer/bill-card';
 import ConsultationPanel from '@/components/customer/consultation-panel';
+import ContractPanel from '@/components/customer/contract-panel';
 import DesignProposalPanel from '@/components/customer/design-proposal-panel';
 import OcularVisitPanel from '@/components/customer/ocular-visit-panel';
-import ReservationFeePanel from '@/components/customer/reservation-fee-panel';
-import { PHASE_LABELS, formatWhen, statusText, statusTone } from '@/components/customer/project-types';
+import { PHASE_LABELS, formatWhen, peso, statusText, statusTone } from '@/components/customer/project-types';
 import type {
     ConsultationInfo,
     ConsultationRules,
+    ContractInfo,
     DesignInfo,
     NextAction,
     OcularVisitInfo,
     ProjectDetail,
-    ReservationFeeInfo,
+    ReservationFeeCard,
     Step,
     StepKey,
 } from '@/components/customer/project-types';
@@ -45,9 +47,10 @@ type Props = {
     currentStep: StepKey;
     nextAction: NextAction;
     consultation: ConsultationInfo;
-    reservationFee: ReservationFeeInfo;
+    reservationFee: ReservationFeeCard;
     ocularVisit: OcularVisitInfo;
     design: DesignInfo;
+    contract: ContractInfo;
     availableSlots: Record<string, string[]>;
     rules: ConsultationRules;
 };
@@ -60,7 +63,7 @@ const STATE_LABEL: Record<Step['state'], string> = {
     locked: 'Locked',
 };
 
-export default function ProjectFolder({ project, steps, currentStep, nextAction, consultation, reservationFee, ocularVisit, design, availableSlots, rules }: Props) {
+export default function ProjectFolder({ project, steps, currentStep, nextAction, consultation, reservationFee, ocularVisit, design, contract, availableSlots, rules }: Props) {
     const [selected, setSelected] = useState<StepKey>(currentStep);
     const step = steps.find((s) => s.key === selected) ?? steps[0];
     const number = steps.indexOf(step) + 1;
@@ -121,6 +124,9 @@ export default function ProjectFolder({ project, steps, currentStep, nextAction,
 
                     <StepHeader step={step} number={number} />
 
+                    {/* After the consultation: the reservation fee comes first (paid on Billing & Payments). */}
+                    {reservationFee && onCurrent && <ReservationFeeBlock fee={reservationFee} />}
+
                     {step.key === 'consultation' ? (
                         <ConsultationPanel
                             projectId={project.id}
@@ -129,12 +135,12 @@ export default function ProjectFolder({ project, steps, currentStep, nextAction,
                             rules={rules}
                             decision={project.decision}
                         />
-                    ) : step.key === 'reservation_fee' ? (
-                        <ReservationFeePanel projectId={project.id} fee={reservationFee} stepState={step.state} />
                     ) : step.key === 'ocular_visit' && step.state !== 'skipped' && step.state !== 'cancelled' ? (
                         <OcularVisitPanel projectId={project.id} venue={project.venue} ocularVisit={ocularVisit} />
                     ) : step.key === 'design' && step.state !== 'cancelled' && (step.state === 'current' || design.latest) ? (
                         <DesignProposalPanel projectId={project.id} design={design} />
+                    ) : step.key === 'contract' && step.state !== 'cancelled' && contract.current ? (
+                        <ContractPanel projectId={project.id} contract={contract} stepState={step.state} />
                     ) : (
                         <StepBody step={step} />
                     )}
@@ -318,11 +324,31 @@ function StepHeader({ step, number }: { step: Step; number: number }) {
     );
 }
 
+/** The reservation fee bill (or the bill to come), with "Pay now" to its page on Billing & Payments. */
+function ReservationFeeBlock({ fee }: { fee: NonNullable<ReservationFeeCard> }) {
+    if (!fee.bill) {
+        return (
+            <p className="mb-4 rounded-xl border border-dashed border-black/15 p-4 text-sm text-ink-soft">
+                Your reservation fee bill of {peso(fee.expectedAmount)} (10% of your budget) is being prepared. You will be able to pay it on Billing &amp;
+                Payments.
+            </p>
+        );
+    }
+
+    return (
+        <BillCard
+            bill={fee.bill}
+            className="mb-4"
+            note="Your event date is confirmed once your reservation fee is verified. If it is not paid by the due date, the project is cancelled."
+        />
+    );
+}
+
 /** The body of a step that has no actions yet: what has happened there so far. */
 function StepBody({ step }: { step: Step }) {
     if (step.details.length === 0) {
         // On the current step the banner above already says where things stand.
-        return step.state === 'current' ? null : (
+        return step.state === 'current' || step.state === 'cancelled' ? null : (
             <p className="rounded-xl border border-dashed border-black/15 p-4 text-sm text-ink-soft">
                 This step is complete. Its full record will appear here once this part of the system is ready.
             </p>

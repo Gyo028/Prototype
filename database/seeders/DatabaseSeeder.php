@@ -35,5 +35,6 @@ class DatabaseSeeder extends Seeder
         $this->call(SiteAccessDocumentSeeder::class);
         $this->call(SiteAssessmentSeeder::class);
         $this->call(DesignProposalSeeder::class);
+        $this->call(ContractSeeder::class);
     }
 }

@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 /**
- * The reservation fee (Plan Project), in one place.
+ * The reservation fee (Plan Project step 2), in one place.
  *
  *  - Issued after the consultation, once the customer decides to proceed
  *    (the Project Manager side calls issue(); sample bills come from a seeder).
@@ -24,8 +24,8 @@ use Illuminate\Support\Facades\Storage;
  *  - Paid in full, by GCash, with the reference number and a receipt.
  *  - One payment waiting for verification at a time. A rejected payment stays
  *    as history and the customer submits a new one.
- *  - Not paid by the due date (no payment submitted or verified): the bill
- *    becomes 'overdue' and the project is cancelled. This rule is to be
+ *  - Not paid by the due date (no payment submitted or verified, and no open
+ *    dispute): the bill becomes 'overdue' and the project is cancelled. This rule is to be
  *    confirmed with the client at the next UAT.
  *
  * Verifying a payment (which makes the project Booked) is the Project
@@ -138,6 +138,8 @@ class ReservationFees
             ->where('status', Billing::STATUS_ISSUED)
             ->where('due_date', '<', $this->today()->toDateString())
             ->whereDoesntHave('payments', fn ($q) => $q->whereIn('status', [Payment::STATUS_SUBMITTED, Payment::STATUS_VERIFIED]))
+            // A disputed bill is on hold until the Project Manager resolves it.
+            ->where(fn ($q) => $q->whereNull('dispute_status')->orWhere('dispute_status', Billing::DISPUTE_RESOLVED))
             ->when($customerId !== null, fn ($q) => $q->whereHas('project.serviceRequest', fn ($r) => $r->where('customer_id', $customerId)))
             ->get();
 

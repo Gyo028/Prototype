@@ -36,13 +36,13 @@ function ppStates(Project $project): array
     return collect(app(ProjectProgress::class)->for($project)['steps'])->pluck('state', 'key')->all();
 }
 
-test('there are 8 steps in three phases', function () {
+test('there are 7 steps in three phases (the reservation fee is a bill, not a step)', function () {
     $steps = app(ProjectProgress::class)->for(ppProject(ProjectStatus::CONSULTATION))['steps'];
 
     expect(collect($steps)->pluck('key')->all())->toBe([
-        'consultation', 'reservation_fee', 'ocular_visit', 'design', 'contract', 'fabrication', 'installation', 'completed',
+        'consultation', 'ocular_visit', 'design', 'contract', 'fabrication', 'installation', 'completed',
     ]);
-    expect(collect($steps)->countBy('phase')->all())->toBe(['planning' => 5, 'execution' => 2, 'closed' => 1]);
+    expect(collect($steps)->countBy('phase')->all())->toBe(['planning' => 4, 'execution' => 2, 'closed' => 1]);
 });
 
 test('a new project starts at the consultation, and booking it is the action needed', function () {
@@ -51,7 +51,7 @@ test('a new project starts at the consultation, and booking it is the action nee
     expect($progress['currentStep'])->toBe('consultation')
         ->and($progress['nextAction']['title'])->toBe('Book your consultation')
         ->and($progress['nextAction']['actionNeeded'])->toBeTrue()
-        ->and(collect($progress['steps'])->where('state', ProjectProgress::LOCKED))->toHaveCount(7);
+        ->and(collect($progress['steps'])->where('state', ProjectProgress::LOCKED))->toHaveCount(6);
 });
 
 test('a project on hold stays at the consultation, with nothing to do', function () {
@@ -77,7 +77,6 @@ test('each status puts the project on the right step', function (string $status,
 test('steps before the current one are done, and the ones after are locked', function () {
     expect(ppStates(ppProject(ProjectStatus::CONTRACT)))->toBe([
         'consultation' => 'done',
-        'reservation_fee' => 'done',
         'ocular_visit' => 'done',
         'design' => 'done',
         'contract' => 'current',
@@ -132,7 +131,7 @@ test('the pages send the steps, and My Projects flags the project that needs act
     $this->actingAs($customer)->get("/customer/projects/{$project->project_id}")
         ->assertInertia(fn (Assert $page) => $page
             ->component('customer/project-show')
-            ->has('steps', 8)
+            ->has('steps', 7)
             ->where('currentStep', 'consultation')
             ->where('nextAction.actionNeeded', true));
 
@@ -140,8 +139,8 @@ test('the pages send the steps, and My Projects flags the project that needs act
         ->assertInertia(fn (Assert $page) => $page
             ->component('customer/projects')
             ->has('items', 13) // 12 projects + 1 pending request
-            // Book the consultation, pay the reservation fee, book the ocular visit, and review the design.
-            ->where('items', fn ($items) => collect($items)->where('nextAction.actionNeeded', true)->count() === 4
+            // Book the consultation, pay the reservation fee, book the ocular visit, review the design, and sign the contract.
+            ->where('items', fn ($items) => collect($items)->where('nextAction.actionNeeded', true)->count() === 5
                 && collect($items)->firstWhere('projectId', null)['nextAction']['title'] === 'Waiting for review'));
 });
 
@@ -152,8 +151,6 @@ test('finished steps keep their details: a summary line and label/value rows', f
     expect($steps['consultation']['summary'])->toStartWith('Held ')->toEndWith('You decided to proceed');
 
     // Done steps show what happened.
-    expect(collect($steps['reservation_fee']['details'])->pluck('value', 'label')->all())
-        ->toMatchArray(['Status' => 'Paid and verified']);
     expect(collect($steps['ocular_visit']['details'])->pluck('value', 'label')->all())
         ->toMatchArray(['Status' => 'Visited']);
     expect(collect($steps['fabrication']['details'])->pluck('value', 'label')->all())

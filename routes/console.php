@@ -13,3 +13,9 @@ Artisan::command('billings:cancel-overdue', function (App\Services\ReservationFe
 })->purpose('Cancel projects whose reservation fee was not paid by the due date');
 
 Illuminate\Support\Facades\Schedule::command('billings:cancel-overdue')->dailyAt('00:10')->timezone('Asia/Manila');
+
+// Developers: rebuild the PDFs of contracts nobody has signed yet, after editing
+// resources/views/pdf/contract.blade.php or config/contract.php.
+Artisan::command('contracts:regenerate', function (App\Services\Contracts $contracts) {
+    $this->info($contracts->regenerateUnsigned().' unsigned contract(s) regenerated.');
+})->purpose('Rebuild unsigned contract PDFs from the current template');

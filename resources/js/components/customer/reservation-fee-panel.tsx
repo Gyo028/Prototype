@@ -7,7 +7,7 @@ import type { ReservationFeeInfo, ReservationPayment, StepState } from '@/compon
 import { Field, GoldButton, Pill, cx, inputClass } from '@/components/dashboard/ui';
 
 /*
- * Customer side: pay the reservation fee — Plan Project step 2.
+ * Pay the reservation fee — Plan Project step 2.
  *
  * The bill is 10% of the budget range, due 7 days after it is issued, and is
  * paid in full by GCash. The customer enters the GCash reference number, the
@@ -15,13 +15,32 @@ import { Field, GoldButton, Pill, cx, inputClass } from '@/components/dashboard/
  * 5 MB). The Project Manager then verifies it; once verified the project is
  * Booked. A rejected payment shows its reason and the customer pays again.
  *
- * If nothing is paid by the due date, the project is cancelled.
+ * If nothing is paid by the due date, the project is cancelled (for now; to be
+ * confirmed with the client at the next UAT).
  */
 
 type Props = {
     projectId: number;
     fee: ReservationFeeInfo;
     stepState: StepState;
+    /** Where the payment is sent. Defaults to the reservation fee. */
+    payUrl?: string;
+    /** Wording for another bill paid the same way (the contract's down payment). */
+    texts?: Partial<Texts>;
+};
+
+type Texts = {
+    heading: string;
+    dueNote: string;
+    pendingNote: string;
+    success: string;
+};
+
+const RESERVATION_TEXTS: Texts = {
+    heading: 'Reservation fee · 10% of your budget',
+    dueNote: 'Pay in full by the due date. If it is not paid by then, your project is cancelled and the date is released.',
+    pendingNote: 'Our Project Manager will check your payment. Your event date is confirmed once it is verified.',
+    success: 'Payment sent. We will let you know once it is verified.',
 };
 
 type Form = { reference: string; paymentDate: string; amount: string; receipt: File | null };
@@ -29,7 +48,8 @@ type Errors = Partial<Record<keyof Form | 'payment', string>>;
 
 const METHOD_LABEL = { gcash: 'GCash', cash: 'Cash', cheque: 'Cheque' } as const;
 
-export default function ReservationFeePanel({ projectId, fee, stepState }: Props) {
+export default function ReservationFeePanel({ projectId, fee, stepState, payUrl, texts: customTexts }: Props) {
+    const texts = { ...RESERVATION_TEXTS, ...customTexts };
     const { billing, payments, canPay, payBlockedReason, gcash, receipt: receiptRules } = fee;
     const latest = payments[0] ?? null;
     const verified = payments.find((p) => p.status === 'verified') ?? null;
@@ -72,13 +92,13 @@ export default function ReservationFeePanel({ projectId, fee, stepState }: Props
 
         setSaving(true);
         router.post(
-            `/customer/projects/${projectId}/reservation-fee/payments`,
+            payUrl ?? `/customer/projects/${projectId}/reservation-fee/payments`,
             { reference: form.reference, paymentDate: form.paymentDate, amount: form.amount, receipt: form.receipt },
             {
                 forceFormData: true,
                 preserveScroll: true,
                 onSuccess: () => {
-                    toast.success('Payment sent. We will let you know once it is verified.');
+                    toast.success(texts.success);
                     setForm(emptyForm());
                     if (fileRef.current) fileRef.current.value = '';
                 },
@@ -113,7 +133,7 @@ export default function ReservationFeePanel({ projectId, fee, stepState }: Props
                             <Wallet className="size-5" />
                         </span>
                         <div>
-                            <p className="text-xs text-ink-soft">Reservation fee · 10% of your budget</p>
+                            <p className="text-xs text-ink-soft">{texts.heading}</p>
                             <p className="text-2xl font-bold text-ink">{peso(billing.amount)}</p>
                         </div>
                     </div>
@@ -130,9 +150,7 @@ export default function ReservationFeePanel({ projectId, fee, stepState }: Props
                     </div>
                 </dl>
                 {unpaid && billing.status !== 'overdue' && (
-                    <p className="mt-3 text-xs text-ink-soft">
-                        Pay in full by the due date. If it is not paid by then, your project is cancelled and the date is released.
-                    </p>
+                    <p className="mt-3 text-xs text-ink-soft">{texts.dueNote}</p>
                 )}
             </section>
 
@@ -140,7 +158,7 @@ export default function ReservationFeePanel({ projectId, fee, stepState }: Props
             {verified && <PaymentCard payment={verified} title="Paid and verified" tone="green" />}
             {!verified && pending && (
                 <PaymentCard payment={pending} title="Payment sent, waiting for verification" tone="gold">
-                    Our Project Manager will check your payment. Your event date is confirmed once it is verified.
+                    {texts.pendingNote}
                 </PaymentCard>
             )}
 

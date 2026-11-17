@@ -109,3 +109,41 @@ test('sample design proposals: a revision and a pending version for Designing, a
 
     \App\Models\DesignProposalFile::all()->each(fn ($f) => Storage::assertExists($f->file_path));
 });
+
+test('the contracts table has the agreed columns', function () {
+    expect(Schema::getColumnListing('contracts'))->toEqualCanonicalizing([
+        'contract_id', 'project_id', 'design_proposal_id', 'version_number', 'status', 'issued_at', 'contract_file_path', 'contract_data',
+        'signed_at', 'sign_method', 'signer_name', 'signed_file_name', 'signed_contract_path', 'executed_contract_path',
+        'reviewed_by', 'reviewed_at', 'verified_at', 'rejection_reason', 'checklist', 'created_at', 'updated_at',
+    ]);
+});
+
+test('sample contracts: one to sign, and signed, verified and paid ones after', function () {
+    $this->seed(DatabaseSeeder::class);
+
+    $inStatus = fn (string $status) => \App\Models\Project::query()
+        ->where('current_status_id', \App\Models\ProjectStatus::idFor($status))
+        ->firstOrFail();
+
+    $toSign = \App\Models\Contract::where('project_id', $inStatus(\App\Models\ProjectStatus::CONTRACT)->project_id)->get();
+    expect($toSign->pluck('status')->all())->toBe(['issued']);
+
+    foreach ([\App\Models\ProjectStatus::FABRICATING => false, \App\Models\ProjectStatus::INSTALLING => true, \App\Models\ProjectStatus::COMPLETED => true] as $status => $balancePaid) {
+        $project = $inStatus($status);
+        $contract = \App\Models\Contract::where('project_id', $project->project_id)->sole();
+
+        expect($contract->status)->toBe('verified')
+            ->and($contract->sign_method)->toBe('electronic')
+            ->and($project->downPayment->status)->toBe('paid')
+            ->and($project->balanceBill->status)->toBe($balancePaid ? 'paid' : 'issued');
+
+        Storage::assertExists($contract->contract_file_path);
+        Storage::assertExists($contract->signed_contract_path);
+        Storage::assertExists($contract->executed_contract_path);
+    }
+
+    // Seeding again adds nothing.
+    $count = \App\Models\Contract::count();
+    $this->seed(\Database\Seeders\ContractSeeder::class);
+    expect(\App\Models\Contract::count())->toBe($count);
+});

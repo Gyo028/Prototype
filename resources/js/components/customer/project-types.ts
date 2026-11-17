@@ -40,7 +40,7 @@ export type NextAction = {
     actionNeeded: boolean;
 };
 
-export type StepKey = 'consultation' | 'reservation_fee' | 'ocular_visit' | 'design' | 'contract' | 'fabrication' | 'installation' | 'completed';
+export type StepKey = 'consultation' | 'ocular_visit' | 'design' | 'contract' | 'fabrication' | 'installation' | 'completed';
 export type StepState = 'done' | 'current' | 'locked' | 'skipped' | 'cancelled';
 
 /** One step of the project timeline, worked out on the server (ProjectProgress). */
@@ -236,6 +236,30 @@ export type ReservationPayment = {
     receiptUrl: string | null;
 };
 
+/* ---------------- Billing & Payments ---------------- */
+
+export type BillKind = 'reservation_fee' | 'down_payment' | 'balance' | 'additional_charge';
+export type BillState = 'unpaid' | 'under_review' | 'disputed' | 'paid' | 'overdue';
+
+/** A bill as a small card (project steps, Billing & Payments list). */
+export type BillCard = {
+    id: number;
+    kind: BillKind;
+    title: string;
+    amount: number;
+    dueDate: string;
+    state: BillState;
+    pastDue: boolean;
+    paidOn: string | null;
+    lastPaymentRejected: boolean;
+    canPay: boolean;
+    url: string; // the bill's own page
+};
+
+/** The reservation fee on the step after the consultation, until it is verified. */
+export type ReservationFeeCard = { bill: BillCard | null; expectedAmount: number } | null;
+
+/** A bill's payment form and history (the bill's own page). */
 export type ReservationFeeInfo = {
     billing: {
         id: number;
@@ -255,6 +279,50 @@ export type ReservationFeeInfo = {
 };
 
 /** Everything the customer submitted (Request Details / Project Details page). */
+/* ---------------- Contract (step 5) ---------------- */
+
+export type ContractStatus = 'issued' | 'signed' | 'verified' | 'rejected';
+
+export type ContractVersion = {
+    id: number;
+    code: string; // e.g. "CON-0006"
+    version: number;
+    status: ContractStatus;
+    issuedAt: string;
+    fileName: string;
+    url: string; // the generated contract PDF (add ?download=1 to download)
+    signedAt: string | null;
+    signMethod: 'electronic' | 'upload' | null;
+    signerName: string | null;
+    signedFile: { name: string; extension: string | null; url: string } | null;
+    executedFile: { name: string; url: string } | null; // fully signed (customer + Owner), once verified
+    reviewedAt: string | null;
+    verifiedAt: string | null;
+    rejectionReason: string | null;
+};
+
+export type ContractInfo = {
+    current: ContractVersion | null;
+    history: ContractVersion[]; // earlier versions, newest first
+    canSign: boolean;
+    signBlockedReason: string | null;
+    signerName: string; // the account's full name, printed under the e-signature
+    summary: {
+        quotationTotal: number;
+        reservationFeePaid: number;
+        finalBilling: number;
+        downPercent: number;
+        downPayment: number;
+        balance: number;
+        downDueDays: number;
+        balanceDaysBeforeEvent: number;
+    } | null;
+    upload: { maxMb: number; types: string[] };
+    pad: { width: number; height: number };
+    downPayment: BillCard | null; // once the contract is verified; paid on Billing & Payments
+    balance: BillCard | null;
+};
+
 export type RequestDetail = {
     id: number;
     code: string;

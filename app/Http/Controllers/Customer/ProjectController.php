@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Customer\ConsultationRequest;
 use App\Models\AppointmentOutcomeFile;
 use App\Models\Billing;
+use App\Models\Contract;
 use App\Models\Customer;
 use App\Models\DesignProposal;
 use App\Models\DesignProposalFile;
@@ -14,7 +15,10 @@ use App\Models\Project;
 use App\Models\ProjectSchedule;
 use App\Models\ServiceRequest;
 use App\Models\SiteAccessDocument;
+use App\Http\Requests\Customer\ContractUploadRequest;
+use App\Services\Billings;
 use App\Services\ConsultationScheduler;
+use App\Services\Contracts;
 use App\Services\DesignProposals;
 use App\Services\OcularVisitScheduler;
 use App\Services\ProjectProgress;
@@ -31,8 +35,9 @@ use Inertia\Response;
  * project and open its folder; pending and rejected ones are listed so the
  * customer can see what they sent.
  *
- * show(): the project folder: the 8-step timeline and what the customer can
- * do on each step (consultation, reservation fee, ocular visit so far).
+ * show(): the project folder: the 7-step timeline and what the customer can
+ * do on each step (consultation, ocular visit, design and contract so far).
+ * Bills are paid on Billing & Payments; the steps link to them.
  */
 class ProjectController extends Controller
 {
@@ -43,6 +48,8 @@ class ProjectController extends Controller
         private ReservationFees $fees,
         private SiteAccessDocuments $documents,
         private DesignProposals $proposals,
+        private Contracts $contracts,
+        private Billings $billings,
     ) {}
 
     public function index(Request $request): Response
@@ -55,7 +62,7 @@ class ProjectController extends Controller
         }
 
         $requests = $customer === null ? collect() : $customer->serviceRequests()
-            ->with(['eventType', 'project.status', 'project.schedules.outcome', 'project.serviceRequest', 'project.reservationFee.payments', 'project.siteAccessDocuments', 'project.designProposals'])
+            ->with(['eventType', 'project.status', 'project.schedules.outcome', 'project.serviceRequest', 'project.reservationFee.payments', 'project.siteAccessDocuments', 'project.designProposals', 'project.contracts', 'project.downPayment.payments'])
             ->latest('service_request_id')
             ->get();
 
@@ -86,6 +93,8 @@ class ProjectController extends Controller
         self::ensureOwned($request, $project);
 
         $this->fees->cancelOverdue($project->serviceRequest()->value('customer_id'));
+        // A project in Contract always has a contract to sign (e.g. sample data).
+        $this->contracts->ensureIssued($project);
 
         $project->refresh()->load(['serviceRequest.eventType', 'status', 'schedules', 'reservationFee.payments']);
         $r = $project->serviceRequest;
@@ -129,12 +138,85 @@ class ProjectController extends Controller
                 'canChange' => $current !== null && $changeBlocked === null,
                 'changeBlockedReason' => $changeBlocked,
             ],
-            'reservationFee' => $this->reservationFeeData($project),
+            // Shown on the step after the consultation until the fee is verified.
+            'reservationFee' => $this->progress->feeOutstanding($project) ? [
+                'bill' => $project->reservationFee ? $this->billings->card($project->reservationFee) : null,
+                'expectedAmount' => $project->serviceRequest->reservationFee(),
+            ] : null,
             'ocularVisit' => $this->ocularVisitData($project, $request),
             'design' => $this->designData($project),
+            'contract' => $this->contractData($project),
             'availableSlots' => $needsSlots ? $this->scheduler->availableSlots($project) : (object) [],
             'rules' => $this->scheduler->rules($project) + ['reasonMax' => ConsultationRequest::REASON_MAX],
         ]);
+    }
+
+    /**
+     * The contract (Plan Project step 5): the current version and how to sign
+     * it, earlier versions, the payment summary and, once verified, the down
+     * payment.
+     *
+     * @return array<string, mixed>
+     */
+    private function contractData(Project $project): array
+    {
+        $project->load(['contracts', 'downPayment.payments', 'balanceBill.payments']);
+        $current = $this->contracts->current($project);
+        $blocked = $this->contracts->signBlockedReason($project, $current);
+        $base = "/customer/projects/{$project->project_id}/contracts";
+
+        $version = fn (Contract $c) => [
+            'id' => $c->contract_id,
+            'code' => $c->code(),
+            'version' => $c->version_number,
+            'status' => $c->status,
+            'issuedAt' => $c->issued_at->toDateString(),
+            'fileName' => $c->downloadName(),
+            'url' => "{$base}/{$c->contract_id}/file",
+            'signedAt' => $c->signed_at?->toDateString(),
+            'signMethod' => $c->sign_method,
+            'signerName' => $c->signer_name,
+            'signedFile' => $c->signed_contract_path ? [
+                'name' => $c->downloadName('signed'),
+                'extension' => $c->signedExtension(),
+                'url' => "{$base}/{$c->contract_id}/file?signed=1",
+            ] : null,
+            // The fully signed contract (customer + Owner), once verified.
+            'executedFile' => $c->executed_contract_path ? [
+                'name' => $c->downloadName('executed'),
+                'url' => "{$base}/{$c->contract_id}/file?executed=1",
+            ] : null,
+            'reviewedAt' => $c->reviewed_at?->toDateString(),
+            'verifiedAt' => $c->verified_at?->toDateString(),
+            'rejectionReason' => $c->rejection_reason,
+        ];
+
+        $payment = $current?->contract_data['payment'] ?? null;
+        $down = $project->downPayment;
+        $balance = $project->balanceBill;
+
+        return [
+            'current' => $current ? $version($current) : null,
+            'history' => $this->contracts->history($project)->map($version)->values(),
+            'canSign' => $blocked === null,
+            'signBlockedReason' => $current ? $blocked : null,
+            'signerName' => $project->serviceRequest->customer->full_name,
+            'summary' => $payment ? [
+                'quotationTotal' => (float) $current->contract_data['quotation']['total'],
+                'reservationFeePaid' => (float) $payment['reservationFeePaid'],
+                'finalBilling' => (float) $payment['finalBilling'],
+                'downPercent' => (int) $payment['downPercent'],
+                'downPayment' => (float) $payment['downPayment'],
+                'balance' => (float) $payment['balance'],
+                'downDueDays' => (int) $payment['downDueDays'],
+                'balanceDaysBeforeEvent' => (int) $payment['balanceDaysBeforeEvent'],
+            ] : null,
+            'upload' => ['maxMb' => ContractUploadRequest::maxMb(), 'types' => config('contract.upload.mimes')],
+            'pad' => ['width' => Contracts::PAD_WIDTH, 'height' => Contracts::PAD_HEIGHT],
+            // Paid on Billing & Payments; the Contract step shows them as cards with "Pay now".
+            'downPayment' => $down ? $this->billings->card($down) : null,
+            'balance' => $balance && $down && $balance->billing_id !== $down->billing_id ? $this->billings->card($balance) : null,
+        ];
     }
 
     /**
@@ -322,49 +404,6 @@ class ProjectController extends Controller
         return $r->request_status === ServiceRequest::STATUS_PENDING
             ? ['title' => 'Waiting for review', 'detail' => 'Our Project Manager is reviewing your request.', 'actionNeeded' => false]
             : null;
-    }
-
-    /** The bill, its payments and how to pay (Plan Project step 2). @return array<string, mixed> */
-    private function reservationFeeData(Project $project): array
-    {
-        /** @var Billing|null $billing */
-        $billing = $project->reservationFee;
-        $blocked = $this->fees->payBlockedReason($billing);
-
-        return [
-            'billing' => $billing ? [
-                'id' => $billing->billing_id,
-                'amount' => (float) $billing->amount,
-                'issuedAt' => $billing->issued_at->toDateString(),
-                'dueDate' => $billing->due_date->toDateString(),
-                'status' => $billing->status,
-                'pastDue' => $this->fees->isPastDue($billing),
-            ] : null,
-            'payments' => $billing
-                ? $billing->payments->sortByDesc('payment_id')->map(fn (Payment $p) => [
-                    'id' => $p->payment_id,
-                    'amount' => (float) $p->amount_paid,
-                    'reference' => $p->payment_reference,
-                    'paymentDate' => $p->payment_date->toDateString(),
-                    'submittedAt' => $p->submitted_at->format('Y-m-d H:i'),
-                    'method' => $p->payment_method,
-                    'status' => $p->status,
-                    'remarks' => $p->remarks,
-                    'verifiedAt' => $p->verified_at?->toDateString(),
-                    'receiptName' => $p->receipt_file_name,
-                    'receiptUrl' => $p->receipt_file_path ? "/customer/payments/{$p->payment_id}/receipt" : null,
-                ])->values()
-                : [],
-            'canPay' => $blocked === null,
-            'payBlockedReason' => $blocked,
-            'expectedAmount' => $project->serviceRequest->reservationFee(),
-            'dueDays' => $this->fees->dueDays(),
-            'gcash' => config('payments.gcash'),
-            'receipt' => [
-                'maxMb' => (int) config('payments.receipt.max_mb', 5),
-                'types' => config('payments.receipt.mimes'),
-            ],
-        ];
     }
 
     /** Projects belong to the customer whose request created them; anyone else gets a 404. */

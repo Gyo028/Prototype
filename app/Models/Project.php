@@ -122,6 +122,26 @@ class Project extends Model
         return $this->hasMany(SiteAccessDocument::class, 'project_id')->orderByDesc('document_id');
     }
 
+    /** Contract versions, oldest first. @return HasMany<Contract, $this> */
+    public function contracts(): HasMany
+    {
+        return $this->hasMany(Contract::class, 'project_id')->orderBy('version_number');
+    }
+
+    /** The 50% down payment bill, once the contract is verified. @return HasOne<Billing, $this> */
+    public function downPayment(): HasOne
+    {
+        return $this->hasOne(Billing::class, 'project_id')
+            ->ofMany(['billing_id' => 'min'], fn ($q) => $q->where('billing_type', Billing::TYPE_FINAL_BILLING));
+    }
+
+    /** The remaining balance bill (the second final billing). @return HasOne<Billing, $this> */
+    public function balanceBill(): HasOne
+    {
+        return $this->hasOne(Billing::class, 'project_id')
+            ->ofMany(['billing_id' => 'max'], fn ($q) => $q->where('billing_type', Billing::TYPE_FINAL_BILLING));
+    }
+
     /** Design proposal versions, oldest first. @return HasMany<DesignProposal, $this> */
     public function designProposals(): HasMany
     {

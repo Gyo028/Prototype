@@ -14,7 +14,9 @@ use App\Http\Controllers\TechnicalAdmin\LayoutAssetController;
 use App\Http\Controllers\TechnicalAdmin\DashboardController;
 use App\Http\Controllers\Customer\ServiceRequestController;
 use App\Http\Controllers\Customer\ProjectController as CustomerProjectController;
+use App\Http\Controllers\Customer\BillingController as CustomerBillingController;
 use App\Http\Controllers\Customer\ConsultationController;
+use App\Http\Controllers\Customer\ContractController as CustomerContractController;
 use App\Http\Controllers\Customer\DesignProposalController;
 use App\Http\Controllers\Customer\OcularVisitController;
 use App\Http\Controllers\Customer\PaymentController as CustomerPaymentController;
@@ -93,7 +95,15 @@ Route::middleware(['auth', 'verified', 'role:customer'])
         Route::post('projects/{project}/design-proposals/{proposal}/approve', [DesignProposalController::class, 'approve'])->name('projects.design.approve');
         Route::post('projects/{project}/design-proposals/{proposal}/revision', [DesignProposalController::class, 'requestRevision'])->name('projects.design.revision');
         Route::get('projects/{project}/design-files/{file}', [DesignProposalController::class, 'file'])->name('projects.design.files.show');
-        Route::post('projects/{project}/reservation-fee/payments', [CustomerPaymentController::class, 'store'])->name('projects.reservation-fee.pay');
+        Route::post('projects/{project}/contract/sign', [CustomerContractController::class, 'sign'])->name('projects.contract.sign');
+        Route::post('projects/{project}/contract/upload', [CustomerContractController::class, 'upload'])->name('projects.contract.upload');
+        Route::get('projects/{project}/contracts/{contract}/file', [CustomerContractController::class, 'file'])->name('projects.contract.file');
+        Route::get('billing', [CustomerBillingController::class, 'index'])->name('billing');
+        Route::get('billing/projects/{project}', [CustomerBillingController::class, 'project'])->name('billing.project');
+        Route::get('billing/{billing}', [CustomerBillingController::class, 'show'])->name('billing.show');
+        Route::post('billing/{billing}/payments', [CustomerBillingController::class, 'pay'])->name('billing.pay');
+        Route::post('billing/{billing}/dispute', [CustomerBillingController::class, 'dispute'])->name('billing.dispute');
+        Route::get('billing/{billing}/dispute-proof', [CustomerBillingController::class, 'disputeProof'])->name('billing.dispute-proof');
         Route::get('payments/{payment}/receipt', [CustomerPaymentController::class, 'receipt'])->name('payments.receipt');
     });
 

@@ -3,11 +3,12 @@ import ProjectFolder from '@/components/customer/project-folder';
 import type {
     ConsultationInfo,
     ConsultationRules,
+    ContractInfo,
     DesignInfo,
     NextAction,
     OcularVisitInfo,
     ProjectDetail,
-    ReservationFeeInfo,
+    ReservationFeeCard,
     Step,
     StepKey,
 } from '@/components/customer/project-types';
@@ -19,9 +20,10 @@ type Props = {
     currentStep: StepKey;
     nextAction: NextAction;
     consultation: ConsultationInfo;
-    reservationFee: ReservationFeeInfo;
+    reservationFee: ReservationFeeCard;
     ocularVisit: OcularVisitInfo;
     design: DesignInfo;
+    contract: ContractInfo;
     availableSlots: Record<string, string[]>;
     rules: ConsultationRules;
 };

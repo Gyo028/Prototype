@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Billing;
+use App\Models\Contract;
 use App\Models\DesignProposal;
 use App\Models\Payment;
 use App\Models\Project;
@@ -13,12 +14,16 @@ use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 
 /**
- * The customer's 8-step timeline for a project, worked out from its status
+ * The customer's 7-step timeline for a project, worked out from its status
  * and schedules. The page only shows what this returns.
  *
- *   Planning:  1 Consultation · 2 Reservation Fee · 3 Ocular Visit · 4 Design · 5 Contract
- *   Execution: 6 Fabrication · 7 Installation
- *   Closed:    8 Completed
+ *   Planning:  1 Consultation · 2 Ocular Visit · 3 Design · 4 Contract
+ *   Execution: 5 Fabrication · 6 Installation
+ *   Closed:    7 Completed
+ *
+ * The reservation fee is a bill (Billing & Payments), not a step: after the
+ * consultation the project moves to the Ocular Visit step (or Design, when no
+ * visit is needed), which asks the customer to pay it first.
  *
  * Step states:
  *  - done       finished; can be opened (read-only)
@@ -33,7 +38,6 @@ class ProjectProgress
 {
     public const STEPS = [
         'consultation' => ['Consultation', 'planning', 'Meet our Project Manager to talk through your event and requirements.'],
-        'reservation_fee' => ['Reservation Fee', 'planning', 'Pay 10% of your budget to reserve your date. Your date is confirmed once the payment is verified.'],
         'ocular_visit' => ['Ocular Visit', 'planning', 'Our team visits your venue to take measurements and check the site.'],
         'design' => ['Design', 'planning', 'Our Design Specialist prepares your design proposal and final quotation for your approval.'],
         'contract' => ['Contract', 'planning', 'Review and sign your project contract.'],
@@ -61,7 +65,7 @@ class ProjectProgress
      */
     public function for(Project $project): array
     {
-        $project->loadMissing(['status', 'serviceRequest', 'schedules.outcome', 'reservationFee.payments', 'siteAccessDocuments', 'designProposals']);
+        $project->loadMissing(['status', 'serviceRequest', 'schedules.outcome', 'reservationFee.payments', 'siteAccessDocuments', 'designProposals', 'contracts', 'downPayment.payments']);
         $schedules = $project->schedules;
         $keys = array_keys(self::STEPS);
 
@@ -109,26 +113,44 @@ class ProjectProgress
         ];
     }
 
-    /** Which step the project is on (0–7). */
+    /** Which step the project is on (0–6). */
     private function currentIndex(Project $project, Collection $schedules): int
     {
         $held = $this->latest($schedules, ProjectSchedule::TYPE_CONSULTATION, ProjectSchedule::STATUS_COMPLETED);
+        // After the consultation: the ocular visit, or design when no visit is needed.
+        $afterConsultation = $project->ocular_visit_required === false ? 2 : 1;
 
         return match ($project->status->status_name) {
-            // After the consultation, a "proceed" decision moves the customer on to the fee.
-            ProjectStatus::CONSULTATION => $held && $project->customer_proceed_decision === Project::DECISION_PROCEED ? 1 : 0,
-            // Paid. Next is the ocular visit, or design when no visit is needed.
-            ProjectStatus::BOOKED => $project->ocular_visit_required === false ? 3 : 2,
-            ProjectStatus::SITE_ASSESSMENT => 2,
-            ProjectStatus::DESIGNING => 3,
-            ProjectStatus::CONTRACT => 4,
-            ProjectStatus::FABRICATING => 5,
-            ProjectStatus::INSTALLING => 6,
-            ProjectStatus::COMPLETED => 7,
-            // Cancelled: at the reservation fee if it went unpaid, at the design step if a
+            // A "proceed" decision moves the customer on; the reservation fee is paid there.
+            ProjectStatus::CONSULTATION => $held && $project->customer_proceed_decision === Project::DECISION_PROCEED ? $afterConsultation : 0,
+            ProjectStatus::BOOKED => $afterConsultation,
+            ProjectStatus::SITE_ASSESSMENT => 1,
+            ProjectStatus::DESIGNING => 2,
+            ProjectStatus::CONTRACT => 3,
+            ProjectStatus::FABRICATING => 4,
+            ProjectStatus::INSTALLING => 5,
+            ProjectStatus::COMPLETED => 6,
+            // Cancelled: where the unpaid reservation fee stopped it, at the design step if a
             // designer was already assigned, otherwise at the consultation.
-            default => $project->reservationFee?->status === Billing::STATUS_OVERDUE ? 1 : ($project->design_specialist_id ? 3 : 0),
+            default => match (true) {
+                $project->reservationFee?->status === Billing::STATUS_OVERDUE => $afterConsultation,
+                $project->design_specialist_id !== null => 2,
+                default => 0,
+            },
         };
+    }
+
+    /**
+     * True while the reservation fee is the next thing to do: the customer chose
+     * to proceed after the consultation, and the fee isn't verified yet.
+     */
+    public function feeOutstanding(Project $project): bool
+    {
+        $project->loadMissing(['status', 'schedules']);
+
+        return $project->status->status_name === ProjectStatus::CONSULTATION
+            && $project->customer_proceed_decision === Project::DECISION_PROCEED
+            && $this->latest($project->schedules, ProjectSchedule::TYPE_CONSULTATION, ProjectSchedule::STATUS_COMPLETED) !== null;
     }
 
     /** The short line under a step in the timeline. */
@@ -152,12 +174,11 @@ class ProjectProgress
             'consultation' => ($s = $this->latest($schedules, ProjectSchedule::TYPE_CONSULTATION, ProjectSchedule::STATUS_COMPLETED))
                 ? 'Held '.$this->day($s->start_datetime)
                 : (($s = $this->active($schedules, ProjectSchedule::TYPE_CONSULTATION)) ? 'Booked for '.$this->day($s->start_datetime) : null),
-            'reservation_fee' => $this->feeNote($project, $done),
-            'ocular_visit' => ($s = $this->latest($schedules, ProjectSchedule::TYPE_OCULAR_VISIT, ProjectSchedule::STATUS_COMPLETED))
+            'ocular_visit' => $this->feeOutstanding($project) ? $this->feeNote($project) : (($s = $this->latest($schedules, ProjectSchedule::TYPE_OCULAR_VISIT, ProjectSchedule::STATUS_COMPLETED))
                 ? 'Visited '.$this->day($s->start_datetime)
-                : (($s = $this->active($schedules, ProjectSchedule::TYPE_OCULAR_VISIT)) ? 'Booked for '.$this->day($s->start_datetime) : null),
-            'design' => $this->designNote($project, $done),
-            'contract' => $done ? 'Signed' : null,
+                : (($s = $this->active($schedules, ProjectSchedule::TYPE_OCULAR_VISIT)) ? 'Booked for '.$this->day($s->start_datetime) : null)),
+            'design' => $this->feeOutstanding($project) ? $this->feeNote($project) : $this->designNote($project, $done),
+            'contract' => $this->contractNote($project, $done),
             'fabrication', 'installation' => ($s = $this->latest($schedules, $key))
                 ? ($done ? 'Done '.$this->day($s->end_datetime) : $this->range($s))
                 : null,
@@ -192,28 +213,59 @@ class ProjectProgress
         };
     }
 
-    /** Timeline note for the reservation fee: due date, sent, or paid. */
-    private function feeNote(Project $project, bool $done): ?string
+    /** The newest contract version, if any. */
+    private function latestContract(Project $project): ?Contract
+    {
+        return $project->contracts->sortBy('version_number')->last();
+    }
+
+    /** Timeline note for the contract: ready to sign, sent, verified, down payment. */
+    private function contractNote(Project $project, bool $done): ?string
+    {
+        $contract = $this->latestContract($project);
+
+        if ($done) {
+            return $contract?->status === Contract::STATUS_VERIFIED && $contract->verified_at
+                ? 'Verified '.$this->day($contract->verified_at)
+                : 'Signed';
+        }
+
+        if ($contract === null) {
+            return null;
+        }
+
+        if ($contract->status === Contract::STATUS_VERIFIED) {
+            $bill = $project->downPayment;
+
+            return match (true) {
+                $bill === null => 'Verified',
+                $bill->payments->contains('status', Payment::STATUS_VERIFIED) => 'Down payment paid',
+                $bill->hasOpenDispute() => 'Down payment disputed',
+                $bill->payments->contains('status', Payment::STATUS_SUBMITTED) => 'Down payment sent',
+                default => 'Down payment due '.$this->day($bill->due_date),
+            };
+        }
+
+        return match ($contract->status) {
+            Contract::STATUS_SIGNED => 'Signed · in review',
+            default => $contract->version_number > 1 ? 'Sign again · v'.$contract->version_number : 'Ready to sign',
+        };
+    }
+
+    /** Timeline note while the reservation fee is outstanding: due, sent or disputed. */
+    private function feeNote(Project $project): ?string
     {
         $bill = $project->reservationFee;
 
         if ($bill === null) {
-            return $done ? 'Verified' : $this->peso($project->serviceRequest->reservationFee());
+            return 'Fee being prepared';
         }
 
-        if ($paid = $bill->payments->firstWhere('status', Payment::STATUS_VERIFIED)) {
-            return 'Paid '.$this->day($paid->payment_date);
-        }
-
-        if ($done) {
-            return 'Verified';
-        }
-
-        if ($bill->payments->contains('status', Payment::STATUS_SUBMITTED)) {
-            return 'Payment sent';
-        }
-
-        return $this->peso((float) $bill->amount).' · due '.$this->day($bill->due_date);
+        return match (true) {
+            $bill->hasOpenDispute() => 'Fee disputed',
+            $bill->payments->contains('status', Payment::STATUS_SUBMITTED) => 'Fee payment sent',
+            default => 'Fee due '.$this->day($bill->due_date),
+        };
     }
 
     /** The folded card's line: the note, plus the decision for the consultation. */
@@ -248,30 +300,6 @@ class ProjectProgress
         $done = $state === self::DONE;
 
         switch ($key) {
-            case 'reservation_fee':
-                $bill = $project->reservationFee;
-
-                if ($bill === null) {
-                    return [
-                        $row('Amount', $this->peso($project->serviceRequest->reservationFee()).' (10% of your budget)'),
-                        $row('Status', $done ? 'Paid and verified' : 'To be billed'),
-                    ];
-                }
-
-                $paid = $bill->payments->firstWhere('status', Payment::STATUS_VERIFIED);
-
-                return array_values(array_filter([
-                    $row('Amount', $this->peso((float) $bill->amount).' (10% of your budget)'),
-                    $row('Due date', $this->day($bill->due_date, true)),
-                    $row('Status', match (true) {
-                        $done || $paid !== null => 'Paid and verified',
-                        $bill->status === Billing::STATUS_OVERDUE => 'Not paid by the due date',
-                        $bill->payments->contains('status', Payment::STATUS_SUBMITTED) => 'Payment sent, waiting for verification',
-                        default => 'Waiting for your payment',
-                    }),
-                    $paid ? $row('Paid on', $this->day($paid->payment_date, true).' · GCash ref. '.$paid->payment_reference) : null,
-                ]));
-
             case 'ocular_visit':
                 if ($state === self::SKIPPED) {
                     return [$row('Status', 'Not needed: the consultation found that no site visit was required.')];
@@ -310,7 +338,21 @@ class ProjectProgress
                 return $done ? [$row('Status', 'Design proposal and quotation approved')] : [];
 
             case 'contract':
-                return $done ? [$row('Status', 'Contract signed and verified')] : [];
+                $contract = $project->contracts->firstWhere('status', Contract::STATUS_VERIFIED);
+
+                if ($contract === null) {
+                    return $done ? [$row('Status', 'Contract signed and verified')] : [];
+                }
+
+                $down = $project->downPayment;
+                $paid = $down?->payments->firstWhere('status', Payment::STATUS_VERIFIED);
+
+                return array_values(array_filter([
+                    $row('Contract', $contract->code().' · version '.$contract->version_number),
+                    $contract->signed_at ? $row('Signed on', $this->day($contract->signed_at, true).($contract->sign_method === Contract::METHOD_ELECTRONIC ? ' · e-signed' : ' · signed copy uploaded')) : null,
+                    $contract->verified_at ? $row('Verified on', $this->day($contract->verified_at, true)) : null,
+                    $down ? $row('Down payment', $this->peso((float) $down->amount).($paid ? ' · paid '.$this->day($paid->payment_date, true) : ' · due '.$this->day($down->due_date, true))) : null,
+                ]));
 
             case 'fabrication':
             case 'installation':
@@ -382,34 +424,11 @@ class ProjectProgress
 
                 return $action('Book your consultation', 'Pick a date and time to meet our Project Manager.', true);
 
-            case 'reservation_fee':
-                $bill = $project->reservationFee;
-
-                if ($bill === null) {
-                    return $action(
-                        'Your reservation fee bill is being prepared',
-                        $this->peso($project->serviceRequest->reservationFee()).' (10% of your budget). You will be able to pay it here.',
-                    );
-                }
-
-                $latest = $bill->payments->sortByDesc('payment_id')->first();
-                $due = $this->day($bill->due_date, true);
-
-                if ($latest?->status === Payment::STATUS_SUBMITTED) {
-                    return $action('Waiting for payment verification', 'We received your GCash payment. Our Project Manager will verify it soon.');
-                }
-
-                if ($latest?->status === Payment::STATUS_REJECTED) {
-                    return $action(
-                        'Your payment was not accepted',
-                        ($latest->remarks ? "Reason: {$latest->remarks}. " : '').'Please submit your payment again by '.$due.'.',
-                        true,
-                    );
-                }
-
-                return $action('Pay your reservation fee', $this->peso((float) $bill->amount)." by GCash, due {$due}. Your event date is confirmed once it is verified.", true);
-
             case 'ocular_visit':
+                if ($this->feeOutstanding($project)) {
+                    return $this->feeAction($project, 'You can book your ocular visit once it is verified.');
+                }
+
                 if ($project->ocular_visit_required !== true) {
                     return $action('Waiting for the Project Manager', 'We are confirming whether a site visit is needed for your venue.');
                 }
@@ -434,6 +453,10 @@ class ProjectProgress
                 return $action('Book your ocular visit', 'Pick a date and time for our team to visit your venue.', true);
 
             case 'design':
+                if ($this->feeOutstanding($project)) {
+                    return $this->feeAction($project, 'A Design Specialist is assigned to your project once it is verified.');
+                }
+
                 $latest = $project->designProposals->filter->isVisibleToCustomer()->sortBy('version_number')->last();
 
                 if ($latest?->customer_decision === DesignProposal::PENDING) {
@@ -454,7 +477,7 @@ class ProjectProgress
                 );
 
             case 'contract':
-                return $action('Waiting for your contract', 'Your final billing and contract are being prepared.');
+                return $this->contractAction($project);
 
             case 'fabrication':
                 $install = $this->latest($schedules, ProjectSchedule::TYPE_INSTALLATION);
@@ -469,6 +492,94 @@ class ProjectProgress
             default:
                 return $action('Your project is complete', 'Thank you! Ratings and reviews will open here soon.');
         }
+    }
+
+    /**
+     * The reservation fee, on the step after the consultation. $next says what
+     * paying it unlocks.
+     *
+     * @return array{title: string, detail: string, actionNeeded: bool}
+     */
+    private function feeAction(Project $project, string $next): array
+    {
+        $action = fn (string $title, string $detail, bool $needed = false) => ['title' => $title, 'detail' => $detail, 'actionNeeded' => $needed];
+        $bill = $project->reservationFee;
+
+        if ($bill === null) {
+            return $action(
+                'Your reservation fee bill is being prepared',
+                $this->peso($project->serviceRequest->reservationFee()).' (10% of your budget). You will be able to pay it on Billing & Payments.',
+            );
+        }
+
+        $latest = $bill->payments->sortByDesc('payment_id')->first();
+        $due = $this->day($bill->due_date, true);
+
+        return match (true) {
+            $bill->hasOpenDispute() => $action('Your reservation fee is disputed', 'Our Project Manager is reviewing your dispute. The bill is on hold until then.'),
+            $latest?->status === Payment::STATUS_SUBMITTED => $action('Waiting for payment verification', "We received your reservation fee payment. {$next}"),
+            $latest?->status === Payment::STATUS_REJECTED => $action(
+                'Your payment was not accepted',
+                ($latest->remarks ? 'Reason: '.rtrim($latest->remarks, '. ').'. ' : '')."Please pay your reservation fee again by {$due}.",
+                true,
+            ),
+            default => $action('Pay your reservation fee', $this->peso((float) $bill->amount)." by GCash, due {$due}. {$next}", true),
+        };
+    }
+
+    /**
+     * The contract step: sign, wait for verification, then pay the down payment.
+     *
+     * @return array{title: string, detail: string, actionNeeded: bool}
+     */
+    private function contractAction(Project $project): array
+    {
+        $action = fn (string $title, string $detail, bool $needed = false) => ['title' => $title, 'detail' => $detail, 'actionNeeded' => $needed];
+        $contract = $this->latestContract($project);
+
+        if ($contract === null) {
+            return $action('Waiting for your contract', 'Your contract is being prepared.');
+        }
+
+        if ($contract->status === Contract::STATUS_ISSUED) {
+            $rejected = $project->contracts->firstWhere('version_number', $contract->version_number - 1);
+
+            if ($rejected?->status === Contract::STATUS_REJECTED) {
+                return $action(
+                    'Your signed contract was not accepted',
+                    ($rejected->rejection_reason ? 'Reason: '.rtrim($rejected->rejection_reason, '. ').'. ' : '').'Please review and sign the contract again.',
+                    true,
+                );
+            }
+
+            return $action('Review and sign your contract', 'Read the contract, then sign it here or upload a signed copy.', true);
+        }
+
+        if ($contract->status === Contract::STATUS_SIGNED) {
+            return $action('Waiting for contract verification', 'Our Project Manager is checking your signed contract.');
+        }
+
+        $bill = $project->downPayment;
+
+        if ($bill === null) {
+            return $action('Your contract is verified', 'Your down payment bill is being prepared.');
+        }
+
+        $latest = $bill->payments->sortByDesc('payment_id')->first();
+        $due = $this->day($bill->due_date, true);
+
+        return match ($latest?->status) {
+            Payment::STATUS_VERIFIED => $action('Getting ready for fabrication', 'Your contract and down payment are verified. We will start making the pieces for your event.'),
+            Payment::STATUS_SUBMITTED => $action('Waiting for payment verification', 'We received your down payment. Our Project Manager will verify it soon.'),
+            Payment::STATUS_REJECTED => $action(
+                'Your payment was not accepted',
+                ($latest->remarks ? "Reason: {$latest->remarks}. " : '').'Please submit your down payment again by '.$due.'.',
+                true,
+            ),
+            default => $bill->hasOpenDispute()
+                ? $action('Your down payment is disputed', 'Our Project Manager is reviewing your dispute. The bill is on hold until then.')
+                : $action('Pay your down payment', $this->peso((float) $bill->amount)." by GCash, due {$due}. Work starts once it is verified.", true),
+        };
     }
 
     /**

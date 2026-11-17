@@ -12,14 +12,14 @@ use Illuminate\Support\Facades\DB;
  * The design proposal's review flow (Plan Project step 4).
  *
  *   Design Specialist submits a version
- *      -Project Manager reviews it (approve, or return with remarks)
- *      -Owner reviews it (approve, or return with remarks)
- *      -customer reviews it: approve → the project moves to Contract;
+ *     - Project Manager reviews it (approve, or return with remarks)
+ *     - Owner reviews it (approve, or return with remarks)
+ *     - customer reviews it: approve → the project moves to Contract;
  *                            request revisions (comments required) → the
  *                            designer submits the next version
  *
  * The customer only sees versions approved by both the Project Manager and the
- * Owner. No limit on revision rounds for now.
+ * Owner. No limit on revision rounds for now (to ask the client at the demo).
  *
  * The customer side uses awaitingCustomer(), approve() and requestRevision().
  * The Project Manager / Owner side can use review().
@@ -80,7 +80,10 @@ class DesignProposals
         return null;
     }
 
-    /** The customer approves the design and quotation: the project moves to Contract. */
+    /**
+     * The customer approves the design and quotation: the project moves to
+     * Contract and the contract is issued from this version.
+     */
     public function approve(DesignProposal $proposal): void
     {
         DB::transaction(function () use ($proposal) {
@@ -90,6 +93,7 @@ class DesignProposals
             ]);
 
             $proposal->project->update(['current_status_id' => ProjectStatus::idFor(ProjectStatus::CONTRACT)]);
+            app(Contracts::class)->issue($proposal->project, $proposal);
         });
     }
 
