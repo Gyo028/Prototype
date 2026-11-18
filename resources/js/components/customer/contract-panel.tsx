@@ -1,5 +1,5 @@
 import { router } from '@inertiajs/react';
-import { CheckCircle2, Clock, Download, Eraser, ExternalLink, FileSignature, FileText, FileUp, History, PenLine, Receipt, Upload, X } from 'lucide-react';
+import { CheckCircle2, Clock, Download, Eraser, ExternalLink, FileSignature, FileText, FileUp, History, Maximize2, PenLine, Receipt, Upload, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 import { toast } from 'sonner';
@@ -159,7 +159,7 @@ function SignBlock({
                 </Notice>
             )}
 
-            <div role="tablist" className="mb-4 inline-flex rounded-lg border border-black/10 p-1">
+            <div role="tablist" className="mb-4 flex rounded-lg border border-black/10 p-1 sm:inline-flex">
                 {(
                     [
                         ['electronic', 'Sign electronically', <PenLine key="i" className="size-4" />],
@@ -173,7 +173,7 @@ function SignBlock({
                         aria-selected={mode === value}
                         onClick={() => setMode(value)}
                         className={cx(
-                            'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-bold transition',
+                            'inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-bold transition sm:flex-none',
                             mode === value ? 'bg-gold/20 text-ink' : 'text-ink-soft hover:text-ink',
                         )}
                     >
@@ -196,6 +196,12 @@ function ESignForm({ projectId, contract, onServerError }: { projectId: number; 
     const [agree, setAgree] = useState(false);
     const [errors, setErrors] = useState<Partial<Record<'signature' | 'agree', string>>>({});
     const [saving, setSaving] = useState(false);
+    const [fullScreen, setFullScreen] = useState(false);
+
+    const changeStrokes = (next: Strokes) => {
+        setStrokes(next);
+        setErrors((x) => ({ ...x, signature: undefined }));
+    };
 
     const points = strokes.reduce((n, s) => n + s.length, 0);
 
@@ -230,13 +236,36 @@ function ESignForm({ projectId, contract, onServerError }: { projectId: number; 
                     width={contract.pad.width}
                     height={contract.pad.height}
                     strokes={strokes}
-                    onChange={(s) => {
-                        setStrokes(s);
-                        setErrors((x) => ({ ...x, signature: undefined }));
-                    }}
+                    onChange={changeStrokes}
                     invalid={!!errors.signature}
                 />
+                {/* Phones: the pad in the page is small, so offer a full-screen one (more room when turned sideways). */}
+                <button
+                    type="button"
+                    onClick={() => setFullScreen(true)}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-gold bg-white px-3 py-2 text-sm font-bold text-ink hover:bg-gold/10 md:hidden"
+                >
+                    <Maximize2 className="size-4" /> Sign in full screen
+                </button>
             </Field>
+
+            {fullScreen && (
+                <div role="dialog" aria-modal="true" aria-label="Sign your contract" className="fixed inset-0 z-50 flex flex-col bg-white p-3">
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                        <p className="text-sm font-bold text-ink">Your signature</p>
+                        <GoldButton onClick={() => setFullScreen(false)} className="px-3 py-1.5">
+                            Done
+                        </GoldButton>
+                    </div>
+                    <div className="flex flex-1 flex-col justify-center">
+                        {/* As wide as the screen allows while the whole pad stays visible. */}
+                        <div className="mx-auto w-full" style={{ maxWidth: `calc((100svh - 9rem) * ${contract.pad.width / contract.pad.height})` }}>
+                            <SignaturePad width={contract.pad.width} height={contract.pad.height} strokes={strokes} onChange={changeStrokes} invalid={false} />
+                        </div>
+                        <p className="mt-2 text-center text-xs text-ink-soft">Turn your phone sideways for more room.</p>
+                    </div>
+                </div>
+            )}
 
             <p className="-mt-2 text-sm text-ink-soft">
                 Signing as <span className="font-semibold text-ink">{contract.signerName}</span>. Your name and today's date are printed under your signature.
@@ -259,7 +288,7 @@ function ESignForm({ projectId, contract, onServerError }: { projectId: number; 
             </div>
 
             <div className="flex justify-end">
-                <GoldButton onClick={submit} disabled={saving}>
+                <GoldButton onClick={submit} disabled={saving} className="w-full sm:w-auto">
                     {saving ? 'Signing…' : 'Sign Contract'}
                 </GoldButton>
             </div>
@@ -451,7 +480,7 @@ function UploadForm({ projectId, contract, onServerError }: { projectId: number;
                 <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={(e) => pick(e.target.files?.[0])} />
             </Field>
 
-            <div className="flex justify-end gap-2">
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                 {file && (
                     <OutlineButton onClick={clear} disabled={saving}>
                         Cancel

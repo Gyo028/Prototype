@@ -1,5 +1,5 @@
 import { router } from '@inertiajs/react';
-import { CheckCircle2, Clock, Download, Eye, FileUp, Info, QrCode, Receipt, Wallet, X } from 'lucide-react';
+import { Check, CheckCircle2, Clock, Copy, Download, Eye, FileUp, Info, QrCode, Receipt, Wallet, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { formatDate, formatLongDate, peso, toISO } from '@/components/customer/project-types';
@@ -159,31 +159,49 @@ export default function BillPaymentPanel({ payment, payUrl, texts, showSummary =
                         </Notice>
                     )}
 
-                    <div className="grid gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-                        <section className="rounded-xl border border-black/10 p-4">
+                    <div id="pay" className="grid scroll-mt-24 gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+                        {/*
+                          * Laptop: the QR first, to scan with a phone. Phones: the number first with Copy,
+                          * since a QR on the same phone can't be scanned; "Save QR image" lets the customer
+                          * use GCash's "Upload QR" instead.
+                          */}
+                        <section className="flex flex-col rounded-xl border border-black/10 p-4">
                             <h3 className="mb-3 flex items-center gap-2 font-bold text-ink">
                                 <QrCode className="size-5 text-gold-dark" /> Pay with GCash
                             </h3>
-                            <div className="mx-auto w-48">
+                            <div className="order-2 mx-auto mt-4 w-40 md:order-1 md:mt-0 md:w-48">
                                 <img src={gcash.qr_image} alt="GCash QR code" className="w-full rounded-lg border border-black/10" />
                                 {gcash.is_sample && <p className="mt-1 text-center text-[11px] font-semibold text-red-700">Sample QR, not for real payments</p>}
+                                <a
+                                    href={gcash.qr_image}
+                                    download
+                                    className="mt-2 flex items-center justify-center gap-1 text-xs font-bold text-gold-dark hover:underline"
+                                >
+                                    <Download className="size-3.5" /> Save QR image
+                                </a>
                             </div>
-                            <dl className="mt-4 grid gap-2 text-sm">
+                            <dl className="order-1 grid gap-2 text-sm md:order-2 md:mt-4">
                                 <div>
                                     <dt className="text-xs text-ink-soft">Account name</dt>
                                     <dd className="font-semibold text-ink">{gcash.account_name}</dd>
                                 </div>
                                 <div>
                                     <dt className="text-xs text-ink-soft">GCash number</dt>
-                                    <dd className="font-semibold text-ink">{gcash.account_number}</dd>
+                                    <dd className="flex items-center justify-between gap-2 font-semibold text-ink">
+                                        {gcash.account_number}
+                                        <CopyButton text={gcash.account_number} label="GCash number" />
+                                    </dd>
                                 </div>
                                 <div>
                                     <dt className="text-xs text-ink-soft">Amount to send</dt>
-                                    <dd className="font-semibold text-ink">{peso(billing.amount)}</dd>
+                                    <dd className="flex items-center justify-between gap-2 font-semibold text-ink">
+                                        {peso(billing.amount)}
+                                        <CopyButton text={billing.amount.toFixed(2)} label="Amount" />
+                                    </dd>
                                 </div>
                             </dl>
-                            <ol className="mt-4 grid list-decimal gap-1 pl-5 text-xs text-ink-soft">
-                                <li>Open GCash and scan the QR code, or send to the number above.</li>
+                            <ol className="order-3 mt-4 grid list-decimal gap-1 pl-5 text-xs text-ink-soft">
+                                <li>Open GCash and send to the number above, or scan or upload the QR code.</li>
                                 <li>Send the exact amount.</li>
                                 <li>Save the receipt and note the reference number.</li>
                             </ol>
@@ -220,6 +238,7 @@ export default function BillPaymentPanel({ payment, payUrl, texts, showSummary =
                                         <input
                                             id="pay-amount"
                                             type="number"
+                                            inputMode="decimal"
                                             step="0.01"
                                             min="0"
                                             className={inputClass}
@@ -252,7 +271,7 @@ export default function BillPaymentPanel({ payment, payUrl, texts, showSummary =
                                             type="button"
                                             onClick={() => fileRef.current?.click()}
                                             className={cx(
-                                                'flex flex-col items-center gap-1 rounded-lg border border-dashed p-4 text-center text-sm transition hover:border-gold hover:bg-gold/5',
+                                                'flex w-full flex-col items-center gap-1 rounded-lg border border-dashed p-4 text-center text-sm transition hover:border-gold hover:bg-gold/5',
                                                 errors.receipt ? 'border-red-400' : 'border-black/20',
                                             )}
                                         >
@@ -270,7 +289,7 @@ export default function BillPaymentPanel({ payment, payUrl, texts, showSummary =
                                     />
                                 </Field>
                                 <div className="flex justify-end">
-                                    <GoldButton onClick={submit} disabled={saving}>
+                                    <GoldButton onClick={submit} disabled={saving} className="w-full sm:w-auto">
                                         {saving ? 'Sending…' : 'Send Payment'}
                                     </GoldButton>
                                 </div>
@@ -384,5 +403,31 @@ function Notice({ children, tone = 'info' }: { children: React.ReactNode; tone?:
             <Info className="mt-0.5 size-4 shrink-0" />
             <span>{children}</span>
         </div>
+    );
+}
+
+/** Copies a value (the GCash number, the amount) so it can be pasted into GCash. */
+function CopyButton({ text, label }: { text: string; label: string }) {
+    const [copied, setCopied] = useState(false);
+
+    const copy = async () => {
+        try {
+            await navigator.clipboard.writeText(text);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch {
+            toast.error(`Couldn't copy. Please copy the ${label.toLowerCase()} by hand.`);
+        }
+    };
+
+    return (
+        <button
+            type="button"
+            onClick={copy}
+            aria-label={`Copy ${label.toLowerCase()}`}
+            className="inline-flex shrink-0 items-center gap-1 rounded-md border border-black/15 px-2 py-1 text-xs font-bold text-gold-dark hover:border-gold"
+        >
+            {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />} {copied ? 'Copied' : 'Copy'}
+        </button>
     );
 }

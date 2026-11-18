@@ -3,8 +3,6 @@ import {
     Building2,
     CalendarCheck,
     CalendarClock,
-    ChevronLeft,
-    ChevronRight,
     Download,
     ExternalLink,
     FileCheck2,
@@ -12,7 +10,6 @@ import {
     FileUp,
     History,
     Home,
-    Image as ImageIcon,
     Ruler,
     X,
 } from 'lucide-react';
@@ -24,6 +21,7 @@ import { VENUE_OWNERSHIPS, formatDate, formatLongDate, formatTime } from '@/comp
 import type { OcularVisitInfo, OutcomeFile, SiteAccessDocument, SiteAccessFile, SiteAssessment, VenueOwnership } from '@/components/customer/project-types';
 import { Field, GoldButton, OutlineButton, Pill, cx } from '@/components/dashboard/ui';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import PhotoViewer from '@/components/customer/photo-viewer';
 
 /*
  * Schedule an ocular visit (Plan Project, step 3).
@@ -268,7 +266,7 @@ export default function OcularVisitPanel({ projectId, venue, ocularVisit }: Prop
                         )}
                     </div>
 
-                    <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+                    <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                         <p className="text-xs text-ink-soft">Face to face, at your venue · about {durationText(rules.slotMinutes)}</p>
                         <GoldButton onClick={book} disabled={saving}>
                             {saving ? 'Booking…' : 'Book Ocular Visit'}
@@ -319,7 +317,7 @@ export default function OcularVisitPanel({ projectId, venue, ocularVisit }: Prop
             )}
 
             <Dialog open={rescheduling} onOpenChange={(open) => !open && setRescheduling(false)}>
-                <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+                <DialogContent className="max-h-[90vh] overflow-y-auto p-4 sm:max-w-3xl sm:p-6">
                     <DialogHeader>
                         <DialogTitle>Reschedule ocular visit</DialogTitle>
                         <DialogDescription>
@@ -345,7 +343,6 @@ export default function OcularVisitPanel({ projectId, venue, ocularVisit }: Prop
 /** The site assessment: findings, the report and the venue photos. */
 function AssessmentBlock({ assessment: a }: { assessment: SiteAssessment }) {
     const [photo, setPhoto] = useState<number | null>(null);
-    const shown = photo === null ? null : a.photos[photo];
 
     return (
         <Block>
@@ -397,39 +394,7 @@ function AssessmentBlock({ assessment: a }: { assessment: SiteAssessment }) {
                 </div>
             )}
 
-            <Dialog open={shown !== null} onOpenChange={(open) => !open && setPhoto(null)}>
-                <DialogContent className="sm:max-w-4xl">
-                    {shown && photo !== null && (
-                        <>
-                            <DialogHeader>
-                                <DialogTitle className="flex items-center gap-2">
-                                    <ImageIcon className="size-5 text-gold-dark" /> {shown.name}
-                                </DialogTitle>
-                                <DialogDescription>
-                                    Photo {photo + 1} of {a.photos.length} · Ocular visit on {formatDate(a.visitDate)}
-                                </DialogDescription>
-                            </DialogHeader>
-                            <img src={shown.url} alt={shown.name} className="max-h-[65vh] w-full rounded-lg bg-black/5 object-contain" />
-                            <DialogFooter className="sm:justify-between">
-                                <div className="flex gap-2">
-                                    <OutlineButton onClick={() => setPhoto((photo - 1 + a.photos.length) % a.photos.length)} disabled={a.photos.length < 2}>
-                                        <ChevronLeft className="size-4" /> Previous
-                                    </OutlineButton>
-                                    <OutlineButton onClick={() => setPhoto((photo + 1) % a.photos.length)} disabled={a.photos.length < 2}>
-                                        Next <ChevronRight className="size-4" />
-                                    </OutlineButton>
-                                </div>
-                                <a
-                                    href={`${shown.url}?download=1`}
-                                    className="inline-flex items-center gap-1.5 rounded-lg border border-gold bg-white px-3 py-2 text-sm font-bold text-ink hover:bg-gold/10"
-                                >
-                                    <Download className="size-4" /> Download
-                                </a>
-                            </DialogFooter>
-                        </>
-                    )}
-                </DialogContent>
-            </Dialog>
+            <PhotoViewer photos={a.photos} index={photo} onIndex={setPhoto} caption={`Ocular visit on ${formatDate(a.visitDate)}`} />
         </Block>
     );
 }
@@ -521,7 +486,7 @@ function FilePicker({
                     type="button"
                     onClick={() => ref.current?.click()}
                     className={cx(
-                        'flex flex-col items-center gap-1 rounded-lg border border-dashed p-4 text-center text-sm transition hover:border-gold hover:bg-gold/5',
+                        'flex w-full flex-col items-center gap-1 rounded-lg border border-dashed p-4 text-center text-sm transition hover:border-gold hover:bg-gold/5',
                         error ? 'border-red-400' : 'border-black/20',
                     )}
                 >

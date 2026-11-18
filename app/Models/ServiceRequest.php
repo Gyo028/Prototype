@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasYearlyCode;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * @property int $service_request_id
+ * @property string|null $request_code e.g. "REQ-26-0001" (year created + number, restarting every year); set right after it is created
  * @property int $customer_id
  * @property string $request_type standard | custom
  * @property int|null $event_type_id
@@ -28,6 +30,12 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  */
 class ServiceRequest extends Model
 {
+    use HasYearlyCode;
+
+    public const CODE_PREFIX = 'REQ';
+
+    public const CODE_COLUMN = 'request_code';
+
     public const TYPE_STANDARD = 'standard';
 
     public const TYPE_CUSTOM = 'custom';

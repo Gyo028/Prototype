@@ -80,14 +80,20 @@ class Contract extends Model
         ];
     }
 
-    /** e.g. "CON-0006": one number per project, shared by its versions. */
+    /** e.g. "CON-26-0006": the project's code with CON, shared by all its versions. */
     public function code(): string
     {
-        return sprintf('CON-%04d', $this->project_id);
+        return self::codeFor($this->project);
+    }
+
+    /** "PRJ-26-0006" → "CON-26-0006". */
+    public static function codeFor(Project $project): string
+    {
+        return 'CON-'.substr((string) $project->project_code, strlen(Project::CODE_PREFIX.'-'));
     }
 
     /**
-     * The file name the customer downloads, e.g. "CON-0006_v1_Contract.pdf".
+     * The file name the customer downloads, e.g. "CON-26-0006_v1_Contract.pdf".
      * $file: 'contract' (unsigned), 'signed' (the customer's copy) or 'executed' (fully signed).
      */
     public function downloadName(string $file = 'contract'): string

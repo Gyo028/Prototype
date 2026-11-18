@@ -472,14 +472,16 @@ class ProjectController extends Controller
         abort_unless($ownerUserId !== null && (int) $ownerUserId === (int) $request->user()->id, 404);
     }
 
+    /** e.g. "REQ-26-0001" (see HasYearlyCode). */
     public static function requestCode(ServiceRequest $r): string
     {
-        return sprintf('REQ-%04d', $r->service_request_id);
+        return (string) $r->request_code;
     }
 
+    /** e.g. "PRJ-26-0001" (see HasYearlyCode). */
     public static function projectCode(Project $p): string
     {
-        return sprintf('PRJ-%04d', $p->project_id);
+        return (string) $p->project_code;
     }
 
     /** Custom: the project title. Standard: the event type, e.g. "Wedding". */

@@ -1,10 +1,10 @@
-import { CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, Download, Hammer, ImageIcon, MapPin, Truck } from 'lucide-react';
+import { CalendarClock, CheckCircle2, Hammer, ImageIcon, MapPin, Truck } from 'lucide-react';
 import { useState } from 'react';
 import { Block, BlockHeader, Notice } from '@/components/customer/appointment-parts';
 import { formatDate, formatLongDate } from '@/components/customer/project-types';
 import type { ExecutionInfo, ExecutionStage } from '@/components/customer/project-types';
-import { OutlineButton, Pill } from '@/components/dashboard/ui';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import PhotoViewer from '@/components/customer/photo-viewer';
+import { Pill } from '@/components/dashboard/ui';
 
 /*
  * Fabrication and installation (steps 5–6), read-only for the customer.
@@ -120,7 +120,6 @@ export default function ExecutionPanel({ kind, execution }: Props) {
 /** The work is done: the Project Manager's note and the photos as proof. */
 function CompletionBlock({ title, completion: c }: { title: string; completion: NonNullable<ExecutionStage['completion']> }) {
     const [photo, setPhoto] = useState<number | null>(null);
-    const shown = photo === null ? null : c.photos[photo];
 
     return (
         <Block>
@@ -143,39 +142,7 @@ function CompletionBlock({ title, completion: c }: { title: string; completion: 
                 ))}
             </ul>
 
-            <Dialog open={shown !== null} onOpenChange={(open) => !open && setPhoto(null)}>
-                <DialogContent className="sm:max-w-4xl">
-                    {shown && photo !== null && (
-                        <>
-                            <DialogHeader>
-                                <DialogTitle className="flex items-center gap-2">
-                                    <ImageIcon className="size-5 text-gold-dark" /> {shown.name}
-                                </DialogTitle>
-                                <DialogDescription>
-                                    Photo {photo + 1} of {c.photos.length}
-                                </DialogDescription>
-                            </DialogHeader>
-                            <img src={shown.url} alt={shown.name} className="max-h-[65vh] w-full rounded-lg bg-black/5 object-contain" />
-                            <DialogFooter className="sm:justify-between">
-                                <div className="flex gap-2">
-                                    <OutlineButton onClick={() => setPhoto((photo - 1 + c.photos.length) % c.photos.length)} disabled={c.photos.length < 2}>
-                                        <ChevronLeft className="size-4" /> Previous
-                                    </OutlineButton>
-                                    <OutlineButton onClick={() => setPhoto((photo + 1) % c.photos.length)} disabled={c.photos.length < 2}>
-                                        Next <ChevronRight className="size-4" />
-                                    </OutlineButton>
-                                </div>
-                                <a
-                                    href={`${shown.url}?download=1`}
-                                    className="inline-flex items-center gap-1.5 rounded-lg border border-gold bg-white px-3 py-2 text-sm font-bold text-ink hover:bg-gold/10"
-                                >
-                                    <Download className="size-4" /> Download
-                                </a>
-                            </DialogFooter>
-                        </>
-                    )}
-                </DialogContent>
-            </Dialog>
+            <PhotoViewer photos={c.photos} index={photo} onIndex={setPhoto} />
         </Block>
     );
 }

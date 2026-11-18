@@ -1,13 +1,13 @@
 import { Link } from '@inertiajs/react';
 import { AlertCircle, ArrowLeft, ArrowRight, Check, Clock, FileText, Lock, SkipForward, X, XCircle } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import BillCard from '@/components/customer/bill-card';
 import ConsultationPanel from '@/components/customer/consultation-panel';
 import ContractPanel from '@/components/customer/contract-panel';
 import DesignProposalPanel from '@/components/customer/design-proposal-panel';
 import ExecutionPanel from '@/components/customer/execution-panel';
 import OcularVisitPanel from '@/components/customer/ocular-visit-panel';
-import { PHASE_LABELS, formatWhen, peso, statusText, statusTone } from '@/components/customer/project-types';
+import { PHASE_LABELS, formatDay, peso, statusText, statusTone } from '@/components/customer/project-types';
 import type {
     ConsultationInfo,
     ConsultationRules,
@@ -27,9 +27,9 @@ import { Pill, cx } from '@/components/dashboard/ui';
  * Customer > My Projects > one project: the Plan Project progress page.
  *
  * One container, stacked:
- *  - header: project code, title, date, status
- *  - progress: the 8 steps in a row under the header, grouped by phase
- *    (a compact scrollable strip on small screens)
+ *  - header: project code, title, date (no time), status
+ *  - progress: the 7 steps in a row under the header, grouped by phase
+ *    (tablet and up), or a scrollable strip that keeps the selected step in view (phones)
  *  - body: the selected step's details at full width, opening on the current step
  *
  * The progress row sits above the body rather than beside it, so a long step
@@ -81,23 +81,22 @@ export default function ProjectFolder({ project, steps, currentStep, nextAction,
 
             {/* One container: header, then the progress row, then the selected step. */}
             <section className="overflow-hidden rounded-2xl border border-black/10 bg-white shadow-sm">
-                {/* Compact header: the full request is on its own page. */}
-                <div className="flex flex-wrap items-end justify-between gap-3 border-b border-black/10 px-5 py-4 lg:px-6">
+                {/* Code · title · date (no time) · status, as on My Projects. The request type and times are on "View project details". */}
+                <div className="flex flex-col gap-3 border-b border-black/10 px-4 py-4 sm:flex-row sm:items-end sm:justify-between sm:px-5 lg:px-6">
                     <div className="min-w-0">
-                        <p className="text-xs font-semibold tracking-wide text-ink-soft uppercase">
-                            {project.code} · {project.requestType === 'custom' ? 'Custom Project' : 'Standard Event Styling'}
+                        <p className="text-xs font-semibold tracking-wide text-ink-soft uppercase">{project.code}</p>
+                        <h1 className="mt-1 text-xl font-bold break-words text-ink sm:text-2xl">{project.title}</h1>
+                        <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-soft">
+                            {formatDay(project)}
+                            <Pill tone={statusTone(project)} className="whitespace-nowrap">
+                                {statusText(project)}
+                            </Pill>
                         </p>
-                        <h1 className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-2xl font-bold text-ink">
-                            {project.title}
-                            <span className="text-base font-normal text-ink-soft">{formatWhen(project)}</span>
-                        </h1>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Pill tone={statusTone(project)}>{statusText(project)}</Pill>
-                        {project.status.onHold && <Pill tone="yellow">On Hold</Pill>}
+                    <div className="flex shrink-0">
                         <Link
                             href={`/customer/requests/${project.requestId}`}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-gold bg-white px-3 py-1.5 text-sm font-bold text-ink hover:bg-gold/10"
+                            className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-gold bg-white px-3 py-2 text-sm font-bold text-ink hover:bg-gold/10 sm:w-auto sm:py-1.5"
                         >
                             <FileText className="size-4" /> View project details
                         </Link>
@@ -109,7 +108,7 @@ export default function ProjectFolder({ project, steps, currentStep, nextAction,
                     <Stepper steps={steps} selected={step.key} onSelect={setSelected} />
                 </div>
 
-                <div className="min-w-0 p-5 lg:p-6">
+                <div className="min-w-0 p-4 sm:p-5 lg:p-6">
                     {onCurrent ? (
                         <NextActionBanner action={nextAction} cancelled={project.status.name === 'Cancelled'} />
                     ) : (
@@ -233,10 +232,8 @@ function Stepper({ steps, selected, onSelect }: { steps: Step[]; selected: StepK
                                 )}
                             >
                                 <StepIcon step={s} number={i + 1} />
-                                <span className={cx('text-sm leading-tight font-bold', locked ? 'text-ink-soft/70' : 'text-ink')}>{s.label}</span>
-                                {s.note && (
-                                    <span className={cx('text-xs leading-tight', s.state === 'cancelled' ? 'text-red-700' : 'text-ink-soft')}>{s.note}</span>
-                                )}
+                                {/* Label only: what happened at a step is in its body when opened. */}
+                                <span className={cx('text-xs leading-tight font-bold lg:text-sm', locked ? 'text-ink-soft/70' : 'text-ink')}>{s.label}</span>
                             </button>
                         </li>
                     );
@@ -248,8 +245,18 @@ function Stepper({ steps, selected, onSelect }: { steps: Step[]; selected: StepK
 
 /** Small screens: the steps as a scrollable row of icons, with the selected step's name. */
 function TimelineStrip({ steps, selected, onSelect }: { steps: Step[]; selected: StepKey; onSelect: (k: StepKey) => void }) {
+    const navRef = useRef<HTMLElement>(null);
+
+    // Keep the selected step in view (on opening, the current step may be past the screen's edge).
+    useEffect(() => {
+        const nav = navRef.current;
+        const button = nav?.querySelector<HTMLElement>('[aria-pressed="true"]');
+        if (!nav || !button) return;
+        nav.scrollTo({ left: button.offsetLeft - (nav.clientWidth - button.offsetWidth) / 2, behavior: 'smooth' });
+    }, [selected]);
+
     return (
-        <nav aria-label="Project steps" className="overflow-x-auto p-3 md:hidden">
+        <nav ref={navRef} aria-label="Project steps" className="relative overflow-x-auto p-3 md:hidden">
             <ol className="flex min-w-max items-center gap-1">
                 {steps.map((s, i) => {
                     const locked = s.state === 'locked';
@@ -265,7 +272,7 @@ function TimelineStrip({ steps, selected, onSelect }: { steps: Step[]; selected:
                                 className={cx('flex flex-col items-center gap-1 rounded-lg px-1.5 py-1', active && 'bg-gold/15', locked && 'cursor-not-allowed')}
                             >
                                 <StepIcon step={s} number={i + 1} />
-                                <span className={cx('text-[10px] font-semibold', active ? 'text-ink' : 'text-ink-soft')}>{s.label}</span>
+                                <span className={cx('text-[11px] font-semibold whitespace-nowrap', active ? 'text-ink' : 'text-ink-soft')}>{s.label}</span>
                             </button>
                             {i < steps.length - 1 && <span aria-hidden className="h-0.5 w-3 bg-black/10" />}
                         </li>
@@ -320,7 +327,7 @@ function StepHeader({ step, number }: { step: Step; number: number }) {
 
     return (
         <div className="mb-4">
-            <h2 className="flex flex-wrap items-center gap-2 text-xl font-bold text-ink">
+            <h2 className="flex flex-wrap items-center gap-2 text-lg font-bold text-ink sm:text-xl">
                 {number}. {step.label} {tag}
             </h2>
             <p className="mt-1 text-sm text-ink-soft">{step.description}</p>

@@ -1,14 +1,17 @@
-import { Link, router } from '@inertiajs/react';
-import { ChevronRight, FolderOpen } from 'lucide-react';
-import { BillStatePill, billStatusLine } from '@/components/customer/bill-card';
+import { Link } from '@inertiajs/react';
+import { ChevronLeft, ChevronRight, FolderOpen } from 'lucide-react';
+import { BillStatePill } from '@/components/customer/bill-card';
 import type { BillingProject } from '@/components/customer/billing-list';
+import { ListCard, ListTable } from '@/components/customer/list-parts';
 import { formatDate, peso, statusText, statusTone } from '@/components/customer/project-types';
 import type { BillCard } from '@/components/customer/project-types';
 import { Pill, cx } from '@/components/dashboard/ui';
 
 /*
  * Customer > Billing & Payments > one project: its totals and its bills.
- * Open a bill to pay it, see its payments or dispute it.
+ * Bills: Bill · Due date · Amount · Status. The whole row opens the bill;
+ * a bill that can be paid also gets a Pay button. Why a payment was rejected
+ * and other details are on the bill's page.
  */
 
 export default function BillingProjectView({ project: p }: { project: BillingProject }) {
@@ -17,93 +20,97 @@ export default function BillingProjectView({ project: p }: { project: BillingPro
             <Breadcrumbs items={[{ label: 'Billing & Payments', href: '/customer/billing' }, { label: p.title }]} />
 
             <section className="overflow-hidden rounded-2xl border border-black/10 bg-white shadow-sm">
-                <header className="flex flex-wrap items-start justify-between gap-3 border-b border-black/10 px-5 py-4">
+                <header className="flex flex-col gap-3 border-b border-black/10 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-5">
                     <div className="min-w-0">
                         <p className="text-xs font-semibold tracking-wide text-ink-soft uppercase">{p.code}</p>
-                        <h1 className="mt-1 flex flex-wrap items-center gap-3 text-2xl font-bold text-ink">
-                            {p.title} <Pill tone={statusTone({ status: p.status })}>{statusText({ status: p.status })}</Pill>
+                        <h1 className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xl font-bold text-ink sm:text-2xl">
+                            <span className="break-words">{p.title}</span>
+                            <Pill tone={statusTone({ status: p.status })} className="whitespace-nowrap">
+                                {statusText({ status: p.status })}
+                            </Pill>
                         </h1>
                     </div>
                     <Link
                         href={`/customer/projects/${p.id}`}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-gold bg-white px-3 py-1.5 text-sm font-bold text-ink hover:bg-gold/10"
+                        className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-gold bg-white px-3 py-2 text-sm font-bold text-ink hover:bg-gold/10 sm:py-1.5"
                     >
                         <FolderOpen className="size-4" /> Open project
                     </Link>
                 </header>
 
-                <dl className="grid gap-4 border-b border-black/10 bg-black/[0.015] px-5 py-4 text-sm sm:grid-cols-3">
+                {/* Three short figures: one row on every screen, smaller on phones. */}
+                <dl className="grid grid-cols-3 gap-3 border-b border-black/10 bg-black/[0.015] px-4 py-4 text-sm sm:gap-4 sm:px-5">
                     <div>
                         <dt className="text-xs text-ink-soft">Contract price</dt>
-                        <dd className="text-xl font-bold text-ink">{p.contractPrice !== null ? peso(p.contractPrice) : '—'}</dd>
+                        <dd className="text-base font-bold text-ink sm:text-xl">{p.contractPrice !== null ? peso(p.contractPrice) : '—'}</dd>
                     </div>
                     <div>
                         <dt className="text-xs text-ink-soft">Paid</dt>
-                        <dd className="text-xl font-bold text-green-700">{peso(p.paid)}</dd>
+                        <dd className="text-base font-bold text-green-700 sm:text-xl">{peso(p.paid)}</dd>
                     </div>
                     <div>
                         <dt className="text-xs text-ink-soft">Remaining</dt>
-                        <dd className="text-xl font-bold text-gold-dark">{peso(p.remaining)}</dd>
+                        <dd className="text-base font-bold text-gold-dark sm:text-xl">{peso(p.remaining)}</dd>
                     </div>
                     {p.contractPrice === null && (
-                        <p className="text-xs text-ink-soft sm:col-span-3">The contract price is set when you approve your design proposal.</p>
+                        <p className="col-span-3 text-xs text-ink-soft">The contract price is set when you approve your design proposal.</p>
                     )}
                 </dl>
 
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm">
-                        <thead className="bg-black/[0.03] text-xs tracking-wide text-ink-soft uppercase">
-                            <tr>
-                                <th className="px-5 py-3 font-semibold">Bill</th>
-                                <th className="px-4 py-3 font-semibold">Due date</th>
-                                <th className="px-4 py-3 text-right font-semibold">Amount</th>
-                                <th className="px-4 py-3 font-semibold">Status</th>
-                                <th className="px-5 py-3" />
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {p.bills.map((b) => (
-                                <BillRow key={b.id} bill={b} />
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                <ListTable
+                    rows={p.bills}
+                    rowKey={(b) => b.id}
+                    href={(b) => b.url}
+                    columns={[
+                        { header: 'Bill', cell: (b) => b.title, className: 'font-semibold text-ink' },
+                        { header: 'Due date', cell: (b) => formatDate(b.dueDate), className: (b) => cx('whitespace-nowrap', isLate(b) ? 'font-semibold text-red-700' : 'text-ink') },
+                        { header: 'Amount', cell: (b) => peso(b.amount), align: 'right', className: 'font-semibold text-ink' },
+                        { header: 'Status', cell: (b) => <BillStatePill bill={b} /> },
+                    ]}
+                    card={(b) => (
+                        <ListCard
+                            top={<span className={isLate(b) ? 'text-red-700' : undefined}>Due {formatDate(b.dueDate)}</span>}
+                            tag={<BillStatePill bill={b} />}
+                            title={b.title}
+                            bottom={<span className="font-semibold text-ink">{peso(b.amount)}</span>}
+                        />
+                    )}
+                    // A bill that can be paid gets a Pay button: one tap to the payment form.
+                    action={(b) =>
+                        b.canPay ? (
+                            <Link
+                                href={`${b.url}#pay`}
+                                className="inline-flex items-center rounded-lg bg-gold px-3 py-1.5 text-xs font-bold whitespace-nowrap text-white hover:bg-gold-dark"
+                            >
+                                Pay
+                            </Link>
+                        ) : null
+                    }
+                />
             </section>
         </div>
     );
 }
 
-function BillRow({ bill: b }: { bill: BillCard }) {
-    const late = b.state === 'overdue' || (b.state === 'unpaid' && b.pastDue);
+const isLate = (b: BillCard) => b.state === 'overdue' || (b.state === 'unpaid' && b.pastDue);
 
-    return (
-        <tr className="cursor-pointer border-t border-black/10 transition hover:bg-gold/5" onClick={() => router.visit(b.url)}>
-            <td className="px-5 py-3 font-semibold text-ink">{b.title}</td>
-            <td className={cx('px-4 py-3 whitespace-nowrap', late ? 'text-red-700' : 'text-ink')}>{formatDate(b.dueDate)}</td>
-            <td className="px-4 py-3 text-right font-semibold whitespace-nowrap text-ink">{peso(b.amount)}</td>
-            <td className="px-4 py-3">
-                <BillStatePill bill={b} />
-                {/* The due date has its own column, so only say more when there is more to say. */}
-                {(b.state !== 'unpaid' || b.lastPaymentRejected) && <div className="mt-1 text-xs text-ink-soft">{billStatusLine(b)}</div>}
-            </td>
-            <td className="px-5 py-3 text-right">
-                <Link
-                    href={b.url}
-                    onClick={(e) => e.stopPropagation()}
-                    className="inline-flex items-center gap-1 text-xs font-bold whitespace-nowrap text-gold-dark hover:underline"
-                >
-                    {b.canPay ? 'Pay' : 'View'} <ChevronRight className="size-4" />
-                </Link>
-            </td>
-        </tr>
-    );
-}
-
-/** Billing & Payments › Project › Bill. The last item is the current page. */
+/**
+ * Billing & Payments › Project › Bill. The last item is the current page.
+ * Phones show only a back link to the page above ("‹ Project title"), so a long
+ * title doesn't wrap over several lines.
+ */
 export function Breadcrumbs({ items }: { items: { label: string; href?: string }[] }) {
+    const parent = [...items].reverse().find((i) => i.href);
+
     return (
         <nav aria-label="Breadcrumb" className="mb-4">
-            <ol className="flex flex-wrap items-center gap-1 text-sm">
+            {parent?.href && (
+                <Link href={parent.href} className="flex max-w-full items-center gap-1 text-sm font-bold text-gold-dark hover:underline sm:hidden">
+                    <ChevronLeft aria-hidden className="size-4 shrink-0" />
+                    <span className="truncate">{parent.label}</span>
+                </Link>
+            )}
+            <ol className="hidden flex-wrap items-center gap-1 text-sm sm:flex">
                 {items.map((item, i) => (
                     <li key={i} className="flex items-center gap-1">
                         {i > 0 && <ChevronRight aria-hidden className="size-4 text-ink-soft" />}

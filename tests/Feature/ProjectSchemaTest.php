@@ -22,6 +22,7 @@ test('the project tables follow the ERD column names', function () {
         'project_id', 'service_request_id', 'project_manager_id', 'design_specialist_id', 'current_status_id',
         'design_assigned_at', 'customer_proceed_decision', 'ocular_visit_required', 'customer_rating',
         'customer_review_text', 'customer_reviewed_at', 'featured_on_website', 'created_at', 'updated_at',
+        'project_code', // "PRJ-26-0001"
     ]);
     expect(Schema::getColumnListing('project_schedules'))->toEqualCanonicalizing([
         'schedule_id', 'project_id', 'schedule_type', 'start_datetime', 'end_datetime', 'schedule_status', 'remarks',

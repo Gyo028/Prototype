@@ -6,7 +6,7 @@ import { BillStatePill } from '@/components/customer/bill-card';
 import BillPaymentPanel from '@/components/customer/bill-payment-panel';
 import { Breadcrumbs } from '@/components/customer/billing-project';
 import type { Texts } from '@/components/customer/bill-payment-panel';
-import { formatLongDate, peso } from '@/components/customer/project-types';
+import { formatDate, formatLongDate, peso } from '@/components/customer/project-types';
 import type { BillCard, ProjectStatusInfo, ReservationFeeInfo } from '@/components/customer/project-types';
 import { Field, GoldButton, OutlineButton, cx, textareaClass } from '@/components/dashboard/ui';
 
@@ -59,41 +59,48 @@ export default function BillingDetail({ project, bill, payment, dispute }: Props
 
             {/* One container: the bill, then paying it, its payments and the dispute. */}
             <section className="overflow-hidden rounded-2xl border border-black/10 bg-white shadow-sm">
-                <header className="flex flex-wrap items-start justify-between gap-3 border-b border-black/10 px-5 py-4">
+                <header className="flex flex-col gap-3 border-b border-black/10 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-5">
                     <div className="min-w-0">
-                        <p className="text-xs font-semibold tracking-wide text-ink-soft uppercase">
+                        <p className="truncate text-xs font-semibold tracking-wide text-ink-soft uppercase">
                             {project.code} · {project.title}
                         </p>
-                        <h1 className="mt-1 flex flex-wrap items-center gap-3 text-2xl font-bold text-ink">
+                        <h1 className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xl font-bold text-ink sm:text-2xl">
                             {bill.title} <BillStatePill bill={bill} />
                         </h1>
                         <p className="mt-0.5 text-sm text-ink-soft">{bill.texts.heading}</p>
                     </div>
                     <Link
                         href={`/customer/projects/${project.id}`}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-gold bg-white px-3 py-1.5 text-sm font-bold text-ink hover:bg-gold/10"
+                        className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-gold bg-white px-3 py-2 text-sm font-bold text-ink hover:bg-gold/10 sm:py-1.5"
                     >
                         <FolderOpen className="size-4" /> Open project
                     </Link>
                 </header>
 
-                <dl className="grid gap-4 border-b border-black/10 bg-black/[0.015] px-5 py-4 text-sm sm:grid-cols-3">
+                {/* Amount, issued, due: one row on every screen (short dates on phones), the amount biggest. */}
+                <dl className="grid grid-cols-3 gap-3 border-b border-black/10 bg-black/[0.015] px-4 py-4 text-sm sm:gap-4 sm:px-5">
                     <div>
                         <dt className="text-xs text-ink-soft">Amount</dt>
-                        <dd className="text-xl font-bold text-ink">{peso(bill.amount)}</dd>
+                        <dd className="text-base font-bold text-ink sm:text-xl">{peso(bill.amount)}</dd>
                     </div>
                     <div>
                         <dt className="text-xs text-ink-soft">Issued</dt>
-                        <dd className="font-semibold text-ink">{formatLongDate(bill.issuedAt)}</dd>
+                        <dd className="font-semibold text-ink">
+                            <span className="sm:hidden">{formatDate(bill.issuedAt)}</span>
+                            <span className="hidden sm:inline">{formatLongDate(bill.issuedAt)}</span>
+                        </dd>
                     </div>
                     <div>
                         <dt className="text-xs text-ink-soft">Due date</dt>
-                        <dd className={cx('font-semibold', unpaid && bill.pastDue ? 'text-red-700' : 'text-ink')}>{formatLongDate(bill.dueDate)}</dd>
+                        <dd className={cx('font-semibold', unpaid && bill.pastDue ? 'text-red-700' : 'text-ink')}>
+                            <span className="sm:hidden">{formatDate(bill.dueDate)}</span>
+                            <span className="hidden sm:inline">{formatLongDate(bill.dueDate)}</span>
+                        </dd>
                     </div>
-                    {unpaid && billing?.status !== 'overdue' && bill.state !== 'disputed' && <p className="text-xs text-ink-soft sm:col-span-3">{bill.texts.dueNote}</p>}
+                    {unpaid && billing?.status !== 'overdue' && bill.state !== 'disputed' && <p className="col-span-3 text-xs text-ink-soft">{bill.texts.dueNote}</p>}
                 </dl>
 
-                <div className="grid gap-4 p-5">
+                <div className="grid gap-4 p-4 sm:p-5">
                     {dispute.status && <DisputeStatus dispute={dispute} amount={bill.amount} />}
 
                     <BillPaymentPanel payment={payment} payUrl={`/customer/billing/${bill.id}/payments`} texts={bill.texts} showSummary={false} />
@@ -198,7 +205,7 @@ function DisputeForm({ billId, dispute }: { billId: number; dispute: DisputeInfo
                     <span className="font-bold">Something wrong with this bill?</span>{' '}
                     <span className="text-ink-soft">You can dispute it before paying. The bill is put on hold while we review it.</span>
                 </p>
-                <OutlineButton onClick={() => setOpen(true)}>
+                <OutlineButton onClick={() => setOpen(true)} className="w-full sm:w-auto">
                     <AlertTriangle className="size-4" /> Dispute this bill
                 </OutlineButton>
             </section>
@@ -258,7 +265,7 @@ function DisputeForm({ billId, dispute }: { billId: number; dispute: DisputeInfo
                     <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={(e) => pick(e.target.files?.[0])} />
                 </Field>
 
-                <div className="flex justify-end gap-2">
+                <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                     <OutlineButton onClick={() => setOpen(false)} disabled={saving}>
                         Cancel
                     </OutlineButton>

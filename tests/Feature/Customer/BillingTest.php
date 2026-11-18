@@ -137,12 +137,14 @@ test('Billing & Payments lists one row per project with bills: paid, remaining a
             ->where('projects.0.paid', fn ($v) => (float) $v === 25000.0)
             ->where('projects.0.remaining', fn ($v) => (float) $v === 0.0)
             ->where('projects.0.nextBill', null)
+            ->where('projects.0.fullyPaid', false) // only the reservation fee so far: nothing due, not fully paid
             ->where('projects.0.bills.0.state', 'paid')
             ->where('projects.1.id', $this->project->project_id)
             ->where('projects.1.url', "/customer/billing/projects/{$this->project->project_id}")
             ->where('projects.1.contractPrice', null)
             ->where('projects.1.remaining', fn ($v) => (float) $v === 25000.0)
             ->where('projects.1.nextBill.title', 'Reservation fee')
+            ->where('projects.1.nextBill.kind', 'reservation_fee')
             ->where('projects.1.nextBill.dueDate', '2026-11-22')
             ->where('projects.1.bills.0.canPay', true)
             ->where('projects.1.bills.0.url', "/customer/billing/{$this->bill->billing_id}"));

@@ -50,6 +50,7 @@ test('the tables follow the ERD column names', function () {
         'service_request_id', 'customer_id', 'request_type', 'event_type_id', 'project_title', 'request_date',
         'start_date', 'end_date', 'event_start_time', 'event_end_time', 'venue', 'guest_count', 'budget_min',
         'budget_max', 'project_description', 'request_status', 'pm_remarks', 'reviewed_at', 'created_at', 'updated_at',
+        'request_code', // "REQ-26-0001"
     ]);
     expect(Schema::getColumnListing('service_request_files'))->toEqualCanonicalizing([
         'request_file_id', 'service_request_id', 'file_name', 'file_path', 'uploaded_at',

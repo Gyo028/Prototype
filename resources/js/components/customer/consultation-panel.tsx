@@ -141,7 +141,7 @@ export default function ConsultationPanel({ projectId, consultation, availableSl
                         icon={<CalendarCheck className="size-5" />}
                     />
                     <SlotPicker noun="consultation" withMeetingMode slot={slot} setSlot={setSlot} errors={errors} availableSlots={availableSlots} rules={rules} />
-                    <div className="mt-6 flex justify-end">
+                    <div className="mt-6 flex flex-col sm:flex-row sm:justify-end">
                         <GoldButton onClick={book} disabled={saving}>
                             {saving ? 'Booking…' : 'Book Consultation'}
                         </GoldButton>
@@ -176,7 +176,7 @@ export default function ConsultationPanel({ projectId, consultation, availableSl
             )}
 
             <Dialog open={dialog === 'reschedule'} onOpenChange={(open) => !open && setDialog(null)}>
-                <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+                <DialogContent className="max-h-[90vh] overflow-y-auto p-4 sm:max-w-3xl sm:p-6">
                     <DialogHeader>
                         <DialogTitle>Reschedule consultation</DialogTitle>
                         <DialogDescription>

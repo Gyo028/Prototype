@@ -409,6 +409,11 @@ export function formatWhen(p: { startDate: string; endDate: string; startTime: s
     return p.startTime && p.endTime ? `${formatDate(p.startDate)} · ${formatTime(p.startTime)} – ${formatTime(p.endTime)}` : formatDate(p.startDate);
 }
 
+/** The date only, no time: "Dec 10, 2026", or "Dec 10 – Dec 14, 2026" for a multi-day project. Used in lists and headers. */
+export function formatDay(p: { startDate: string; endDate: string }) {
+    return formatWhen({ ...p, startTime: null, endTime: null });
+}
+
 export const peso = (n: number) => `₱${n.toLocaleString('en-PH')}`;
 
 export const budgetLabel = (min: number, max: number | null) =>
@@ -419,11 +424,15 @@ export function statusTone(item: { requestStatus?: string; status: ProjectStatus
     if (!item.status) return item.requestStatus === 'rejected' ? 'gray' : 'yellow';
     if (item.status.name === 'Completed') return 'green';
     if (item.status.name === 'Cancelled') return 'red';
+    if (item.status.onHold) return 'yellow';
     return item.status.phase === 'Execution' ? 'blue' : 'cream';
 }
 
-/** "Planning · Designing", "Pending review", "Not approved" */
+/**
+ * "Designing", "Pending review", "Not approved", "On hold · Designing".
+ * The sub-status only: the phase shows in its colour (statusTone) and on the project's timeline.
+ */
 export function statusText(item: { requestStatus?: string; status: ProjectStatusInfo | null }): string {
     if (!item.status) return item.requestStatus === 'rejected' ? 'Not approved' : 'Pending review';
-    return item.status.terminal ? item.status.name : `${item.status.phase} · ${item.status.name}`;
+    return item.status.onHold && !item.status.terminal ? `On hold · ${item.status.name}` : item.status.name;
 }

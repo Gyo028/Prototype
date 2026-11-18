@@ -112,7 +112,7 @@ class Contracts
         $version = (int) $project->contracts()->max('version_number') + 1;
         $data = $this->buildData($project, $proposal, $version, $issuedAt);
 
-        $path = $this->folder($project, $version).'/'.sprintf('CON-%04d_v%d_Contract.pdf', $project->project_id, $version);
+        $path = $this->folder($project, $version).'/'.sprintf('%s_v%d_Contract.pdf', Contract::codeFor($project), $version);
         Storage::put($path, $this->render($data));
 
         try {
@@ -152,7 +152,7 @@ class Contracts
             }
 
             $data = $this->buildData($contract->project, $contract->designProposal, $contract->version_number, $contract->issued_at);
-            $path = $this->folder($contract->project, $contract->version_number).'/'.sprintf('CON-%04d_v%d_Contract.pdf', $contract->project_id, $contract->version_number);
+            $path = $this->folder($contract->project, $contract->version_number).'/'.sprintf('%s_v%d_Contract.pdf', $contract->code(), $contract->version_number);
 
             Storage::put($path, $this->render($data));
             $contract->update(['contract_data' => $data, 'contract_file_path' => $path]);
@@ -190,7 +190,7 @@ class Contracts
         $end = $request->end_date;
 
         return [
-            'code' => sprintf('CON-%04d', $project->project_id),
+            'code' => Contract::codeFor($project),
             'version' => $version,
             'issuedAt' => $issuedAt->toDateString(),
             'business' => config('contract.business'),
@@ -201,7 +201,7 @@ class Contracts
                 'address' => $customer->address,
             ],
             'project' => [
-                'code' => sprintf('PRJ-%04d', $project->project_id),
+                'code' => (string) $project->project_code,
                 'title' => $request->isCustom() ? (string) $request->project_title : ($request->eventType?->event_type_name ?? 'Event'),
                 'type' => $request->isCustom() ? 'Custom Project' : 'Standard Event Styling',
                 'dates' => $start->isSameDay($end)
@@ -374,7 +374,7 @@ class Contracts
     public function upload(Contract $contract, UploadedFile $file): void
     {
         $extension = strtolower($file->getClientOriginalExtension() ?: 'pdf');
-        $stored = sprintf('CON-%04d_v%d_Signed-Contract.%s', $contract->project_id, $contract->version_number, $extension);
+        $stored = sprintf('%s_v%d_Signed-Contract.%s', $contract->code(), $contract->version_number, $extension);
         $path = $file->storeAs($this->folder($contract->project, $contract->version_number), $stored);
 
         try {
@@ -467,7 +467,7 @@ class Contracts
             // The same contract (same values), as the next version to sign.
             $version = $contract->version_number + 1;
             $data = ['version' => $version] + Arr::except($contract->contract_data, 'signature');
-            $path = $this->folder($contract->project, $version).'/'.sprintf('CON-%04d_v%d_Contract.pdf', $contract->project_id, $version);
+            $path = $this->folder($contract->project, $version).'/'.sprintf('%s_v%d_Contract.pdf', $contract->code(), $version);
             Storage::put($path, $this->render($data));
 
             $next = $contract->project->contracts()->create([

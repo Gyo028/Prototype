@@ -70,10 +70,12 @@ export function SlotPicker({
     const longSlots = rules.slotMinutes > 60;
 
     return (
-        <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
-            <div className="grid content-start gap-5">
+        // Laptop: meeting mode and time on the left, the calendar on the right.
+        // Smaller screens: one column in the order it is filled in (mode, date, then time).
+        <div className="grid gap-5 lg:grid-cols-[1fr_1fr] lg:gap-6">
+            <div className="contents lg:grid lg:content-start lg:gap-5">
                 {withMeetingMode && (
-                    <Field label="How would you like to meet?" required error={errors.meetingMode}>
+                    <Field label="How would you like to meet?" required error={errors.meetingMode} className="order-1 lg:order-none">
                         <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Meeting mode">
                             {MEETING_MODES.map((m) => {
                                 const selected = slot.meetingMode === m.value;
@@ -102,7 +104,7 @@ export function SlotPicker({
                     </Field>
                 )}
 
-                <Field label={slot.date ? `Time on ${formatLongDate(slot.date)}` : 'Time'} required error={errors.time}>
+                <Field label={slot.date ? `Time on ${formatLongDate(slot.date)}` : 'Time'} required error={errors.time} className="order-3 lg:order-none">
                     {!slot.date ? (
                         <p className="rounded-lg border border-dashed border-black/15 p-4 text-center text-xs text-ink-soft">Pick a date first.</p>
                     ) : (
@@ -119,7 +121,7 @@ export function SlotPicker({
                                         title={free ? undefined : 'This slot is taken.'}
                                         onClick={() => setSlot({ ...slot, time: t })}
                                         className={cx(
-                                            'rounded-lg border px-2 py-2 text-sm font-semibold transition',
+                                            'rounded-lg border px-2 py-2.5 text-sm font-semibold transition sm:py-2',
                                             selected
                                                 ? 'border-gold bg-gold text-white'
                                                 : free
@@ -135,12 +137,12 @@ export function SlotPicker({
                         </div>
                     )}
                 </Field>
-                <p className="text-xs text-ink-soft">
+                <p className="order-4 text-xs text-ink-soft lg:order-none">
                     Each {noun} takes about {durationText(rules.slotMinutes)}.
                 </p>
             </div>
 
-            <Field label="Date" required error={errors.date}>
+            <Field label="Date" required error={errors.date} className="order-2 lg:order-none">
                 <DatePicker
                     value={slot.date}
                     onChange={(date) => setSlot({ ...slot, date, time: '' })}

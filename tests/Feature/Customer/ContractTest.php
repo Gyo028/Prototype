@@ -236,7 +236,7 @@ test('e-signing saves the signed copy and waits for verification', function () {
         ->and($contract->sign_method)->toBe(Contract::METHOD_ELECTRONIC)
         ->and($contract->signer_name)->toBe('Andrea Santos') // from the customers table
         ->and($contract->signed_at)->not->toBeNull()
-        ->and($contract->signed_file_name)->toBe(sprintf('CON-%04d_v1_Signed-Contract.pdf', $this->project->project_id));
+        ->and($contract->signed_file_name)->toBe(Contract::codeFor($this->project).'_v1_Signed-Contract.pdf');
     Storage::assertExists($contract->signed_contract_path);
 
     ctPage($this)->assertInertia(fn (Assert $page) => $page
@@ -361,7 +361,7 @@ test('verifying creates the down payment and balance bills', function () {
 
     // The fully signed contract, with the Owner's signature.
     Storage::assertExists($contract->executed_contract_path);
-    expect(basename($contract->executed_contract_path))->toBe(sprintf('CON-%04d_v1_Fully-Signed-Contract.pdf', $this->project->project_id));
+    expect(basename($contract->executed_contract_path))->toBe(Contract::codeFor($this->project).'_v1_Fully-Signed-Contract.pdf');
 
     $project = $this->project->refresh();
     expect((float) $project->downPayment->amount)->toBe(165000.0)
@@ -380,7 +380,7 @@ test('verifying creates the down payment and balance bills', function () {
         ->where('contract.downPayment.url', "/customer/billing/{$project->downPayment->billing_id}")
         ->where('contract.balance.title', 'Remaining balance')
         ->where('contract.balance.dueDate', '2027-01-02')
-        ->where('contract.current.executedFile.name', sprintf('CON-%04d_v1_Fully-Signed-Contract.pdf', $this->project->project_id)));
+        ->where('contract.current.executedFile.name', Contract::codeFor($this->project).'_v1_Fully-Signed-Contract.pdf'));
 
     // Billing & Payments: remaining is the contract price minus what is paid (the reservation fee).
     $this->actingAs($this->user)->get('/customer/billing')
@@ -388,7 +388,9 @@ test('verifying creates the down payment and balance bills', function () {
             ->where('projects.0.contractPrice', fn ($v) => (float) $v === 380000.0)
             ->where('projects.0.paid', fn ($v) => (float) $v === 50000.0)
             ->where('projects.0.remaining', fn ($v) => (float) $v === 330000.0)
-            ->where('projects.0.nextBill.title', 'Down payment'));
+            ->where('projects.0.nextBill.title', 'Down payment')
+            ->where('projects.0.nextBill.kind', 'down_payment')
+            ->where('projects.0.fullyPaid', false));
 });
 
 test('the fully signed contract shows both signatures, for e-signed and uploaded copies', function () {
@@ -424,7 +426,7 @@ test('an uploaded paper copy is also made into a fully signed contract when veri
     Storage::assertExists($contract->refresh()->executed_contract_path);
     $this->actingAs($this->user)
         ->get("/customer/projects/{$this->project->project_id}/contracts/{$contract->contract_id}/file?executed=1&download=1")
-        ->assertDownload(sprintf('CON-%04d_v1_Fully-Signed-Contract.pdf', $this->project->project_id));
+        ->assertDownload(Contract::codeFor($this->project).'_v1_Fully-Signed-Contract.pdf');
 });
 
 test('when the event is close, the balance is due with the down payment', function () {
@@ -490,8 +492,8 @@ test('the customer can open and download the contract and their signed copy', fu
     $base = "/customer/projects/{$this->project->project_id}/contracts/{$contract->contract_id}/file";
 
     $this->actingAs($this->user)->get($base)->assertOk();
-    $this->actingAs($this->user)->get($base.'?download=1')->assertDownload(sprintf('CON-%04d_v1_Contract.pdf', $this->project->project_id));
-    $this->actingAs($this->user)->get($base.'?signed=1&download=1')->assertDownload(sprintf('CON-%04d_v1_Signed-Contract.pdf', $this->project->project_id));
+    $this->actingAs($this->user)->get($base.'?download=1')->assertDownload(Contract::codeFor($this->project).'_v1_Contract.pdf');
+    $this->actingAs($this->user)->get($base.'?signed=1&download=1')->assertDownload(Contract::codeFor($this->project).'_v1_Signed-Contract.pdf');
 });
 
 test('another customer cannot open, sign or upload the contract', function () {

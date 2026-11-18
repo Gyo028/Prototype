@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasYearlyCode;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -13,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * on the service request.
  *
  * @property int $project_id
+ * @property string|null $project_code e.g. "PRJ-26-0001" (year created + number, restarting every year); set right after it is created
  * @property int $service_request_id
  * @property int $project_manager_id employee_id
  * @property int|null $design_specialist_id employee_id
@@ -27,6 +29,12 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  */
 class Project extends Model
 {
+    use HasYearlyCode;
+
+    public const CODE_PREFIX = 'PRJ';
+
+    public const CODE_COLUMN = 'project_code';
+
     public const DECISION_PROCEED = 'proceed';
 
     public const DECISION_HOLD = 'hold';

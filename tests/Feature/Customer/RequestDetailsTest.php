@@ -51,7 +51,7 @@ test('an approved request shows as Project Details, linked to its project', func
     $this->actingAs($this->customer)->get("/customer/requests/{$r->service_request_id}")
         ->assertInertia(fn (Assert $page) => $page
             ->where('project.id', $r->project->project_id)
-            ->where('project.code', sprintf('PRJ-%04d', $r->project->project_id))
+            ->where('project.code', $r->project->project_code)
             ->has('project.status.name'));
 });
 

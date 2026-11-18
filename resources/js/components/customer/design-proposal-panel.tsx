@@ -105,7 +105,7 @@ export default function DesignProposalPanel({ projectId, design }: Props) {
                     <p className="mt-1 text-sm text-ink-soft">
                         Approve the design and quotation to move on to your contract, or tell us what you would like changed.
                     </p>
-                    <div className="mt-4 flex flex-wrap gap-3">
+                    <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                         <GoldButton onClick={() => open('approve')}>
                             <CheckCircle2 className="size-4" /> Approve Design
                         </GoldButton>

@@ -75,6 +75,10 @@ class BillingController extends Controller
      * additional charges, minus what is paid. Before that, the unpaid bills
      * issued so far (the reservation fee).
      *
+     * Fully paid: the contract is verified and nothing remains. Before the
+     * contract, paying every bill so far is "nothing due", not fully paid,
+     * since the down payment and balance are still to come.
+     *
      * @return array<string, mixed>
      */
     private function projectSummary(Project $project): array
@@ -108,7 +112,9 @@ class BillingController extends Controller
             'contractPrice' => $this->billings->contractPrice($project),
             'paid' => $paid,
             'remaining' => $remaining,
+            'fullyPaid' => $verified !== null && $remaining <= 0,
             'nextBill' => $next ? [
+                'kind' => $next['kind'], // reservation_fee | down_payment | balance | additional_charge
                 'title' => $next['title'],
                 'dueDate' => $next['dueDate'],
                 'state' => $next['state'],

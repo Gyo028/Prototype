@@ -1,16 +1,19 @@
-import { Link, router } from '@inertiajs/react';
-import { ChevronLeft, ChevronRight, Receipt, Search } from 'lucide-react';
+import { Receipt } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { formatDate, peso, statusText, statusTone } from '@/components/customer/project-types';
-import type { BillCard, BillState, ProjectStatusInfo } from '@/components/customer/project-types';
-import { PageHeader, Panel, Pill, cx, inputClass } from '@/components/dashboard/ui';
+import { ListCard, ListEmpty, ListPager, ListTable, ListToolbar, pageSlice } from '@/components/customer/list-parts';
+import { formatDate } from '@/components/customer/project-types';
+import type { BillCard, BillKind, BillState, ProjectStatusInfo } from '@/components/customer/project-types';
+import { PageHeader, Panel, cx } from '@/components/dashboard/ui';
 
 /*
  * Customer > Billing & Payments.
  *
- * One row per project that has bills, like My Projects: the contract price,
- * what is paid, what remains and the next bill due. Open a project to see its
- * bills; open a bill to pay it, see its payments or dispute it.
+ * One row per project that has bills, like My Projects:
+ * Code · Project title · Billing type (of the next bill) · Due. The contract
+ * price, what is paid and what remains are on the project's billing page.
+ * "Fully paid" only once the contract is verified and nothing remains;
+ * before that, all bills paid so far is "Nothing due". Open a project to see its bills;
+ * open a bill to pay it, see its payments or dispute it.
  */
 
 export type BillingProject = {
@@ -22,7 +25,9 @@ export type BillingProject = {
     contractPrice: number | null;
     paid: number;
     remaining: number;
-    nextBill: { title: string; dueDate: string; state: BillState; pastDue: boolean } | null;
+    /** The contract is verified and nothing remains. Before the contract, all bills paid is "Nothing due". */
+    fullyPaid: boolean;
+    nextBill: { kind: BillKind; title: string; dueDate: string; state: BillState; pastDue: boolean } | null;
     bills: BillCard[];
 };
 
@@ -50,7 +55,7 @@ const inFilter = (p: BillingProject, f: Filter): boolean => {
         case 'disputed':
             return has('disputed');
         case 'paid':
-            return p.bills.every((b) => b.state === 'paid');
+            return p.fullyPaid;
         default:
             return true;
     }
@@ -68,172 +73,75 @@ export default function BillingList({ projects }: { projects: BillingProject[] }
 
     const count = (f: Filter) => projects.filter((p) => inFilter(p, f)).length;
 
-    const pages = Math.max(1, Math.ceil(shown.length / PAGE_SIZE));
-    const current = Math.min(page, pages);
-    const start = (current - 1) * PAGE_SIZE;
-    const visible = shown.slice(start, start + PAGE_SIZE);
+    const { current, visible } = pageSlice(shown, page, PAGE_SIZE);
 
     return (
         <div className="mx-auto w-full max-w-[1150px]">
             <PageHeader title="Billing & Payments" description="Every bill for your projects. Open a bill to pay it, see its payments or dispute it." />
 
             <Panel className="p-0">
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/10 p-4">
-                    <div className="flex flex-wrap gap-2" role="tablist" aria-label="Filter bills">
-                        {FILTERS.map((f) => (
-                            <button
-                                key={f.value}
-                                type="button"
-                                role="tab"
-                                aria-selected={filter === f.value}
-                                onClick={() => {
-                                    setFilter(f.value);
-                                    setPage(1);
-                                }}
-                                className={cx(
-                                    'rounded-full border px-3 py-1 text-xs font-bold transition',
-                                    filter === f.value ? 'border-gold bg-gold text-white' : 'border-black/15 bg-white text-ink hover:border-gold',
-                                )}
-                            >
-                                {f.label} ({count(f.value)})
-                            </button>
-                        ))}
-                    </div>
-                    <label className="relative w-full sm:w-64">
-                        <span className="sr-only">Search projects</span>
-                        <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-soft" />
-                        <input
-                            className={cx(inputClass, 'pl-9')}
-                            placeholder="Search project or code"
-                            value={query}
-                            onChange={(e) => {
-                                setQuery(e.target.value);
-                                setPage(1);
-                            }}
-                        />
-                    </label>
-                </div>
+                <ListToolbar
+                    filters={FILTERS}
+                    value={filter}
+                    onChange={(f) => {
+                        setFilter(f);
+                        setPage(1);
+                    }}
+                    count={count}
+                    label="Filter bills"
+                    query={query}
+                    onQuery={(q) => {
+                        setQuery(q);
+                        setPage(1);
+                    }}
+                    placeholder="Search project or code"
+                />
 
                 {shown.length === 0 ? (
-                    <div className="flex flex-col items-center gap-2 px-6 py-14 text-center text-ink-soft">
-                        <Receipt className="size-8" />
-                        <p className="text-sm">
-                            {projects.length === 0
-                                ? 'No bills yet. Your reservation fee bill appears here after your consultation.'
-                                : 'No projects match this filter.'}
-                        </p>
-                    </div>
+                    <ListEmpty icon={<Receipt className="size-8" />}>
+                        {projects.length === 0 ? 'No bills yet. Your reservation fee bill appears here after your consultation.' : 'No projects match this filter.'}
+                    </ListEmpty>
                 ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm">
-                            <thead className="bg-black/[0.03] text-xs tracking-wide text-ink-soft uppercase">
-                                <tr>
-                                    <th className="px-4 py-3 font-semibold">Project</th>
-                                    <th className="px-4 py-3 text-right font-semibold">Contract price</th>
-                                    <th className="px-4 py-3 text-right font-semibold">Paid</th>
-                                    <th className="px-4 py-3 text-right font-semibold">Remaining</th>
-                                    <th className="px-4 py-3 font-semibold">Next bill due</th>
-                                    <th className="px-4 py-3" />
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {visible.map((p) => (
-                                    <ProjectRow key={p.id} project={p} />
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                    <ListTable
+                        rows={visible}
+                        rowKey={(p) => p.id}
+                        href={(p) => p.url}
+                        columns={[
+                            { header: 'Code', cell: (p) => p.code, className: 'whitespace-nowrap font-semibold text-ink-soft' },
+                            { header: 'Project title', cell: (p) => p.title, className: 'font-bold text-ink' },
+                            { header: 'Billing type', cell: billingType, className: 'whitespace-nowrap text-ink' },
+                            { header: 'Due', cell: (p) => nextDue(p).text, className: (p) => cx('whitespace-nowrap', nextDue(p).late ? 'font-semibold text-red-700' : 'text-ink') },
+                        ]}
+                        card={(p) => (
+                            <ListCard
+                                top={p.code}
+                                tag={<span className={cx('text-xs font-semibold', nextDue(p).late ? 'text-red-700' : 'text-ink-soft')}>{nextDue(p).text}</span>}
+                                title={p.title}
+                                bottom={billingType(p)}
+                            />
+                        )}
+                    />
                 )}
 
-                {shown.length > 0 && (
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-black/10 px-4 py-3">
-                        <p className="text-xs text-ink-soft">
-                            Showing {start + 1}–{Math.min(start + PAGE_SIZE, shown.length)} of {shown.length}
-                        </p>
-                        {pages > 1 && (
-                            <div className="flex items-center gap-2">
-                                <button
-                                    type="button"
-                                    aria-label="Previous page"
-                                    disabled={current === 1}
-                                    onClick={() => setPage(current - 1)}
-                                    className="rounded border border-black/15 bg-white p-1.5 disabled:opacity-40"
-                                >
-                                    <ChevronLeft className="size-4" />
-                                </button>
-                                {Array.from({ length: pages }).map((_, i) => (
-                                    <button
-                                        key={i}
-                                        type="button"
-                                        aria-label={`Page ${i + 1}`}
-                                        aria-current={current === i + 1 ? 'page' : undefined}
-                                        onClick={() => setPage(i + 1)}
-                                        className={cx(
-                                            'size-8 rounded border text-xs font-bold',
-                                            current === i + 1 ? 'border-gold bg-gold text-white' : 'border-black/15 bg-white',
-                                        )}
-                                    >
-                                        {i + 1}
-                                    </button>
-                                ))}
-                                <button
-                                    type="button"
-                                    aria-label="Next page"
-                                    disabled={current === pages}
-                                    onClick={() => setPage(current + 1)}
-                                    className="rounded border border-black/15 bg-white p-1.5 disabled:opacity-40"
-                                >
-                                    <ChevronRight className="size-4" />
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                )}
+                <ListPager page={current} pageSize={PAGE_SIZE} total={shown.length} onPage={setPage} />
             </Panel>
         </div>
     );
 }
 
-function ProjectRow({ project: p }: { project: BillingProject }) {
-    const next = p.nextBill;
+/** The type of the next bill to pay, e.g. "Down payment". */
+function billingType(p: BillingProject): string {
+    if (!p.nextBill) return '—';
+    // An additional charge's title is its reason; the column shows the type.
+    return p.nextBill.kind === 'additional_charge' ? 'Additional charge' : p.nextBill.title;
+}
 
-    return (
-        <tr
-            className="cursor-pointer border-t border-black/10 transition hover:bg-gold/5"
-            // The whole row opens the project's bills; the link in the last cell is there for keyboard users.
-            onClick={() => router.visit(p.url)}
-        >
-            <td className="px-4 py-3">
-                <div className="font-bold text-ink">{p.title}</div>
-                <div className="text-xs text-ink-soft">{p.code}</div>
-                <div className="mt-1">
-                    <Pill tone={statusTone({ status: p.status })}>{statusText({ status: p.status })}</Pill>
-                </div>
-            </td>
-            <td className="px-4 py-3 text-right whitespace-nowrap text-ink">{p.contractPrice !== null ? peso(p.contractPrice) : '—'}</td>
-            <td className="px-4 py-3 text-right font-semibold whitespace-nowrap text-green-700">{peso(p.paid)}</td>
-            <td className="px-4 py-3 text-right font-semibold whitespace-nowrap text-gold-dark">{peso(p.remaining)}</td>
-            <td className="px-4 py-3">
-                {next ? (
-                    <>
-                        <div className="text-ink">{next.title}</div>
-                        <div className={cx('text-xs', next.pastDue && next.state === 'unpaid' ? 'text-red-700' : 'text-ink-soft')}>
-                            {next.state === 'under_review' ? 'Under review' : next.state === 'disputed' ? 'Disputed' : `Due ${formatDate(next.dueDate)}`}
-                        </div>
-                    </>
-                ) : (
-                    <span className="text-ink-soft">—</span>
-                )}
-            </td>
-            <td className="px-4 py-3 text-right">
-                <Link
-                    href={p.url}
-                    onClick={(e) => e.stopPropagation()}
-                    className="inline-flex items-center gap-1 text-xs font-bold whitespace-nowrap text-gold-dark hover:underline"
-                >
-                    Open <ChevronRight className="size-4" />
-                </Link>
-            </td>
-        </tr>
-    );
+/** The "Due" cell: one short line. */
+function nextDue(p: BillingProject): { text: string; late: boolean } {
+    const next = p.nextBill;
+    if (!next) return { text: p.fullyPaid ? 'Fully paid' : 'Nothing due', late: false };
+    if (next.state === 'under_review') return { text: 'Under review', late: false };
+    if (next.state === 'disputed') return { text: 'Disputed', late: false };
+    const late = next.state === 'overdue' || next.pastDue;
+    return { text: late ? `Overdue · ${formatDate(next.dueDate)}` : formatDate(next.dueDate), late };
 }
