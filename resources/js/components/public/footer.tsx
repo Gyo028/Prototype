@@ -1,3 +1,5 @@
+import { Link } from '@inertiajs/react';
+
 export default function Footer() {
     return (
         <footer className="border-t border-gray-200 bg-white">
@@ -20,6 +22,15 @@ export default function Footer() {
                 </div>
 
                 <div className="footer-divider" />
+
+                <div className="mb-3 flex justify-center gap-8 text-sm text-gray-500">
+                    <Link href="/terms" className="transition-colors hover:text-gold">
+                        Terms &amp; Conditions
+                    </Link>
+                    <Link href="/privacy" className="transition-colors hover:text-gold">
+                        Privacy Policy
+                    </Link>
+                </div>
 
                 <p className="footer-copy">© 2026 Great A's Event Styling Services. All rights reserved.</p>
             </div>

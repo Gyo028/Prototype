@@ -1,4 +1,4 @@
-import { Head } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import { ArrowLeft } from 'lucide-react';
 
 import LandingFooter from '@/components/public/landing/landing-footer';
@@ -13,7 +13,6 @@ type Project = {
     size: TileSize;
 };
 
-// Sample photos, titles and categories. Replace them with the real projects later.
 const projects: Project[] = [
     { image: '/images/works/work-7.webp', title: 'A Night in Paris', category: 'Themed Event', size: 'feature' },
     { image: '/images/works/work-8.webp', title: 'Garden Signage', category: 'Custom Fabrication', size: 'tall' },
@@ -29,8 +28,6 @@ const projects: Project[] = [
     { image: '/images/works/work-16.webp', title: 'The Mirror Arch', category: 'Custom Fabrication', size: 'tall' },
 ];
 
-// How much of the grid each tile covers. Column spans only start at tablet size,
-// so the one-column phone layout never creates extra columns.
 const sizeClasses: Record<TileSize, string> = {
     regular: '',
     wide: 'sm:col-span-2',
@@ -42,22 +39,23 @@ function ProjectTile({ project }: { project: Project }) {
     return (
         <figure
             tabIndex={0}
-            className={`group relative isolate overflow-hidden rounded-2xl bg-neutral-200 shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-[#C99A2E] ${sizeClasses[project.size]}`}
+            className={`group relative isolate overflow-hidden bg-neutral-200 outline-none focus-visible:ring-2 focus-visible:ring-[#C99A2E] focus-visible:ring-offset-2 focus-visible:ring-offset-[#FBF9F5] ${sizeClasses[project.size]}`}
         >
             <img
                 src={project.image}
                 alt={`${project.title} - ${project.category}`}
                 loading="lazy"
                 decoding="async"
-                className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105 group-focus-visible:scale-105"
+                className="h-full w-full object-cover transition-transform duration-[1200ms] ease-out group-hover:scale-[1.04] group-focus-visible:scale-[1.04]"
             />
 
-            {/* Dark gradient + title. Always visible on touch screens; fades in on hover with a mouse. */}
-            <figcaption className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/75 via-black/25 to-transparent p-5 text-white opacity-100 transition-opacity duration-500 ease-out sm:p-6 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-focus-visible:opacity-100 [@media(hover:hover)]:group-hover:opacity-100">
-                <span className="text-[11px] font-semibold tracking-[0.22em] text-[#F2C75C] uppercase">
+            <figcaption className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/70 via-black/15 to-transparent p-5 text-white opacity-100 transition-opacity duration-500 ease-out sm:p-6 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-focus-visible:opacity-100 [@media(hover:hover)]:group-hover:opacity-100">
+                <span className="text-[10px] font-semibold tracking-[0.2em] text-[#F2C75C] uppercase">
                     {project.category}
                 </span>
-                <span className="mt-1 text-lg leading-snug font-semibold sm:text-xl">{project.title}</span>
+                <span className="mt-1 font-['DM_Serif_Display',serif] text-lg leading-snug font-normal tracking-wide sm:text-xl">
+                    {project.title}
+                </span>
             </figcaption>
         </figure>
     );
@@ -65,7 +63,7 @@ function ProjectTile({ project }: { project: Project }) {
 
 export default function OurWorks() {
     return (
-        <div className="min-h-screen bg-[#FBF9F5] font-sans text-black [&_h1]:font-heading">
+        <div className="min-h-screen bg-[#FBF9F5] font-sans text-black">
             <Head title="Our Works - Gr3at A's Events Styling & Services">
                 <link rel="preconnect" href="https://fonts.googleapis.com" />
                 <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -77,26 +75,27 @@ export default function OurWorks() {
 
             <LandingNav isHome={false} loginStyle="gold" />
 
-            <main className="mx-auto max-w-[1400px] px-5 pt-32 pb-20 md:px-8 lg:px-12 lg:pt-40 lg:pb-28">
-                <a
-                    href="/"
-                    className="inline-flex items-center gap-2 text-sm font-semibold text-neutral-700 transition-colors hover:text-[#C99A2E]"
-                >
-                    <ArrowLeft className="h-4 w-4" />
-                    Back
-                </a>
+            <main className="mx-auto max-w-[1240px] px-5 pt-28 pb-20 md:px-8 lg:px-12 lg:pt-36 lg:pb-28">
 
-                <header className="mt-8 mb-12 max-w-2xl lg:mb-16">
-                    <p className="text-xs font-semibold tracking-[0.3em] text-[#C99A2E] uppercase">Portfolio</p>
-                    <h1 className="mt-3 font-['DM_Serif_Display',serif] text-4xl font-normal tracking-wide text-neutral-900 sm:text-5xl lg:text-6xl">
+                <header className="mt-4 mb-10 overflow-x-clip text-center [container-type:inline-size] lg:mb-14">
+                    <span
+                        aria-hidden="true"
+                        className="pointer-events-none block font-['DM_Serif_Display',serif] text-[clamp(2.5rem,16cqw,12rem)] leading-[0.9] font-normal whitespace-nowrap text-[#F3E8D2] select-none"
+                    >
                         OUR WORKS
-                    </h1>
-                    <p className="mt-5 text-base leading-8 text-neutral-600 md:text-lg">
-                        A collection of moments, spaces, and celebrations we've brought to life.
-                    </p>
+                    </span>
+
+                    <div className="relative -mt-[7cqw] px-2">
+                        <h1 className="font-['DM_Serif_Display',serif] text-[clamp(1.75rem,5.5cqw,3.5rem)] leading-none font-normal text-[#0D0D33]">
+                            OUR WORKS
+                        </h1>
+                        <p className="mx-auto mt-2 max-w-[32ch] font-['DM_Serif_Display',serif] text-[clamp(0.8rem,1.4cqw,1rem)] leading-snug text-balance text-[#0D0D33] sm:mt-3 sm:max-w-none">
+                            A collection of moments, spaces, and celebrations we've brought to life.
+                        </p>
+                    </div>
                 </header>
 
-                <div className="grid auto-rows-[220px] grid-flow-dense grid-cols-1 gap-4 sm:auto-rows-[260px] sm:grid-cols-2 lg:auto-rows-[300px] lg:grid-cols-4 lg:gap-5">
+                <div className="grid auto-rows-[170px] grid-flow-dense grid-cols-1 gap-3 sm:auto-rows-[190px] sm:grid-cols-2 sm:gap-4 lg:auto-rows-[190px] lg:grid-cols-4 lg:gap-5">
                     {projects.map((project) => (
                         <ProjectTile key={project.title} project={project} />
                     ))}

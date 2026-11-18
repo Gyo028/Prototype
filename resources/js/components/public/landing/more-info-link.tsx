@@ -1,3 +1,5 @@
+import { Link } from '@inertiajs/react';
+
 import { cn } from '@/lib/utils';
 
 type Props = {
@@ -5,16 +7,15 @@ type Props = {
     className?: string;
 };
 
-/** Gold "More Info ⟶" text link used in About and Services. Visual only for now. */
+/** Gold "More Info ⟶" text link used in About and Services. */
 export default function MoreInfoLink({ href = '#about', className }: Props) {
-    return (
-        <a
-            href={href}
-            className={cn(
-                'group inline-flex items-center gap-4 text-sm text-[#E8830E] transition-colors hover:text-[#B8650A]',
-                className,
-            )}
-        >
+    const classes = cn(
+        'group inline-flex items-center gap-4 text-sm text-[#E8830E] transition-colors hover:text-[#B8650A]',
+        className,
+    );
+
+    const content = (
+        <>
             More Info
             <svg
                 aria-hidden="true"
@@ -28,6 +29,22 @@ export default function MoreInfoLink({ href = '#about', className }: Props) {
             >
                 <path d="M1 6h45M41 1l5 5-5 5" />
             </svg>
+        </>
+    );
+
+    // Links to another page use Inertia so the page changes without a full reload;
+    // #section links stay plain anchors.
+    if (href.startsWith('/') && !href.includes('#')) {
+        return (
+            <Link href={href} className={classes}>
+                {content}
+            </Link>
+        );
+    }
+
+    return (
+        <a href={href} className={classes}>
+            {content}
         </a>
     );
 }

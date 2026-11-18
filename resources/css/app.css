@@ -1,5 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Poppins:wght@400;500;600&family=Cormorant+Garamond:wght@400;500;600&family=Lora:ital,wght@0,400;0,500;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Poppins:wght@400;500;600&family=Lora:ital,wght@0,400;0,500;1,400&display=swap');
 @import 'tailwindcss';
 
 @import 'tw-animate-css';
@@ -9,6 +9,7 @@
 @import './public/works-carousel.css';
 @import './public/footer.css';
 @import './public/faq.css';
+@import './page-transition.css';
 
 @source '../views';
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
@@ -16,6 +17,8 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
+    --font-display: 'DM Serif Display', ui-serif, Georgia, serif;
+
     --font-sans:
         'Inter', ui-sans-serif, system-ui, sans-serif,
         'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',

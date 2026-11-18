@@ -1,16 +1,15 @@
-/* FAQ page */
 @layer components {
     .faq-card {
-        @apply bg-white rounded-2xl border border-gray-200 shadow-sm transition-all duration-300;
-        min-height: 120px;
+        @apply border border-neutral-200 bg-white transition-[border-color,box-shadow] duration-300;
     }
 
-    .faq-card:hover {
-        @apply shadow-lg;
+    .faq-card:hover,
+    .faq-card[open] {
+        @apply border-[#C99A2E]/60 shadow-[0_12px_30px_-18px_rgba(0,0,0,0.25)];
     }
 
     .faq-header {
-        @apply flex items-center justify-between p-6 min-h-[120px] cursor-pointer list-none;
+        @apply flex min-h-[96px] cursor-pointer list-none items-center justify-between px-6 py-5 outline-none focus-visible:ring-2 focus-visible:ring-[#C99A2E] focus-visible:ring-inset;
     }
 
     .faq-header::-webkit-details-marker {
@@ -18,15 +17,19 @@
     }
 
     .faq-question {
-        @apply flex-1 text-[20px] font-semibold text-[#23235B] pr-6;
+        @apply flex-1 pr-6 font-sans text-base leading-snug font-semibold text-neutral-900 xl:text-lg;
     }
 
     .faq-icon {
-        @apply w-10 h-10 rounded-full bg-gold text-white flex items-center justify-center shrink-0;
+        @apply flex size-9 shrink-0 items-center justify-center rounded-full bg-[#C99A2E] text-[#1F2023] transition-colors duration-300;
+    }
+
+    .faq-card:hover .faq-icon {
+        @apply bg-[#F2C75C];
     }
 
     .faq-arrow {
-        @apply w-5 h-5 transition-transform duration-300;
+        @apply size-4 transition-transform duration-300;
     }
 
     .faq-card[open] .faq-arrow {
@@ -34,6 +37,6 @@
     }
 
     .faq-answer {
-        @apply px-6 pb-6 text-[17px] text-gray-500 leading-8;
+        @apply px-6 pb-6 text-[15px] leading-8 text-neutral-600 md:text-base;
     }
 }

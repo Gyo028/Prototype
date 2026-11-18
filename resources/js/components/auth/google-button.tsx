@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 function GoogleIcon() {
     return (
@@ -38,12 +39,15 @@ export function OrDivider({ label = 'or' }: { label?: string }) {
     );
 }
 
-export function GoogleButton() {
+export function GoogleButton({ className }: { className?: string }) {
     return (
         <Button
             type="button"
             variant="outline"
-            className="h-11 w-full gap-3 border-black/15 bg-white font-normal text-ink-soft hover:bg-cream"
+            className={cn(
+                'h-11 w-full gap-3 border-black/15 bg-white font-normal text-ink-soft hover:bg-cream',
+                className,
+            )}
             onClick={() => {
                 // TODO: Google login via Laravel Socialite (next steps, item 17)
             }}
