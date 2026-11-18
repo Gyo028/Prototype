@@ -8,9 +8,10 @@ import type { ConsultationOutcome, ProjectDecision, ProjectRequest } from '@/dat
 /*
  * Backlog #16: Record consultation outcomes.
  * After the consultation, the Project Manager records what happened, updates the
- * project details, says whether an ocular visit is needed, and decides if the
- * project can proceed. The form will not save until the outcome, the ocular visit
- * requirement and the project decision are all specified.
+ * project details, says whether an ocular visit is needed (the customer books the
+ * date later, after paying the reservation fee), and decides if the project can proceed.
+ * The form will not save until the outcome, the ocular visit requirement and the
+ * project decision are all specified.
  */
 
 /** Everything the form holds. Choices start as '' (nothing picked yet). */
@@ -26,8 +27,6 @@ export type ConsultationValues = {
     budget: string;
     additionalNotes: string;
     ocularVisitRequired: '' | 'yes' | 'no';
-    ocularVisitDate: string;
-    ocularVisitTime: string;
     decision: ProjectDecision | '';
     decisionReason: string;
 };
@@ -47,8 +46,6 @@ const FIELD_LABELS: Record<keyof ConsultationValues, string> = {
     budget: 'Budget',
     additionalNotes: 'Additional notes',
     ocularVisitRequired: 'Ocular visit requirement',
-    ocularVisitDate: 'Ocular visit date',
-    ocularVisitTime: 'Ocular visit time',
     decision: 'Project decision',
     decisionReason: 'Reason for not proceeding',
 };
@@ -56,8 +53,6 @@ const FIELD_LABELS: Record<keyof ConsultationValues, string> = {
 /** Fills the form from the request: current project details, plus the saved consultation if there is one. */
 function initialValues(r: ProjectRequest): ConsultationValues {
     const c = r.consultation;
-    const [ocularDate = '', ocularTime = ''] = c?.ocularVisit.scheduledAt?.split('T') ?? [];
-
     return {
         outcome: c?.outcome ?? '',
         summary: c?.summary ?? '',
@@ -70,8 +65,6 @@ function initialValues(r: ProjectRequest): ConsultationValues {
         budget: r.budget,
         additionalNotes: c?.additionalNotes ?? '',
         ocularVisitRequired: c ? (c.ocularVisit.required ? 'yes' : 'no') : '',
-        ocularVisitDate: ocularDate,
-        ocularVisitTime: ocularTime.slice(0, 5),
         decision: c?.decision ?? '',
         decisionReason: c?.decisionReason ?? '',
     };
@@ -95,11 +88,6 @@ function validate(v: ConsultationValues, isMall: boolean): ConsultationErrors {
     if (!v.venue.trim()) e.venue = 'Venue is required.';
     if (!v.budget) e.budget = 'Budget is required.';
     if (!isMall && (!v.guests || Number(v.guests) < 1)) e.guests = 'Enter the expected number of guests.';
-
-    if (v.ocularVisitRequired === 'yes') {
-        if (!v.ocularVisitDate) e.ocularVisitDate = 'Set the ocular visit date.';
-        if (!v.ocularVisitTime) e.ocularVisitTime = 'Set the ocular visit time.';
-    }
 
     if (v.decision === 'Do not proceed' && !v.decisionReason.trim()) {
         e.decisionReason = 'Give the reason the project will not proceed.';
@@ -340,26 +328,9 @@ export default function ConsultationForm({ request, saving, serverErrors, onCanc
                     error={errors.ocularVisitRequired}
                 />
                 {values.ocularVisitRequired === 'yes' && (
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <Field label="Visit date" htmlFor="c-ocular-date" required error={errors.ocularVisitDate}>
-                            <input
-                                id="c-ocular-date"
-                                type="date"
-                                value={values.ocularVisitDate}
-                                onChange={(e) => set('ocularVisitDate', e.target.value)}
-                                className={inputClass}
-                            />
-                        </Field>
-                        <Field label="Visit time" htmlFor="c-ocular-time" required error={errors.ocularVisitTime}>
-                            <input
-                                id="c-ocular-time"
-                                type="time"
-                                value={values.ocularVisitTime}
-                                onChange={(e) => set('ocularVisitTime', e.target.value)}
-                                className={inputClass}
-                            />
-                        </Field>
-                    </div>
+                    <p className="text-xs text-ink-soft">
+                        The customer will book the ocular visit date after paying the reservation fee.
+                    </p>
                 )}
             </FormSection>
 

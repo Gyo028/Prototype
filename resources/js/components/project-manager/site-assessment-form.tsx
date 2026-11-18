@@ -2,8 +2,8 @@ import { FileText, ImageIcon, Upload, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Field, GoldButton, OutlineButton, cx, inputClass, textareaClass } from '@/components/dashboard/ui';
 import { DialogFooter } from '@/components/ui/dialog';
-import { PHOTO_EXTENSIONS, PHOTO_MAX_MB, REPORT_EXTENSIONS, REPORT_MAX_MB } from '@/data/project-manager/site-assessments';
-import type { AssessmentProject, SitePhoto } from '@/data/project-manager/site-assessments';
+import { PHOTO_EXTENSIONS, PHOTO_MAX_MB, REPORT_EXTENSIONS, REPORT_MAX_MB } from '@/data/project-manager/projects';
+import type { Project, SitePhoto } from '@/data/project-manager/projects';
 
 /*
  * Backlog #20: Record site assessment details.
@@ -30,7 +30,7 @@ const tooBig = (file: File, maxMb: number) => file.size > maxMb * 1024 * 1024;
 const today = () => new Date().toISOString().slice(0, 10);
 
 type Props = {
-    project: AssessmentProject;
+    project: Project;
     saving: boolean;
     /** Validation errors sent back by Laravel, if any. */
     serverErrors: SiteAssessmentErrors;
@@ -39,7 +39,7 @@ type Props = {
 };
 
 export default function SiteAssessmentForm({ project, saving, serverErrors, onCancel, onSave }: Props) {
-    const saved = project.assessment;
+    const saved = project.siteAssessment;
 
     const [assessedOn, setAssessedOn] = useState(saved?.assessedOn ?? project.ocularVisitAt?.slice(0, 10) ?? today());
     const [findings, setFindings] = useState(saved?.findings ?? '');
@@ -132,7 +132,7 @@ export default function SiteAssessmentForm({ project, saving, serverErrors, onCa
         savedRef.current = true;
         onSave({ assessedOn, findings, reportFile, keptPhotos, newPhotos });
     };
-    
+
     const photoCount = keptPhotos.length + newPhotos.length;
 
     return (
