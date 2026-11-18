@@ -6,17 +6,17 @@
 
 export const MAX_WORKS = 10;
 
-export type Work = { file: string; label: string };
+export type Work = { file: string; label: string; description?: string };
 
 export const works: Work[] = [
-    { file: 'work-1.webp', label: 'Corporate Event' },
-    { file: 'work-2.webp', label: 'Mall Activation' },
-    { file: 'work-3.webp', label: 'Garden Setup' },
-    { file: 'work-4.webp', label: 'Birthday Styling' },
-    { file: 'work-5.webp', label: 'Custom Fabrication' },
-    { file: 'work-6.webp', label: 'Wedding Setup' },
-    { file: 'work-7.webp', label: 'Debut Styling' },
-    { file: 'work-8.webp', label: 'Mall Display' },
-    { file: 'work-9.webp', label: 'Corporate Gala' },
-    { file: 'work-10.webp', label: 'Special Occasion' },
+    { file: 'work-14.webp', label: 'Wellness Place' },
+    { file: 'work-13.webp', label: 'SM City Fairview Plant Wall' },
+    { file: 'work-18.webp', label: 'Christmas Mall Display' },
+    { file: 'work-3.webp', label: 'Digiplus Booth' },
+    { file: 'work-15.webp', label: 'Garden Arch Aisle' },
+    { file: 'work-10.webp', label: 'Paris-Themed Setup' },
+    { file: 'work-16.webp', label: 'Mirror Tunnel Installation' },
+    { file: 'work-17.webp', label: 'Carnival Tent Setup' },
+    { file: 'work-19.webp', label: 'Giant Paper Flowers' },
+    { file: 'work-11.webp', label: 'Aura Floral Installation' },
 ];

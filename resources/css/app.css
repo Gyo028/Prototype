@@ -9,6 +9,7 @@
 @import './public/works-carousel.css';
 @import './public/footer.css';
 @import './public/faq.css';
+@import './page-transition.css';
 
 @source '../views';
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';

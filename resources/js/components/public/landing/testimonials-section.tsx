@@ -14,7 +14,7 @@ type Review = {
 
 const reviews: Review[] = [
     {
-        name: 'Jessice Tan',
+        name: 'Jessica Tan',
         role: 'Corporate Event Client',
         quote: 'The level of professionalism and real-time coordination for our corporate gala was incredible. We could visualize our setup beforehand, and the execution was flawless from start to finish.',
         rating: 5,

@@ -1,4 +1,4 @@
-import { Head } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import { ArrowLeft } from 'lucide-react';
 
 import LandingFooter from '@/components/public/landing/landing-footer';
@@ -76,7 +76,7 @@ export default function OurWorks() {
             <LandingNav isHome={false} loginStyle="gold" />
 
             <main className="mx-auto max-w-[1240px] px-5 pt-28 pb-20 md:px-8 lg:px-12 lg:pt-36 lg:pb-28">
-                <a
+                <Link
                     href="/"
                     className="relative z-10 inline-flex items-center gap-4 text-sm font-semibold text-black transition-colors hover:text-[#C99A2E]"
                 >
@@ -84,7 +84,7 @@ export default function OurWorks() {
                         <path d="M27.5 4H1M4.5 0.8 1 4l3.5 3.2" />
                     </svg>
                     Back
-                </a>
+                </Link>
 
                 <header className="mt-4 mb-10 overflow-x-clip text-center [container-type:inline-size] lg:mb-14">
                     <span

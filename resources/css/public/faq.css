@@ -17,7 +17,7 @@
     }
 
     .faq-question {
-        @apply flex-1 pr-6 font-['DM_Serif_Display',serif] text-xl leading-snug font-normal tracking-wide text-neutral-900;
+        @apply flex-1 pr-6 font-sans text-base leading-snug font-semibold text-neutral-900 xl:text-lg;
     }
 
     .faq-icon {

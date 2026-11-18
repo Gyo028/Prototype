@@ -1,6 +1,7 @@
-import { usePage } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import { Menu, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 
 type LandingNavProps = {
     isHome?: boolean;
@@ -28,9 +29,26 @@ function getNavLinks(isHome: boolean): NavLink[] {
 const navLoginButton =
     'items-center justify-center rounded-full bg-[#C99A2E] font-bold tracking-wide text-[#1F2023] uppercase shadow-sm transition-[background-color,box-shadow] duration-300 hover:bg-white hover:shadow-[0_0_20px_rgba(255,255,255,0.65)] focus-visible:bg-white focus-visible:shadow-[0_0_20px_rgba(255,255,255,0.65)] focus-visible:outline-none';
 
+// Pages without a #section use Inertia's Link so they change without a full reload.
+type NavAnchorProps = {
+    href: string;
+    className?: string;
+    onClick?: () => void;
+    'aria-current'?: 'page';
+    children: ReactNode;
+};
+
+function NavAnchor({ href, ...props }: NavAnchorProps) {
+    if (href.startsWith('/') && !href.includes('#')) {
+        return <Link href={href} {...props} />;
+    }
+
+    return <a href={href} {...props} />;
+}
+
 function Logo({ href }: { href: string }) {
     return (
-        <a href={href} className="flex shrink-0 items-center gap-3">
+        <NavAnchor href={href} className="flex shrink-0 items-center gap-3">
             <img
                 src="/images/Logo.png"
                 alt="GR3AT A's logo"
@@ -42,7 +60,7 @@ function Logo({ href }: { href: string }) {
                     Event Styling Services
                 </span>
             </span>
-        </a>
+        </NavAnchor>
     );
 }
 
@@ -71,7 +89,7 @@ export default function LandingNav({ isHome = true }: LandingNavProps) {
 
                                 return (
                                     <li key={link.label}>
-                                        <a
+                                        <NavAnchor
                                             href={link.href}
                                             onClick={() => setClicked(link.label)}
                                             aria-current={active ? 'page' : undefined}
@@ -82,7 +100,7 @@ export default function LandingNav({ isHome = true }: LandingNavProps) {
                                             }`}
                                         >
                                             {link.label}
-                                        </a>
+                                        </NavAnchor>
                                     </li>
                                 );
                             })}
@@ -117,7 +135,7 @@ export default function LandingNav({ isHome = true }: LandingNavProps) {
 
                                 return (
                                     <li key={link.label}>
-                                        <a
+                                        <NavAnchor
                                             href={link.href}
                                             onClick={() => {
                                                 setClicked(link.label);
@@ -129,7 +147,7 @@ export default function LandingNav({ isHome = true }: LandingNavProps) {
                                             }`}
                                         >
                                             {link.label}
-                                        </a>
+                                        </NavAnchor>
                                     </li>
                                 );
                             })}

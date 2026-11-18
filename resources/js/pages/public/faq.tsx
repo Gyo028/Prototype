@@ -19,12 +19,11 @@ export default function Faq() {
             <LandingNav isHome={false} loginStyle="gold" />
 
             <main id="faq" className="mx-auto max-w-[1240px] px-5 pt-32 pb-20 md:px-8 lg:px-12 lg:pt-40 lg:pb-28">
-                <header className="mb-10 max-w-2xl lg:mb-14">
-                    <p className="text-xs font-semibold tracking-[0.3em] text-[#C99A2E] uppercase">Help</p>
-                    <h1 className="mt-3 font-['DM_Serif_Display',serif] text-4xl font-normal tracking-wide text-neutral-900 sm:text-5xl lg:text-6xl">
-                        FREQUENTLY ASKED QUESTIONS
+                <header className="mb-10 lg:mb-14">
+                    <h1 className="font-['DM_Serif_Display',serif] text-[clamp(1.5rem,6.2vw,3rem)] leading-tight font-normal whitespace-nowrap text-black">
+                        Frequently Asked Questions
                     </h1>
-                    <p className="mt-5 text-base leading-8 text-neutral-600 md:text-lg">
+                    <p className="mt-4 text-base leading-7 text-neutral-600 sm:whitespace-nowrap md:text-lg">
                         Quick answers about our services, custom designs, and how to start your project.
                     </p>
                 </header>
