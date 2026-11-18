@@ -22,6 +22,9 @@ use App\Http\Controllers\Customer\OcularVisitController;
 use App\Http\Controllers\Customer\PaymentController as CustomerPaymentController;
 use App\Http\Controllers\Customer\RequestController as CustomerRequestController;
 use App\Http\Controllers\DesignSpecialist;
+use App\Http\Controllers\Bookkeeper\ExpenseController;
+use App\Http\Controllers\Bookkeeper\FinancialReportController;
+
 
 
 Route::inertia('/', 'public/landing')->name('home');
@@ -143,6 +146,11 @@ Route::middleware(['auth', 'verified', 'role:bookkeeper'])
     ->name('bookkeeper.')
     ->group(function () {
         Route::inertia('/', 'bookkeeper/dashboard')->name('dashboard');
+
+        Route::get('/expenses', [ExpenseController::class, 'index'])->name('expenses.index');
+        Route::post('/expenses', [ExpenseController::class, 'store'])->name('expenses.store');
+
+        Route::get('/financial-reports', [FinancialReportController::class, 'index'])->name('financial-reports');
     });
 
 require __DIR__.'/settings.php';
