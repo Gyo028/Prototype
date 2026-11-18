@@ -19,7 +19,7 @@ function getNavLinks(isHome: boolean): NavLink[] {
 
     return [
         { label: 'Home', href: isHome ? '#home' : '/', isActive: () => false },
-        { label: 'Services', href: `${prefix}#services`, isActive: () => false },
+        { label: 'Services', href: `${prefix}#services`, isActive: (path) => path.startsWith('/services') },
         { label: 'Our Works', href: '/our-works', isActive: (path) => path.startsWith('/our-works') },
         { label: 'About us', href: `${prefix}#about`, isActive: () => false },
         { label: 'FAQ', href: '/faq', isActive: (path) => path.startsWith('/faq') },

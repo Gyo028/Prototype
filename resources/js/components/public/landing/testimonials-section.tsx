@@ -34,7 +34,6 @@ const reviews: Review[] = [
         rating: 5,
         avatarColor: 'bg-[#8A7A5C]',
     },
-    // Placeholder review so the row has four cards like the design. Replace with a real client review.
     {
         name: 'Sarah Lim',
         role: 'Birthday Client',
