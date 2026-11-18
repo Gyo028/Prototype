@@ -57,10 +57,13 @@ test('every held ocular visit gets a sample site assessment with a report and ph
         ->where('schedule_status', ProjectSchedule::STATUS_COMPLETED)
         ->get();
 
-    expect($held)->not->toBeEmpty()
-        ->and(AppointmentOutcome::count())->toBe($held->count());
+    // Only the ocular visits' outcomes (finished fabrication/installation have their own photos).
+    $assessments = AppointmentOutcome::with('files')->whereIn('schedule_id', $held->pluck('schedule_id'))->get();
 
-    foreach (AppointmentOutcome::with('files')->get() as $outcome) {
+    expect($held)->not->toBeEmpty()
+        ->and($assessments)->toHaveCount($held->count());
+
+    foreach ($assessments as $outcome) {
         expect($outcome->files->where('file_type', AppointmentOutcomeFile::TYPE_REPORT))->toHaveCount(1)
             ->and($outcome->files->where('file_type', AppointmentOutcomeFile::TYPE_PHOTO))->toHaveCount(3);
 

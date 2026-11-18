@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property \Illuminate\Support\Carbon $start_datetime
  * @property \Illuminate\Support\Carbon $end_datetime
  * @property string $schedule_status pending | tentative | confirmed | completed | cancelled
+ * @property \Carbon\CarbonInterface|null $completed_at when the work was finished (fabrication, installation)
  * @property string|null $meeting_mode online | face_to_face (appointments only)
  * @property string|null $venue_ownership own_property | third_party (ocular visits only)
  * @property string|null $remarks
@@ -63,6 +64,7 @@ class ProjectSchedule extends Model
         'start_datetime',
         'end_datetime',
         'schedule_status',
+        'completed_at',
         'meeting_mode',
         'venue_ownership',
         'remarks',
@@ -74,6 +76,7 @@ class ProjectSchedule extends Model
         return [
             'start_datetime' => 'datetime',
             'end_datetime' => 'datetime',
+            'completed_at' => 'datetime',
         ];
     }
 

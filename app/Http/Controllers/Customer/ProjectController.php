@@ -20,6 +20,7 @@ use App\Services\Billings;
 use App\Services\ConsultationScheduler;
 use App\Services\Contracts;
 use App\Services\DesignProposals;
+use App\Services\ExecutionSchedules;
 use App\Services\OcularVisitScheduler;
 use App\Services\ProjectProgress;
 use App\Services\ReservationFees;
@@ -50,6 +51,7 @@ class ProjectController extends Controller
         private DesignProposals $proposals,
         private Contracts $contracts,
         private Billings $billings,
+        private ExecutionSchedules $execution,
     ) {}
 
     public function index(Request $request): Response
@@ -146,9 +148,63 @@ class ProjectController extends Controller
             'ocularVisit' => $this->ocularVisitData($project, $request),
             'design' => $this->designData($project),
             'contract' => $this->contractData($project),
+            'execution' => $this->executionData($project),
             'availableSlots' => $needsSlots ? $this->scheduler->availableSlots($project) : (object) [],
             'rules' => $this->scheduler->rules($project) + ['reasonMax' => ConsultationRequest::REASON_MAX],
         ]);
+    }
+
+    /**
+     * Fabrication and installation (read-only for the customer): the dates,
+     * where it stands, any moves with the reason, and once done, the photos
+     * of the finished work.
+     *
+     * @return array<string, mixed>
+     */
+    private function executionData(Project $project): array
+    {
+        $project->load(['schedules.outcome.files']);
+
+        $stage = function (string $type) use ($project) {
+            $current = $this->execution->current($project, $type);
+            $outcome = $current?->schedule_status === ProjectSchedule::STATUS_COMPLETED ? $current->outcome : null;
+
+            return [
+                'state' => $this->execution->state($current),
+                'schedule' => $current ? [
+                    'start' => $current->start_datetime->toDateString(),
+                    'end' => $current->end_datetime->toDateString(),
+                    'completedAt' => $current->completed_at?->toDateString(),
+                ] : null,
+                'changes' => $this->execution->changes($project, $type)->map(fn (ProjectSchedule $s) => [
+                    'start' => $s->start_datetime->toDateString(),
+                    'end' => $s->end_datetime->toDateString(),
+                    'reason' => $s->remarks,
+                ])->values(),
+                'completion' => $outcome ? [
+                    'note' => $outcome->notes,
+                    'recordedAt' => $outcome->recorded_at->toDateString(),
+                    'photos' => $outcome->files->where('file_type', AppointmentOutcomeFile::TYPE_PHOTO)->map(fn (AppointmentOutcomeFile $f) => [
+                        'id' => $f->outcome_file_id,
+                        'name' => $f->file_name,
+                        'url' => "/customer/projects/{$project->project_id}/work-photos/{$f->outcome_file_id}",
+                    ])->values(),
+                ] : null,
+            ];
+        };
+
+        $request = $project->serviceRequest;
+
+        return [
+            'fabrication' => $stage(ProjectSchedule::TYPE_FABRICATION),
+            'installation' => $stage(ProjectSchedule::TYPE_INSTALLATION) + [
+                'event' => [
+                    'date' => $request->start_date->toDateString(),
+                    'endDate' => $request->end_date->toDateString(),
+                    'venue' => $request->venue,
+                ],
+            ],
+        ];
     }
 
     /**

@@ -236,6 +236,20 @@ export type ReservationPayment = {
     receiptUrl: string | null;
 };
 
+/* ---------------- Fabrication and installation (steps 5–6) ---------------- */
+
+export type ExecutionStage = {
+    state: 'not_scheduled' | 'scheduled' | 'in_progress' | 'done';
+    schedule: { start: string; end: string; completedAt: string | null } | null;
+    changes: { start: string; end: string; reason: string | null }[]; // earlier dates, newest first
+    completion: { note: string | null; recordedAt: string; photos: { id: number; name: string; url: string }[] } | null;
+};
+
+export type ExecutionInfo = {
+    fabrication: ExecutionStage;
+    installation: ExecutionStage & { event: { date: string; endDate: string; venue: string } };
+};
+
 /* ---------------- Billing & Payments ---------------- */
 
 export type BillKind = 'reservation_fee' | 'down_payment' | 'balance' | 'additional_charge';

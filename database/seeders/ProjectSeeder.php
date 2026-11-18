@@ -135,9 +135,9 @@ class ProjectSeeder extends Seeder
         $this->schedule($project, ProjectSchedule::TYPE_CONSULTATION, -45, '10:00', '11:00', ProjectSchedule::STATUS_COMPLETED);
         $this->schedule($project, ProjectSchedule::TYPE_OCULAR_VISIT, -40, '09:00', '11:00', ProjectSchedule::STATUS_COMPLETED);
         $this->schedule($project, ProjectSchedule::TYPE_FABRICATION, -2, '08:00', '17:00', ProjectSchedule::STATUS_CONFIRMED, endDay: 15);
-        $this->schedule($project, ProjectSchedule::TYPE_INSTALLATION, 19, '08:00', '18:00', ProjectSchedule::STATUS_PENDING, endDay: 20);
+        $this->schedule($project, ProjectSchedule::TYPE_INSTALLATION, 19, '08:00', '18:00', ProjectSchedule::STATUS_CONFIRMED, endDay: 20);
 
-        // 8. Installing — fabrication done; the set-up is going in for the event in two days.
+        // 8. Installing — fabrication done; the set-up started today for the event in two days.
         $project = $this->project(
             $this->standard('Debut', 2, '18:00', '23:30', 150, 100000, 250000, 'Crowne Plaza Galleria Ballroom, Quezon City', requestedDaysAgo: 70),
             ProjectStatus::INSTALLING,
@@ -148,7 +148,7 @@ class ProjectSeeder extends Seeder
         $this->schedule($project, ProjectSchedule::TYPE_CONSULTATION, -65, '10:00', '11:00', ProjectSchedule::STATUS_COMPLETED);
         $this->schedule($project, ProjectSchedule::TYPE_OCULAR_VISIT, -60, '09:00', '11:00', ProjectSchedule::STATUS_COMPLETED);
         $this->schedule($project, ProjectSchedule::TYPE_FABRICATION, -20, '08:00', '17:00', ProjectSchedule::STATUS_COMPLETED, endDay: -3);
-        $this->schedule($project, ProjectSchedule::TYPE_INSTALLATION, 1, '08:00', '18:00', ProjectSchedule::STATUS_CONFIRMED, endDay: 2);
+        $this->schedule($project, ProjectSchedule::TYPE_INSTALLATION, 0, '08:00', '18:00', ProjectSchedule::STATUS_CONFIRMED, endDay: 2);
 
         // 9. Completed — the event is over.
         $project = $this->project(

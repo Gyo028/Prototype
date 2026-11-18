@@ -26,7 +26,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  * 'pending' until the Project Manager approves the authorization letter and
  * the venue permit (uploaded when booking or later, until the day before).
  * Booking moves the project from Booked to Site Assessment. Rescheduling keeps
- * history like the consultation. There is no cancellation .
+ * history like the consultation. There is no cancel.
  *
  * file(): the site assessment report and venue photos the Project Manager
  * uploaded, for the customer to view or download.
@@ -129,7 +129,11 @@ class OcularVisitController extends Controller
             : Storage::response($document->file_path, $document->file_name);
     }
 
-    /** Shows a site assessment file in the browser, or downloads it with ?download=1. */
+    /**
+     * Shows a file recorded for one of the project's schedules (site assessment report
+     * and photos, photos of the finished fabrication / installation) in the
+     * browser, or downloads it with ?download=1.
+     */
     public function file(Request $request, Project $project, AppointmentOutcomeFile $file): StreamedResponse
     {
         ProjectController::ensureOwned($request, $project);

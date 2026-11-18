@@ -5,6 +5,7 @@ import type {
     ConsultationRules,
     ContractInfo,
     DesignInfo,
+    ExecutionInfo,
     NextAction,
     OcularVisitInfo,
     ProjectDetail,
@@ -24,6 +25,7 @@ type Props = {
     ocularVisit: OcularVisitInfo;
     design: DesignInfo;
     contract: ContractInfo;
+    execution: ExecutionInfo;
     availableSlots: Record<string, string[]>;
     rules: ConsultationRules;
 };

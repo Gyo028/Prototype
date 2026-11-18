@@ -10,7 +10,7 @@ use Database\Seeders\DatabaseSeeder;
 use Inertia\Testing\AssertableInertia as Assert;
 
 /*
- * The customer's 8-step project timeline (ProjectProgress), checked against
+ * The customer's 7-step project timeline (ProjectProgress), checked against
  * the sample projects from ProjectSeeder: one per status, plus one on hold.
  */
 
@@ -153,8 +153,8 @@ test('finished steps keep their details: a summary line and label/value rows', f
     // Done steps show what happened.
     expect(collect($steps['ocular_visit']['details'])->pluck('value', 'label')->all())
         ->toMatchArray(['Status' => 'Visited']);
-    expect(collect($steps['fabrication']['details'])->pluck('value', 'label')->all())
-        ->toMatchArray(['Status' => 'Done']);
+    expect(collect($steps['fabrication']['details'])->pluck('value', 'label')->all()['Status'])
+        ->toStartWith('Done on ');
 
     // The current step shows its progress; locked steps show nothing yet.
     expect(collect($steps['installation']['details'])->pluck('value', 'label')->all())

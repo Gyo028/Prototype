@@ -5,6 +5,7 @@ import BillCard from '@/components/customer/bill-card';
 import ConsultationPanel from '@/components/customer/consultation-panel';
 import ContractPanel from '@/components/customer/contract-panel';
 import DesignProposalPanel from '@/components/customer/design-proposal-panel';
+import ExecutionPanel from '@/components/customer/execution-panel';
 import OcularVisitPanel from '@/components/customer/ocular-visit-panel';
 import { PHASE_LABELS, formatWhen, peso, statusText, statusTone } from '@/components/customer/project-types';
 import type {
@@ -12,6 +13,7 @@ import type {
     ConsultationRules,
     ContractInfo,
     DesignInfo,
+    ExecutionInfo,
     NextAction,
     OcularVisitInfo,
     ProjectDetail,
@@ -51,6 +53,7 @@ type Props = {
     ocularVisit: OcularVisitInfo;
     design: DesignInfo;
     contract: ContractInfo;
+    execution: ExecutionInfo;
     availableSlots: Record<string, string[]>;
     rules: ConsultationRules;
 };
@@ -63,7 +66,7 @@ const STATE_LABEL: Record<Step['state'], string> = {
     locked: 'Locked',
 };
 
-export default function ProjectFolder({ project, steps, currentStep, nextAction, consultation, reservationFee, ocularVisit, design, contract, availableSlots, rules }: Props) {
+export default function ProjectFolder({ project, steps, currentStep, nextAction, consultation, reservationFee, ocularVisit, design, contract, execution, availableSlots, rules }: Props) {
     const [selected, setSelected] = useState<StepKey>(currentStep);
     const step = steps.find((s) => s.key === selected) ?? steps[0];
     const number = steps.indexOf(step) + 1;
@@ -141,6 +144,8 @@ export default function ProjectFolder({ project, steps, currentStep, nextAction,
                         <DesignProposalPanel projectId={project.id} design={design} />
                     ) : step.key === 'contract' && step.state !== 'cancelled' && contract.current ? (
                         <ContractPanel projectId={project.id} contract={contract} stepState={step.state} />
+                    ) : (step.key === 'fabrication' || step.key === 'installation') && (step.state === 'current' || step.state === 'done') ? (
+                        <ExecutionPanel kind={step.key} execution={execution} />
                     ) : (
                         <StepBody step={step} />
                     )}

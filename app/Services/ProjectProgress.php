@@ -11,6 +11,7 @@ use App\Models\ProjectSchedule;
 use App\Models\ProjectStatus;
 use App\Models\SiteAccessDocument;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
 /**
@@ -179,9 +180,11 @@ class ProjectProgress
                 : (($s = $this->active($schedules, ProjectSchedule::TYPE_OCULAR_VISIT)) ? 'Booked for '.$this->day($s->start_datetime) : null)),
             'design' => $this->feeOutstanding($project) ? $this->feeNote($project) : $this->designNote($project, $done),
             'contract' => $this->contractNote($project, $done),
-            'fabrication', 'installation' => ($s = $this->latest($schedules, $key))
-                ? ($done ? 'Done '.$this->day($s->end_datetime) : $this->range($s))
-                : null,
+            'fabrication', 'installation' => ($s = $this->work($schedules, $key))
+                ? ($s->schedule_status === ProjectSchedule::STATUS_COMPLETED
+                    ? 'Done '.$this->day($s->completed_at ?? $s->end_datetime)
+                    : $this->range($s))
+                : ($state === self::CURRENT ? 'Dates to follow' : null),
             'completed' => ($event = $this->latest($schedules, ProjectSchedule::TYPE_EVENT)) ? 'Event on '.$this->day($event->start_datetime) : null,
             default => null,
         };
@@ -356,19 +359,20 @@ class ProjectProgress
 
             case 'fabrication':
             case 'installation':
-                $work = $this->latest($schedules, $key);
+                $work = $this->work($schedules, $key);
 
                 if ($work === null) {
                     return [];
                 }
 
-                $status = match ($work->schedule_status) {
-                    ProjectSchedule::STATUS_COMPLETED => 'Done',
-                    ProjectSchedule::STATUS_CONFIRMED => $state === self::CURRENT ? 'In progress' : 'Scheduled',
-                    default => 'Scheduled',
-                };
+                $doneOn = $work->schedule_status === ProjectSchedule::STATUS_COMPLETED;
 
-                return [$row('Dates', $this->range($work, true)), $row('Status', $status)];
+                return array_values(array_filter([
+                    $row('Dates', $this->range($work, true)),
+                    $row('Status', $doneOn
+                        ? 'Done on '.$this->day($work->completed_at ?? $work->end_datetime, true)
+                        : ($work->start_datetime->toDateString() <= Carbon::now(ConsultationScheduler::TIMEZONE)->toDateString() ? 'In progress' : 'Scheduled')),
+                ]));
 
             case 'completed':
                 $event = $this->latest($schedules, ProjectSchedule::TYPE_EVENT);
@@ -480,14 +484,19 @@ class ProjectProgress
                 return $this->contractAction($project);
 
             case 'fabrication':
-                $install = $this->latest($schedules, ProjectSchedule::TYPE_INSTALLATION);
+                $work = $this->work($schedules, ProjectSchedule::TYPE_FABRICATION);
 
-                return $action('Nothing needed from you', "We're making the pieces for your event.".($install ? ' Installation: '.$this->range($install).'.' : ''));
+                return $work
+                    ? $action('Nothing needed from you', "We're making the pieces for your event: ".$this->range($work, true).'. You will see photos here once it is done.')
+                    : $action('Nothing needed from you', 'Our Project Manager will set the fabrication dates soon.');
 
             case 'installation':
+                $work = $this->work($schedules, ProjectSchedule::TYPE_INSTALLATION);
                 $event = $this->latest($schedules, ProjectSchedule::TYPE_EVENT);
 
-                return $action('Nothing needed from you', "We're setting up at your venue.".($event ? ' Your event: '.$this->day($event->start_datetime, true).'.' : ''));
+                return $work
+                    ? $action('Nothing needed from you', "We're setting up at your venue: ".$this->range($work, true).'.'.($event ? ' Your event: '.$this->day($event->start_datetime, true).'.' : ''))
+                    : $action('Nothing needed from you', 'Our Project Manager will set the installation dates soon.');
 
             default:
                 return $action('Your project is complete', 'Thank you! Ratings and reviews will open here soon.');
@@ -627,6 +636,16 @@ class ProjectProgress
     }
 
     /** The latest schedule of a type (optionally with a status). */
+    /** The current (not moved) fabrication or installation schedule. */
+    private function work(Collection $schedules, string $type): ?ProjectSchedule
+    {
+        return $schedules
+            ->where('schedule_type', $type)
+            ->where('schedule_status', '!=', ProjectSchedule::STATUS_CANCELLED)
+            ->sortByDesc('schedule_id')
+            ->first();
+    }
+
     private function latest(Collection $schedules, string $type, ?string $status = null): ?ProjectSchedule
     {
         return $schedules

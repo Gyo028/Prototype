@@ -27,6 +27,7 @@ test('the project tables follow the ERD column names', function () {
         'schedule_id', 'project_id', 'schedule_type', 'start_datetime', 'end_datetime', 'schedule_status', 'remarks',
         'meeting_mode', 'changed_by', // added for consultation bookings (Slice 1)
         'venue_ownership', // added for ocular visits (Slice 3)
+        'completed_at', // added for fabrication / installation completion
     ]);
 });
 
