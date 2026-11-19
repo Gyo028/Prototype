@@ -120,7 +120,7 @@ export const SAMPLE_PROJECT_REQUESTS: ProjectRequest[] = [
             { id: 2, name: 'seating-plan.pdf', type: 'pdf', url: '#' },
         ],
         layoutSnapshotUrl: null,
-        submittedAt: '2026-11-08T09:24:00+08:00',
+        submittedAt: '2026-09-01T09:24:00+08:00',
         status: 'Pending',
         decision: null,
         consultation: null,
@@ -150,7 +150,7 @@ export const SAMPLE_PROJECT_REQUESTS: ProjectRequest[] = [
         ],
         files: [],
         layoutSnapshotUrl: null,
-        submittedAt: '2026-11-09T15:02:00+08:00',
+        submittedAt: '2026-09-03T15:02:00+08:00',
         status: 'Pending',
         decision: null,
         consultation: null,
@@ -173,7 +173,7 @@ export const SAMPLE_PROJECT_REQUESTS: ProjectRequest[] = [
         assets: [{ id: 'backdrop-panel', name: 'Backdrop Panel', category: 'Structures' }],
         files: [{ id: 3, name: 'brand-guidelines.pdf', type: 'pdf', url: '#' }],
         layoutSnapshotUrl: null,
-        submittedAt: '2026-11-10T08:45:00+08:00',
+        submittedAt: '2026-09-05T08:45:00+08:00',
         status: 'Pending',
         decision: null,
         consultation: null,
@@ -199,7 +199,7 @@ export const SAMPLE_PROJECT_REQUESTS: ProjectRequest[] = [
         assets: [{ id: 'entrance-arch', name: 'Entrance Arch', category: 'Structures' }],
         files: [],
         layoutSnapshotUrl: null,
-        submittedAt: '2026-11-03T11:10:00+08:00',
+        submittedAt: '2026-09-07T11:10:00+08:00',
         status: 'Approved',
         decision: {
             remarks: 'Requirements are complete. Please book a consultation.',
@@ -229,7 +229,7 @@ export const SAMPLE_PROJECT_REQUESTS: ProjectRequest[] = [
         assets: [],
         files: [],
         layoutSnapshotUrl: null,
-        submittedAt: '2026-11-01T16:30:00+08:00',
+        submittedAt: '2026-09-09T16:30:00+08:00',
         status: 'Rejected',
         decision: {
             remarks: 'The budget cannot cover catering for 400 guests. Please adjust the guest count or budget and submit a new request.',
@@ -262,12 +262,12 @@ export const SAMPLE_PROJECT_REQUESTS: ProjectRequest[] = [
         ],
         files: [],
         layoutSnapshotUrl: null,
-        submittedAt: '2026-10-20T13:40:00+08:00',
+        submittedAt: '2026-09-11T13:40:00+08:00',
         status: 'Approved',
         decision: {
             remarks: 'Approved. Please book a consultation.',
             decidedBy: 'Project Manager',
-            decidedAt: '2026-10-21T09:00:00+08:00',
+            decidedAt: '2026-10-24T09:00:00+08:00',
         },
         consultation: {
             outcome: 'Completed',
@@ -281,3 +281,17 @@ export const SAMPLE_PROJECT_REQUESTS: ProjectRequest[] = [
         },
     },
 ];
+
+/* ---------- sample store (only while the backend is not ready) ---------- */
+
+// The list page and the request page both read and save here, so a decision made
+// on a request's page is also shown on the list.
+let requestStore = SAMPLE_PROJECT_REQUESTS;
+
+export const getSampleRequests = () => requestStore;
+
+export const getSampleRequest = (id: number) => requestStore.find((r) => r.id === id) ?? null;
+
+export function saveSampleRequest(request: ProjectRequest) {
+    requestStore = requestStore.map((r) => (r.id === request.id ? request : r));
+}

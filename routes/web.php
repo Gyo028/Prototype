@@ -121,6 +121,7 @@ Route::middleware(['auth', 'verified', 'role:project_manager'])
     ->group(function () {
         Route::inertia('/', 'project-manager/dashboard')->name('dashboard');
         Route::inertia('service-requests', 'project-manager/service-requests')->name('service-requests');
+        Route::inertia('service-requests/{serviceRequest}', 'project-manager/service-request-show')->name('service-requests.show');
         Route::inertia('projects', 'project-manager/projects')->name('projects');
         Route::inertia('projects/{project}', 'project-manager/project-show')->name('projects.show');
     });

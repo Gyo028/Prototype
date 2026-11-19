@@ -288,6 +288,20 @@ export const SAMPLE_SPECIALISTS: DesignSpecialist[] = [
 
 type SampleInput = Pick<Project, 'id' | 'code' | 'customer' | 'eventType' | 'eventDate' | 'venue'> & Partial<Project>;
 
+/**
+ * Sample date submitted, worked out from the request number so the numbers follow the
+ * queue (first come, first served): REQ-0001 → Sep 1, REQ-0002 → Sep 3, REQ-0004 → Sep 7 ...
+ * Matches the dates on the Service Requests sample data.
+ */
+function sampleSubmittedAt(code: string) {
+    const n = Number(code.replace(/\D/g, ''));
+    const date = new Date(2026, 8, 2 * n - 1); // month 8 = September
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}T09:00:00+08:00`;
+}
+
 /** Fills in the fields every sample shares, so each sample only lists what is different. */
 function sample(p: SampleInput): Project {
     return {
@@ -305,7 +319,7 @@ function sample(p: SampleInput): Project {
         assets: [{ id: 'entrance-arch', name: 'Entrance Arch', category: 'Structures' }],
         files: [],
         layoutSnapshotUrl: null,
-        submittedAt: '2026-10-15T10:00:00+08:00',
+        submittedAt: sampleSubmittedAt(p.code),
         status: 'Approved',
         decision: { remarks: 'Approved. Please book a consultation.', decidedBy: 'Project Manager', decidedAt: '2026-10-16T09:00:00+08:00' },
         consultation: null,
