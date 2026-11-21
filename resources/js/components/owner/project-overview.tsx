@@ -2,29 +2,21 @@ import { CheckCircle2, FolderKanban, Hourglass, XCircle } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { PageHeader, Panel, Pill, cx, inputClass } from '@/components/dashboard/ui';
-import type { PillTone } from '@/components/dashboard/ui';
+import { projectStatusTone } from '@/components/project-manager/project-status';
 import { formatDate } from '@/components/project-manager/request-details';
 import { ONGOING_STATUSES, getSampleOwnerProjects } from '@/data/owner/projects';
-import type { OwnerProjectStatus, OwnerProjectSummary } from '@/data/owner/projects';
+import type { OwnerProjectSummary } from '@/data/owner/projects';
 
 /*
  * Backlog #39: the Owner's dashboard overview of all ongoing and completed projects.
  *   - Shows every project with its current status (acceptance criterion 1).
  *   - With no project records at all, shows "No project records available." (acceptance criterion 2).
  * Read only: the Owner monitors projects; the Project Manager updates them.
+ * Revision (Nov 19): the status is the step the project is in, Completed or Cancelled.
  */
 
 type Filter = 'Ongoing' | 'Completed' | 'All';
 const FILTERS: Filter[] = ['Ongoing', 'Completed', 'All'];
-
-const statusTone: Record<OwnerProjectStatus, PillTone> = {
-    'In Progress': 'yellow',
-    Rescheduled: 'blue',
-    Completed: 'green',
-    Cancelled: 'red',
-    'Not Proceeding': 'red',
-};
-
 const isOngoing = (p: OwnerProjectSummary) => ONGOING_STATUSES.includes(p.status);
 
 function StatCard({ label, value, icon, tone }: { label: string; value: number; icon: ReactNode; tone: string }) {
@@ -52,7 +44,7 @@ export default function ProjectOverview({ projects }: Props) {
 
     const ongoing = all.filter(isOngoing).length;
     const completed = all.filter((p) => p.status === 'Completed').length;
-    const closed = all.filter((p) => p.status === 'Cancelled' || p.status === 'Not Proceeding').length;
+    const closed = all.filter((p) => p.status === 'Cancelled').length;
     const count = (f: Filter) => (f === 'Ongoing' ? ongoing : f === 'Completed' ? completed : all.length);
 
     const q = query.trim().toLowerCase();
@@ -85,7 +77,7 @@ export default function ProjectOverview({ projects }: Props) {
                         <StatCard label="Total projects" value={all.length} icon={<FolderKanban className="size-5" />} tone="bg-gold/15 text-gold-dark" />
                         <StatCard label="Ongoing" value={ongoing} icon={<Hourglass className="size-5" />} tone="bg-amber-100 text-amber-700" />
                         <StatCard label="Completed" value={completed} icon={<CheckCircle2 className="size-5" />} tone="bg-green-100 text-green-700" />
-                        <StatCard label="Cancelled / Not proceeding" value={closed} icon={<XCircle className="size-5" />} tone="bg-red-100 text-red-700" />
+                        <StatCard label="Cancelled" value={closed} icon={<XCircle className="size-5" />} tone="bg-red-100 text-red-700" />
                     </div>
 
                     {/* Toolbar */}
@@ -149,7 +141,7 @@ export default function ProjectOverview({ projects }: Props) {
                                             <td className="px-2 py-3 text-ink-soft">{p.venue}</td>
                                             <td className="px-2 py-3 text-ink">{p.currentStep ?? '—'}</td>
                                             <td className="px-2 py-3 pr-4 whitespace-nowrap">
-                                                <Pill tone={statusTone[p.status]}>{p.status}</Pill>
+                                                <Pill tone={projectStatusTone[p.status]}>{p.status}</Pill>
                                             </td>
                                         </tr>
                                     ))

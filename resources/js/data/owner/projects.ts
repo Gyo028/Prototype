@@ -7,7 +7,7 @@
  * show the same projects while the backend is not ready yet.
  */
 
-import { STEPS, activeStep, getSampleProjects, projectStatus } from '@/data/project-manager/projects';
+import { PROJECT_STATUSES, STEPS, activeStep, getSampleProjects, projectStatus } from '@/data/project-manager/projects';
 import type { Project, ProjectStatus } from '@/data/project-manager/projects';
 
 export type OwnerProjectStatus = ProjectStatus; // In Progress, Rescheduled, Completed, Cancelled, Not Proceeding
@@ -23,8 +23,8 @@ export type OwnerProjectSummary = {
     currentStep: string | null; // e.g. "Step 6 of 8 · Contract"; null when completed or closed
 };
 
-/** Ongoing = still being worked on. */
-export const ONGOING_STATUSES: OwnerProjectStatus[] = ['In Progress', 'Rescheduled'];
+/** Ongoing = still being worked on (every status except Completed and Cancelled). */
+export const ONGOING_STATUSES: OwnerProjectStatus[] = PROJECT_STATUSES.filter((s) => s !== 'Completed' && s !== 'Cancelled');
 
 /** Turns a full project into the summary the Owner sees. */
 export function toOwnerSummary(p: Project): OwnerProjectSummary {

@@ -1,10 +1,10 @@
 import { router } from '@inertiajs/react';
 import { useState } from 'react';
 import { PageHeader, Panel, Pill, cx, inputClass } from '@/components/dashboard/ui';
-import type { PillTone } from '@/components/dashboard/ui';
+import { projectStatusTone } from '@/components/project-manager/project-status';
 import { formatDate } from '@/components/project-manager/request-details';
 import { PROJECTS_URL } from '@/components/project-manager/steps/step-ui';
-import { getSampleProjects, projectStatus } from '@/data/project-manager/projects';
+import { PROJECT_STATUSES, getSampleProjects, projectStatus } from '@/data/project-manager/projects';
 import type { Project, ProjectStatus } from '@/data/project-manager/projects';
 
 /*
@@ -13,19 +13,12 @@ import type { Project, ProjectStatus } from '@/data/project-manager/projects';
  * Revision (leader, Nov 19):
  *   - Only 4 columns: Number, Project Title, Date, Status.
  *   - Numbers follow a queue: first come, first served (oldest at the top).
+ *   - The status is the step the project is in (Consultation ... Installation), Completed or Cancelled.
  */
 
 type Filter = ProjectStatus | 'All';
 
-const FILTERS: Filter[] = ['In Progress', 'Rescheduled', 'Completed', 'Cancelled', 'Not Proceeding', 'All'];
-
-const statusTone: Record<ProjectStatus, PillTone> = {
-    'In Progress': 'yellow',
-    Rescheduled: 'blue',
-    Completed: 'green',
-    Cancelled: 'red',
-    'Not Proceeding': 'red',
-};
+const FILTERS: Filter[] = ['All', ...PROJECT_STATUSES];
 
 type Props = {
     /** Sent by the controller (approved requests only). Leave it out to use the sample data. */
@@ -36,7 +29,7 @@ export default function ProjectList({ projects }: Props) {
     const allProjects = projects ?? getSampleProjects();
 
     const [query, setQuery] = useState('');
-    const [filter, setFilter] = useState<Filter>('In Progress');
+    const [filter, setFilter] = useState<Filter>('All');
 
     const count = (f: Filter) => (f === 'All' ? allProjects.length : allProjects.filter((p) => projectStatus(p) === f).length);
 
@@ -120,7 +113,7 @@ export default function ProjectList({ projects }: Props) {
                                         <td className="px-2 py-3 text-ink">{p.eventType}</td>
                                         <td className="px-2 py-3 whitespace-nowrap text-ink">{formatDate(p.submittedAt.slice(0, 10))}</td>
                                         <td className="px-2 py-3 pr-4 whitespace-nowrap">
-                                            <Pill tone={statusTone[status]}>{status}</Pill>
+                                            <Pill tone={projectStatusTone[status]}>{status}</Pill>
                                         </td>
                                     </tr>
                                 );
