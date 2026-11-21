@@ -8,7 +8,7 @@
 // ---------------------------------------------------------------------------
 // FILL THESE IN: they appear in the documents and on the page headers.
 // ---------------------------------------------------------------------------
-{/*export const EFFECTIVE_DATE = `November 14, 2026`; */}
+export const EFFECTIVE_DATE = `November 14, 2026`;
 
 export const COMPANY = {
     name: `GR3AT A's Event Styling Services`,

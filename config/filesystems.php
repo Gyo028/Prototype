@@ -16,6 +16,16 @@ return [
     'default' => env('FILESYSTEM_DISK', 'local'),
 
     /*
+    | E-VenturePro: customer and project files (request attachments, receipts,
+    | dispute proof, site access documents, site assessments, design proposals,
+    | contracts, completion photos) all use the default disk, under
+    | customers/{customer_id}/... Set FILESYSTEM_DISK=supabase to keep them in
+    | the private Supabase Storage bucket (the team shares one, like the
+    | database); "local" keeps them on this computer. Tests always use "local"
+    | (phpunit.xml). Landing page images stay in public/images.
+    */
+
+    /*
     |--------------------------------------------------------------------------
     | Filesystem Disks
     |--------------------------------------------------------------------------
@@ -45,6 +55,24 @@ return [
             'visibility' => 'public',
             'throw' => false,
             'report' => false,
+        ],
+
+        // Supabase Storage through its S3-compatible endpoint (private bucket).
+        // Needs: composer require league/flysystem-aws-s3-v3 "^3.0"
+        // Keys: Supabase dashboard > Storage > S3 Configuration. Server-side only.
+        'supabase' => [
+            'driver' => 's3',
+            'key' => env('SUPABASE_S3_ACCESS_KEY_ID'),
+            'secret' => env('SUPABASE_S3_SECRET_ACCESS_KEY'),
+            'region' => env('SUPABASE_S3_REGION'),
+            'bucket' => env('SUPABASE_S3_BUCKET'),
+            // https://<project-ref>.storage.supabase.co/storage/v1/s3
+            'endpoint' => env('SUPABASE_S3_ENDPOINT'),
+            'use_path_style_endpoint' => true,
+            'visibility' => 'private',
+            // Report a failed upload instead of carrying on as if the file was saved.
+            'throw' => true,
+            'report' => true,
         ],
 
         's3' => [

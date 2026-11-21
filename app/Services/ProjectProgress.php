@@ -61,8 +61,12 @@ class ProjectProgress
      * @return array{
      *     steps: list<array{key: string, label: string, phase: string, description: string, state: string, note: string|null, summary: string|null, details: list<array{label: string, value: string}>}>,
      *     currentStep: string,
-     *     nextAction: array{title: string, detail: string, actionNeeded: bool}
+     *     nextAction: array{title: string, detail: string, actionNeeded: bool, button: string|null, billId: int|null}
      * }
+     *
+     * nextAction.button: the label of the button that does the action ("Pay now",
+     * "Review design"…) when the customer has something to do; billId: the bill,
+     * for a payment. The dashboard's "Action needed" list uses both.
      */
     public function for(Project $project): array
     {
@@ -394,10 +398,10 @@ class ProjectProgress
         ];
     }
 
-    /** @return array{title: string, detail: string, actionNeeded: bool} */
+    /** @return array{title: string, detail: string, actionNeeded: bool, button: string|null, billId: int|null} */
     private function nextAction(string $step, Project $project, Collection $schedules): array
     {
-        $action = fn (string $title, string $detail, bool $needed = false) => ['title' => $title, 'detail' => $detail, 'actionNeeded' => $needed];
+        $action = fn (string $title, string $detail, bool $needed = false, ?string $button = null, ?int $billId = null) => ['title' => $title, 'detail' => $detail, 'actionNeeded' => $needed, 'button' => $button, 'billId' => $billId];
 
         if ($project->status->status_name === ProjectStatus::CANCELLED) {
             $bill = $project->reservationFee;
@@ -426,7 +430,7 @@ class ProjectProgress
                     return $action('Waiting for your consultation outcome', 'Our Project Manager is recording the results of your consultation.');
                 }
 
-                return $action('Book your consultation', 'Pick a date and time to meet our Project Manager.', true);
+                return $action('Book your consultation', 'Pick a date and time to meet our Project Manager.', true, 'Book now');
 
             case 'ocular_visit':
                 if ($this->feeOutstanding($project)) {
@@ -454,7 +458,7 @@ class ProjectProgress
                         : $action('Waiting for the site assessment', 'Our team is writing up what they found at your venue.');
                 }
 
-                return $action('Book your ocular visit', 'Pick a date and time for our team to visit your venue.', true);
+                return $action('Book your ocular visit', 'Pick a date and time for our team to visit your venue.', true, 'Book now');
 
             case 'design':
                 if ($this->feeOutstanding($project)) {
@@ -468,6 +472,7 @@ class ProjectProgress
                         'Review your design proposal',
                         'Version '.$latest->version_number.' is ready, with a quotation of '.$this->peso((float) $latest->quotation_amount).'. Approve it or ask for changes.',
                         true,
+                        'Review design',
                     );
                 }
 
@@ -507,11 +512,11 @@ class ProjectProgress
      * The reservation fee, on the step after the consultation. $next says what
      * paying it unlocks.
      *
-     * @return array{title: string, detail: string, actionNeeded: bool}
+     * @return array{title: string, detail: string, actionNeeded: bool, button: string|null, billId: int|null}
      */
     private function feeAction(Project $project, string $next): array
     {
-        $action = fn (string $title, string $detail, bool $needed = false) => ['title' => $title, 'detail' => $detail, 'actionNeeded' => $needed];
+        $action = fn (string $title, string $detail, bool $needed = false, ?string $button = null, ?int $billId = null) => ['title' => $title, 'detail' => $detail, 'actionNeeded' => $needed, 'button' => $button, 'billId' => $billId];
         $bill = $project->reservationFee;
 
         if ($bill === null) {
@@ -531,19 +536,21 @@ class ProjectProgress
                 'Your payment was not accepted',
                 ($latest->remarks ? 'Reason: '.rtrim($latest->remarks, '. ').'. ' : '')."Please pay your reservation fee again by {$due}.",
                 true,
+                'Pay now',
+                $bill->billing_id,
             ),
-            default => $action('Pay your reservation fee', $this->peso((float) $bill->amount)." by GCash, due {$due}. {$next}", true),
+            default => $action('Pay your reservation fee', $this->peso((float) $bill->amount)." by GCash, due {$due}. {$next}", true, 'Pay now', $bill->billing_id),
         };
     }
 
     /**
      * The contract step: sign, wait for verification, then pay the down payment.
      *
-     * @return array{title: string, detail: string, actionNeeded: bool}
+     * @return array{title: string, detail: string, actionNeeded: bool, button: string|null, billId: int|null}
      */
     private function contractAction(Project $project): array
     {
-        $action = fn (string $title, string $detail, bool $needed = false) => ['title' => $title, 'detail' => $detail, 'actionNeeded' => $needed];
+        $action = fn (string $title, string $detail, bool $needed = false, ?string $button = null, ?int $billId = null) => ['title' => $title, 'detail' => $detail, 'actionNeeded' => $needed, 'button' => $button, 'billId' => $billId];
         $contract = $this->latestContract($project);
 
         if ($contract === null) {
@@ -558,10 +565,11 @@ class ProjectProgress
                     'Your signed contract was not accepted',
                     ($rejected->rejection_reason ? 'Reason: '.rtrim($rejected->rejection_reason, '. ').'. ' : '').'Please review and sign the contract again.',
                     true,
+                    'Sign contract',
                 );
             }
 
-            return $action('Review and sign your contract', 'Read the contract, then sign it here or upload a signed copy.', true);
+            return $action('Review and sign your contract', 'Read the contract, then sign it here or upload a signed copy.', true, 'Sign contract');
         }
 
         if ($contract->status === Contract::STATUS_SIGNED) {
@@ -584,10 +592,12 @@ class ProjectProgress
                 'Your payment was not accepted',
                 ($latest->remarks ? "Reason: {$latest->remarks}. " : '').'Please submit your down payment again by '.$due.'.',
                 true,
+                'Pay now',
+                $bill->billing_id,
             ),
             default => $bill->hasOpenDispute()
                 ? $action('Your down payment is disputed', 'Our Project Manager is reviewing your dispute. The bill is on hold until then.')
-                : $action('Pay your down payment', $this->peso((float) $bill->amount)." by GCash, due {$due}. Work starts once it is verified.", true),
+                : $action('Pay your down payment', $this->peso((float) $bill->amount)." by GCash, due {$due}. Work starts once it is verified.", true, 'Pay now', $bill->billing_id),
         };
     }
 
@@ -595,7 +605,7 @@ class ProjectProgress
      * A pending visit at a third-party venue: upload the documents, or wait for
      * the Project Manager to review them.
      *
-     * @return array{title: string, detail: string, actionNeeded: bool}
+     * @return array{title: string, detail: string, actionNeeded: bool, button: string|null, billId: int|null}
      */
     private function documentsAction(Project $project, ProjectSchedule $visit): array
     {
@@ -625,6 +635,8 @@ class ProjectProgress
                 'title' => 'Upload your site access documents',
                 'detail' => "Your visit on {$when} is pending until our Project Manager approves them. ".implode(' ', $parts),
                 'actionNeeded' => true,
+                'button' => 'Upload documents',
+                'billId' => null,
             ];
         }
 
@@ -632,6 +644,8 @@ class ProjectProgress
             'title' => 'Waiting for document review',
             'detail' => "Our Project Manager is checking your authorization letter and venue permit. Your visit on {$when} is confirmed once they are approved.",
             'actionNeeded' => false,
+            'button' => null,
+            'billId' => null,
         ];
     }
 

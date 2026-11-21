@@ -73,7 +73,7 @@ test('another customer cannot see the request or its files', function () {
 test('reference files can be viewed and downloaded, only through their own request', function () {
     Storage::fake();
     $r = rdPending();
-    $path = UploadedFile::fake()->create('peg.jpg', 100, 'image/jpeg')->store("service-requests/{$r->service_request_id}");
+    $path = UploadedFile::fake()->create('peg.jpg', 100, 'image/jpeg')->store("customers/{$r->customer_id}/requests/{$r->service_request_id}");
     $file = $r->files()->create(['file_name' => 'peg.jpg', 'file_path' => $path]);
 
     $url = "/customer/requests/{$r->service_request_id}/files/{$file->request_file_id}";
