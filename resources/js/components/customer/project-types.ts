@@ -38,6 +38,10 @@ export type NextAction = {
     title: string;
     detail: string;
     actionNeeded: boolean;
+    /** Label of the button that does the action ("Pay now", "Review design"…), when one is needed. */
+    button?: string | null;
+    /** The bill to pay, for a payment action. */
+    billId?: number | null;
 };
 
 export type StepKey = 'consultation' | 'ocular_visit' | 'design' | 'contract' | 'fabrication' | 'installation' | 'completed';
@@ -371,7 +375,7 @@ export const meetingModeLabel = (m: MeetingMode | null) => MEETING_MODES.find((x
 
 /* ---------- formatting ---------- */
 
-const fromISO = (iso: string) => {
+export const fromISO = (iso: string) => {
     const [y, m, d] = iso.split('-').map(Number);
     return new Date(y, m - 1, d);
 };

@@ -17,6 +17,7 @@ use App\Http\Controllers\Customer\ProjectController as CustomerProjectController
 use App\Http\Controllers\Customer\BillingController as CustomerBillingController;
 use App\Http\Controllers\Customer\ConsultationController;
 use App\Http\Controllers\Customer\ContractController as CustomerContractController;
+use App\Http\Controllers\Customer\DashboardController as CustomerDashboardController;
 use App\Http\Controllers\Customer\DesignProposalController;
 use App\Http\Controllers\Customer\OcularVisitController;
 use App\Http\Controllers\Customer\PaymentController as CustomerPaymentController;
@@ -83,7 +84,7 @@ Route::middleware(['auth', 'verified', 'role:customer'])
     ->prefix('customer')
     ->name('customer.')
     ->group(function () {
-        Route::inertia('/', 'customer/dashboard')->name('dashboard');
+        Route::get('/', [CustomerDashboardController::class, 'index'])->name('dashboard');
         Route::get('new-request', [ServiceRequestController::class, 'create'])->name('new-request');
         Route::post('new-request', [ServiceRequestController::class, 'store'])->name('new-request.store');
         Route::get('projects', [CustomerProjectController::class, 'index'])->name('projects');
