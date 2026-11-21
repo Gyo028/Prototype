@@ -307,7 +307,7 @@ test('reference files are stored privately and saved with the request', function
         ->and($serviceRequest->files->pluck('file_name')->all())->toEqualCanonicalizing(['arch-inspiration.jpg', 'seating-plan.pdf']);
 
     foreach ($serviceRequest->files as $file) {
-        expect($file->file_path)->toStartWith("service-requests/{$serviceRequest->service_request_id}/");
+        expect($file->file_path)->toStartWith("customers/{$serviceRequest->customer_id}/requests/{$serviceRequest->service_request_id}/");
         Storage::disk('local')->assertExists($file->file_path);
     }
 });

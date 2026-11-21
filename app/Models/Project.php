@@ -155,4 +155,10 @@ class Project extends Model
     {
         return $this->hasMany(DesignProposal::class, 'project_id')->orderBy('version_number');
     }
+
+    /** Expenses recorded by the Bookkeeper, archived ones included. @return HasMany<ProjectExpense, $this> */
+    public function expenses(): HasMany
+    {
+        return $this->hasMany(ProjectExpense::class, 'project_id', 'project_id');
+    }
 }
