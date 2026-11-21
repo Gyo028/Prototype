@@ -1,10 +1,11 @@
 import { Head, Link } from '@inertiajs/react';
 import { ArrowRight, Phone } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 
 import LandingFooter from '@/components/public/landing/landing-footer';
 import LandingNav from '@/components/public/landing/landing-nav';
+import Reveal from '@/components/public/landing/reveal';
+import ServiceSwitcher from '@/components/public/service-switcher';
 import { COMPANY } from '@/data/legal';
 
 const heroImage = '/images/works/work-20.webp';
@@ -90,54 +91,15 @@ const moreServices = [
         title: 'Special Occasions',
         text: 'Creative setups for weddings, birthdays, debuts, and milestone celebrations.',
         image: '/images/works/work-7.webp',
+        href: '/services/special-occasions',
     },
     {
         title: 'Custom Fabrication',
         text: 'Design and production of customized backdrops, props, and themed event structures.',
         image: '/images/works/work-8.webp',
+        href: '/services/custom-fabrication',
     },
 ];
-
-function Reveal({ children, className = '', delay = 0 }: { children: ReactNode; className?: string; delay?: number }) {
-    const ref = useRef<HTMLDivElement>(null);
-    const [shown, setShown] = useState(false);
-
-    useEffect(() => {
-        const el = ref.current;
-        if (!el) return;
-
-        if (!('IntersectionObserver' in window) || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-            setShown(true);
-            return;
-        }
-
-        const observer = new IntersectionObserver(
-            ([entry]) => {
-                if (entry.isIntersecting) {
-                    setShown(true);
-                    observer.disconnect();
-                }
-            },
-            { threshold: 0.12, rootMargin: '0px 0px -6% 0px' },
-        );
-
-        observer.observe(el);
-
-        return () => observer.disconnect();
-    }, []);
-
-    return (
-        <div
-            ref={ref}
-            style={{ transitionDelay: `${delay}ms` }}
-            className={`transition-[opacity,transform] duration-700 ease-out motion-reduce:transition-none ${
-                shown ? 'translate-y-0 opacity-100' : 'translate-y-7 opacity-0'
-            } ${className}`}
-        >
-            {children}
-        </div>
-    );
-}
 
 const primaryButton =
     'group inline-flex items-center justify-center gap-3 rounded-full bg-[#C99A2E] px-8 py-4 text-sm font-bold tracking-[0.14em] text-[#1F2023] uppercase transition-all duration-300 hover:bg-[#F2C75C] hover:shadow-[0_14px_40px_-12px_rgba(242,199,92,0.7)] focus-visible:ring-2 focus-visible:ring-[#F2C75C] focus-visible:ring-offset-2 focus-visible:ring-offset-[#1F2023] focus-visible:outline-none';
@@ -169,6 +131,7 @@ export default function CorporateEvents() {
             <LandingNav isHome={false} loginStyle="gold" />
 
             <main>
+                {/* HERO: full-bleed, left-aligned, sharp editorial */}
                 <section className="relative isolate flex min-h-[640px] items-end overflow-hidden bg-[#1F2023] text-white lg:min-h-[800px]">
                     <img
                         src={heroImage}
@@ -188,6 +151,7 @@ export default function CorporateEvents() {
 
                     <div className="mx-auto w-full max-w-[1240px] px-5 pt-36 pb-16 md:px-8 lg:px-12 lg:pb-24">
                         <div className="max-w-3xl">
+                            <ServiceSwitcher active="corporate-events" />
                             <h1 className="font-['DM_Serif_Display',serif] text-[clamp(3rem,8.5vw,6.25rem)] leading-[1.02] font-normal tracking-tight">
                                 Corporate
                                 <br />
@@ -214,67 +178,71 @@ export default function CorporateEvents() {
                     </div>
                 </section>
 
+                {/* INTRO: headline + copy side by side, pillars in a row, wide image banner */}
                 <section className="bg-white py-20 lg:py-32">
-                    <div className="mx-auto grid max-w-[1240px] items-center gap-16 px-5 md:px-8 lg:grid-cols-[1.05fr_1fr] lg:gap-20 lg:px-12">
-                        <Reveal>
-                            <h2 className="font-['DM_Serif_Display',serif] text-4xl leading-[1.12] font-normal text-[#0D0D33] md:text-5xl">
+                    <div className="mx-auto max-w-[1240px] px-5 md:px-8 lg:px-12">
+                        <Reveal className="grid gap-10 lg:grid-cols-[1fr_1fr] lg:gap-20">
+                            <h2 className="font-['DM_Serif_Display',serif] text-4xl leading-[1.12] font-normal text-[#0D0D33] md:text-5xl lg:text-6xl">
                                 Where your brand
                                 <br />
                                 takes the stage.
                             </h2>
-                            <p className="mt-8 text-base leading-8 text-neutral-700 md:text-[17px]">
-                                A corporate event is more than a venue and a program. It is the moment your clients, partners, and guests
-                                experience your brand in person. GR3AT A's turns that moment into a polished, cohesive setting that looks
-                                exactly the way your company wants to be remembered.
-                            </p>
-                            <p className="mt-5 text-base leading-8 text-neutral-700 md:text-[17px]">
-                                From a single booth to a full gala night, we handle the styling, the build, and the on-site management, so
-                                every detail works together.
-                            </p>
-
-                            <dl className="mt-12 space-y-8 border-t border-neutral-200 pt-10">
-                                {pillars.map((pillar, i) => (
-                                    <div key={pillar.title} className="grid grid-cols-[3rem_1fr] gap-x-4">
-                                        <span className="font-['DM_Serif_Display',serif] text-3xl leading-none text-[#C99A2E]">
-                                            {String(i + 1).padStart(2, '0')}
-                                        </span>
-                                        <div>
-                                            <dt className="font-['DM_Serif_Display',serif] text-xl text-[#0D0D33]">{pillar.title}</dt>
-                                            <dd className="mt-2 text-sm leading-7 text-neutral-600">{pillar.text}</dd>
-                                        </div>
-                                    </div>
-                                ))}
-                            </dl>
+                            <div>
+                                <p className="text-base leading-8 text-neutral-700 md:text-[17px]">
+                                    A corporate event is more than a venue and a program. It is the moment your clients, partners, and guests
+                                    experience your brand in person. GR3AT A's turns that moment into a polished, cohesive setting that looks
+                                    exactly the way your company wants to be remembered.
+                                </p>
+                                <p className="mt-5 text-base leading-8 text-neutral-700 md:text-[17px]">
+                                    From a single booth to a full gala night, we handle the styling, the build, and the on-site management, so
+                                    every detail works together.
+                                </p>
+                            </div>
                         </Reveal>
 
-                        <Reveal delay={150}>
-                            <div className="relative mx-auto w-full max-w-[600px] pb-20 lg:mx-0 lg:ml-auto">
-                                <div className="relative ml-auto w-[88%]">
-                                    <div
-                                        aria-hidden="true"
-                                        className="absolute inset-0 translate-x-4 translate-y-4 border border-[#C99A2E]/70"
-                                    />
-                                    <img
-                                        src="/images/works/work-4.webp"
-                                        alt="Corporate launch booth with branded backdrop and reception counter"
-                                        loading="lazy"
-                                        decoding="async"
-                                        className="relative aspect-[4/5] w-full object-cover shadow-[0_30px_60px_-30px_rgba(31,32,35,0.5)]"
-                                    />
-                                </div>
+                        <dl className="mt-16 grid gap-10 md:grid-cols-3 md:gap-8 lg:mt-20">
+                            {pillars.map((pillar, i) => (
+                                <Reveal key={pillar.title} delay={i * 90}>
+                                    <div className="border-t-2 border-[#C99A2E] pt-6">
+                                        <span className="font-['DM_Serif_Display',serif] text-4xl leading-none text-[#C99A2E]">
+                                            {String(i + 1).padStart(2, '0')}
+                                        </span>
+                                        <dt className="mt-5 font-['DM_Serif_Display',serif] text-2xl text-[#0D0D33]">{pillar.title}</dt>
+                                        <dd className="mt-3 text-sm leading-7 text-neutral-600">{pillar.text}</dd>
+                                    </div>
+                                </Reveal>
+                            ))}
+                        </dl>
+
+                        <Reveal delay={100} className="mt-16 lg:mt-24">
+                            <div className="relative">
                                 <img
-                                    src="/images/works/work-3.webp"
-                                    alt="Exhibit booth with branded displays and a custom reception desk"
+                                    src="/images/works/work-4.webp"
+                                    alt="Corporate launch booth with branded backdrop and reception counter"
                                     loading="lazy"
                                     decoding="async"
-                                    className="absolute bottom-0 left-0 aspect-square w-[50%] border-[10px] border-white object-cover shadow-[0_30px_60px_-24px_rgba(31,32,35,0.55)]"
+                                    className="aspect-[16/9] w-full object-cover shadow-[0_30px_60px_-30px_rgba(31,32,35,0.5)] lg:aspect-[21/9]"
                                 />
+                                <div className="absolute right-4 -bottom-8 w-[38%] max-w-[300px] sm:right-8 lg:right-12 lg:-bottom-12">
+                                    <div
+                                        aria-hidden="true"
+                                        className="absolute inset-0 -translate-x-3 translate-y-3 border border-[#C99A2E]/80"
+                                    />
+                                    <img
+                                        src="/images/works/work-3.webp"
+                                        alt="Exhibit booth with branded displays and a custom reception desk"
+                                        loading="lazy"
+                                        decoding="async"
+                                        className="relative aspect-[4/3] w-full border-[6px] border-white object-cover shadow-[0_30px_60px_-24px_rgba(31,32,35,0.55)] sm:border-8"
+                                    />
+                                </div>
                             </div>
                         </Reveal>
                     </div>
                 </section>
 
-                <section className="py-20 lg:py-32">
+                {/* OFFERINGS: hairline-bordered grid */}
+                <section className="pt-28 pb-20 lg:pt-40 lg:pb-32">
                     <div className="mx-auto max-w-[1240px] px-5 md:px-8 lg:px-12">
                         <Reveal className="mx-auto max-w-2xl text-center">
                             <h2 className="font-['DM_Serif_Display',serif] text-4xl font-normal text-[#0D0D33] md:text-5xl">
@@ -313,6 +281,7 @@ export default function CorporateEvents() {
                     </div>
                 </section>
 
+                {/* SHOWCASE: dark bento grid with overlay captions */}
                 <section className="relative overflow-hidden bg-[#1F2023] py-20 text-white lg:py-32">
                     <div
                         aria-hidden="true"
@@ -322,11 +291,9 @@ export default function CorporateEvents() {
 
                     <div className="relative mx-auto max-w-[1240px] px-5 md:px-8 lg:px-12">
                         <Reveal className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
-                            <div>
-                                <h2 className="font-['DM_Serif_Display',serif] text-4xl font-normal md:text-5xl">
-                                    Corporate moments we've brought to life
-                                </h2>
-                            </div>
+                            <h2 className="font-['DM_Serif_Display',serif] text-4xl font-normal md:text-5xl">
+                                Corporate moments we've brought to life
+                            </h2>
                             <Link
                                 href="/our-works"
                                 className="group inline-flex shrink-0 items-center gap-4 text-sm font-semibold text-[#F2C75C] transition-colors hover:text-white"
@@ -366,34 +333,33 @@ export default function CorporateEvents() {
                     </div>
                 </section>
 
+                {/* PROCESS: heading on the left, vertical timeline on the right */}
                 <section className="bg-white py-20 lg:py-32">
-                    <div className="mx-auto max-w-[1240px] px-5 md:px-8 lg:px-12">
-                        <Reveal className="mx-auto max-w-2xl text-center">
-                            <p className="text-xs font-semibold tracking-[0.3em] text-[#C99A2E] uppercase">How It Works</p>
-                            <h2 className="mt-6 font-['DM_Serif_Display',serif] text-4xl font-normal text-[#0D0D33] md:text-5xl">
-                                A clear path from brief to big day
-                            </h2>
+                    <div className="mx-auto grid max-w-[1240px] gap-12 px-5 md:px-8 lg:grid-cols-[0.8fr_1.2fr] lg:gap-20 lg:px-12">
+                        <Reveal>
+                            <div className="lg:sticky lg:top-32">
+                                <p className="text-xs font-semibold tracking-[0.3em] text-[#C99A2E] uppercase">How It Works</p>
+                                <h2 className="mt-6 font-['DM_Serif_Display',serif] text-4xl font-normal text-[#0D0D33] md:text-5xl">
+                                    A clear path
+                                    <br />
+                                    <span className="italic">from brief to big day</span>
+                                </h2>
+                            </div>
                         </Reveal>
 
-                        <ol className="mt-14 grid gap-10 sm:grid-cols-2 lg:mt-20 lg:grid-cols-5 lg:gap-6">
+                        <ol className="relative space-y-10 before:absolute before:top-2 before:bottom-2 before:left-[1.4rem] before:w-px before:bg-gradient-to-b before:from-[#C99A2E] before:to-[#C99A2E]/10">
                             {steps.map((step, i) => (
                                 <li key={step.title}>
-                                    <Reveal delay={i * 90}>
-                                        <div className="relative flex items-center">
-                                            <span className="font-['DM_Serif_Display',serif] text-5xl leading-none text-[#C99A2E]">
-                                                {String(i + 1).padStart(2, '0')}
-                                            </span>
-                                            <span
-                                                aria-hidden="true"
-                                                className={`ml-5 h-px flex-1 bg-gradient-to-r from-[#C99A2E] to-[#C99A2E]/10 ${
-                                                    i === steps.length - 1 ? 'lg:hidden' : ''
-                                                }`}
-                                            />
+                                    <Reveal delay={i * 80} className="relative flex gap-6">
+                                        <span className="relative z-10 flex h-[2.8rem] w-[2.8rem] shrink-0 items-center justify-center rounded-full border border-[#C99A2E] bg-[#FBF9F5] font-['DM_Serif_Display',serif] text-lg text-[#A97E1F]">
+                                            {i + 1}
+                                        </span>
+                                        <div className="pt-1.5">
+                                            <h3 className="font-['DM_Serif_Display',serif] text-xl font-normal text-[#0D0D33] md:text-2xl">
+                                                {step.title}
+                                            </h3>
+                                            <p className="mt-2 max-w-lg text-sm leading-7 text-neutral-600">{step.text}</p>
                                         </div>
-                                        <h3 className="mt-6 font-['DM_Serif_Display',serif] text-xl font-normal text-[#0D0D33]">
-                                            {step.title}
-                                        </h3>
-                                        <p className="mt-3 text-sm leading-7 text-neutral-600">{step.text}</p>
                                     </Reveal>
                                 </li>
                             ))}
@@ -401,6 +367,7 @@ export default function CorporateEvents() {
                     </div>
                 </section>
 
+                {/* CTA: full-bleed gold */}
                 <section className="relative isolate overflow-hidden bg-[#C99A2E] py-20 lg:py-28">
                     <div
                         aria-hidden="true"
@@ -440,21 +407,20 @@ export default function CorporateEvents() {
                     </Reveal>
                 </section>
 
+                {/* OTHER SERVICES */}
                 <section className="py-20 lg:py-28">
                     <div className="mx-auto max-w-[1240px] px-5 md:px-8 lg:px-12">
-                        <Reveal className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-                            <div>
-                                <h2 className="font-['DM_Serif_Display',serif] text-3xl font-normal text-[#0D0D33] md:text-4xl">
-                                    Explore our other services
-                                </h2>
-                            </div>
+                        <Reveal>
+                            <h2 className="font-['DM_Serif_Display',serif] text-3xl font-normal text-[#0D0D33] md:text-4xl">
+                                Explore our other services
+                            </h2>
                         </Reveal>
 
                         <div className="mt-10 grid gap-5 md:grid-cols-2 lg:mt-14 lg:gap-8">
                             {moreServices.map((service, i) => (
                                 <Reveal key={service.title} delay={i * 100}>
-                                    <a
-                                        href="/#services"
+                                    <Link
+                                        href={service.href}
                                         className="group relative isolate block aspect-[16/10] overflow-hidden bg-neutral-800 focus-visible:ring-2 focus-visible:ring-[#C99A2E] focus-visible:ring-offset-2 focus-visible:outline-none"
                                     >
                                         <img
@@ -478,7 +444,7 @@ export default function CorporateEvents() {
                                                 <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
                                             </span>
                                         </div>
-                                    </a>
+                                    </Link>
                                 </Reveal>
                             ))}
                         </div>
