@@ -28,5 +28,14 @@ class DatabaseSeeder extends Seeder
         }
         $this->call(WebsiteContentSeeder::class);
         $this->call(ServiceAssetSeeder::class);
+        $this->call(CustomerSeeder::class);
+        $this->call(StaffEmployeeSeeder::class);
+        $this->call(ProjectSeeder::class);
+        $this->call(ReservationFeeSeeder::class);
+        $this->call(SiteAccessDocumentSeeder::class);
+        $this->call(SiteAssessmentSeeder::class);
+        $this->call(DesignProposalSeeder::class);
+        $this->call(ContractSeeder::class);
+        $this->call(ExecutionSeeder::class);
     }
 }

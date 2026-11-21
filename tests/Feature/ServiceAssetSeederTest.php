@@ -11,10 +11,11 @@ test('the seeder loads the sample services, event types, themes and assets', fun
     $this->seed(ServiceAssetSeeder::class);
 
     expect(Service::count())->toBe(7)
-        ->and(EventType::count())->toBe(5)
-        ->and(DesignTheme::count())->toBe(9)
+        ->and(EventType::count())->toBe(4)
+        ->and(DesignTheme::count())->toBe(8)
         ->and(LayoutAsset::count())->toBe(8)
-        ->and(AssetVariant::count())->toBe(0); // real prices are added later
+        ->and(AssetVariant::count())->toBe(0) // real prices are added later
+        ->and(EventType::where('event_type_name', 'Mall Activation')->exists())->toBeFalse();
 });
 
 test('the Event Styling fee and the per-guest catering are seeded correctly', function () {
@@ -33,11 +34,11 @@ test('the Event Styling fee and the per-guest catering are seeded correctly', fu
 test('themes are linked to their event types', function () {
     $this->seed(ServiceAssetSeeder::class);
 
-    $booth = DesignTheme::where('theme_name', 'Mall Display Booth')->firstOrFail();
+   $glam = DesignTheme::where('theme_name', 'Debut Glam')->firstOrFail();
 
-    expect($booth->eventType->event_type_name)->toBe('Mall Activation')
-        ->and($booth->venue)->toBe('indoor')
-        ->and($booth->max_guests)->toBe(1000)
+    expect($glam->eventType->event_type_name)->toBe('Debut')
+        ->and($glam->venue)->toBe('indoor')
+        ->and($glam->max_guests)->toBe(200)
         ->and(EventType::where('event_type_name', 'Wedding')->first()->designThemes)->toHaveCount(3);
 });
 
@@ -49,6 +50,6 @@ test('running the seeder again changes nothing, so admin edits are never overwri
     $this->seed(ServiceAssetSeeder::class);
 
     expect(Service::count())->toBe(7)
-        ->and(DesignTheme::count())->toBe(9)
+        ->and(DesignTheme::count())->toBe(8)
         ->and(Service::where('service_name', 'DJ Services')->first()->price)->toBe('18000.00');
 });

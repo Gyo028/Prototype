@@ -1,12 +1,12 @@
 import { Link } from '@inertiajs/react';
-import { Bell, Menu, Search, UserRound, X } from 'lucide-react';
+import { Bell, Menu, UserRound, X } from 'lucide-react';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import BrandLogo from '@/components/brand-logo';
 import CustomerSidebar from '@/components/dashboard/customer-sidebar';
 
 /**
- * Customer shell: top bar + customer sidebar (Figma "Customer Dashboard").
+ * Customer shell: top bar + customer sidebar.
  * Self-contained, so it does not depend on the staff dashboard layout.
  */
 export default function CustomerLayout({
@@ -37,16 +37,6 @@ export default function CustomerLayout({
                 </div>
 
                 <div className="flex items-center gap-4">
-                    <label className="hidden h-11 w-72 items-center gap-3 rounded-full bg-neutral-200 px-4 md:flex lg:w-80">
-                        <Menu className="size-4 text-ink-soft" />
-                        <input
-                            type="search"
-                            placeholder="Search"
-                            className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-ink-soft"
-                        />
-                        <Search className="size-4 text-ink-soft" />
-                    </label>
-
                     <Link
                         href="/customer/notifications"
                         aria-label="Notifications"

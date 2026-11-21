@@ -12,8 +12,21 @@ use App\Http\Controllers\TechnicalAdmin\ServicesAssetsController;
 use App\Http\Controllers\TechnicalAdmin\DesignThemeController;
 use App\Http\Controllers\TechnicalAdmin\LayoutAssetController;
 use App\Http\Controllers\TechnicalAdmin\DashboardController;
+use App\Http\Controllers\Customer\ServiceRequestController;
+use App\Http\Controllers\Customer\ProjectController as CustomerProjectController;
+use App\Http\Controllers\Customer\BillingController as CustomerBillingController;
+use App\Http\Controllers\Customer\ConsultationController;
+use App\Http\Controllers\Customer\ContractController as CustomerContractController;
+use App\Http\Controllers\Customer\DesignProposalController;
+use App\Http\Controllers\Customer\OcularVisitController;
+use App\Http\Controllers\Customer\PaymentController as CustomerPaymentController;
+use App\Http\Controllers\Customer\RequestController as CustomerRequestController;
+use App\Http\Controllers\DesignSpecialist;
+use App\Http\Controllers\Bookkeeper\ExpenseController;
+use App\Http\Controllers\Bookkeeper\FinancialReportController;
 
-// Landing Page
+
+
 Route::inertia('/', 'public/landing')->name('home');
 Route::inertia('/faq', 'public/faq')->name('faq');
 Route::inertia('/our-works', 'public/our-works')->name('our-works');
@@ -21,7 +34,6 @@ Route::inertia('/services/corporate-events', 'public/corporate-events')->name('s
 Route::inertia('/terms', 'public/terms')->name('terms');
 Route::inertia('/privacy', 'public/privacy')->name('privacy');
 
-// Generic Dashboard of Laravel
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', function (Request $request) {
         $home = $request->user()->role->homeRoute();
@@ -72,7 +84,35 @@ Route::middleware(['auth', 'verified', 'role:customer'])
     ->name('customer.')
     ->group(function () {
         Route::inertia('/', 'customer/dashboard')->name('dashboard');
-        Route::inertia('new-request', 'customer/project-request')->name('new-request');
+        Route::get('new-request', [ServiceRequestController::class, 'create'])->name('new-request');
+        Route::post('new-request', [ServiceRequestController::class, 'store'])->name('new-request.store');
+        Route::get('projects', [CustomerProjectController::class, 'index'])->name('projects');
+        Route::get('requests/{serviceRequest}', [CustomerRequestController::class, 'show'])->name('requests.show');
+        Route::get('requests/{serviceRequest}/files/{file}', [CustomerRequestController::class, 'file'])->name('requests.files.show');
+        Route::get('projects/{project}', [CustomerProjectController::class, 'show'])->name('projects.show');
+        Route::post('projects/{project}/consultation', [ConsultationController::class, 'store'])->name('projects.consultation.store');
+        Route::patch('projects/{project}/consultation/reschedule', [ConsultationController::class, 'reschedule'])->name('projects.consultation.reschedule');
+        Route::patch('projects/{project}/consultation/cancel', [ConsultationController::class, 'cancel'])->name('projects.consultation.cancel');
+        Route::post('projects/{project}/ocular-visit', [OcularVisitController::class, 'store'])->name('projects.ocular-visit.store');
+        Route::patch('projects/{project}/ocular-visit/reschedule', [OcularVisitController::class, 'reschedule'])->name('projects.ocular-visit.reschedule');
+        Route::post('projects/{project}/site-access-documents', [OcularVisitController::class, 'uploadDocument'])->name('projects.site-access-documents.store');
+        Route::get('projects/{project}/site-access-documents/{document}', [OcularVisitController::class, 'document'])->name('projects.site-access-documents.show');
+        Route::get('projects/{project}/site-assessment/files/{file}', [OcularVisitController::class, 'file'])->name('projects.site-assessment.files.show');
+        // Photos of the finished fabrication / installation (same storage as the site assessment).
+        Route::get('projects/{project}/work-photos/{file}', [OcularVisitController::class, 'file'])->name('projects.work-photos');
+        Route::post('projects/{project}/design-proposals/{proposal}/approve', [DesignProposalController::class, 'approve'])->name('projects.design.approve');
+        Route::post('projects/{project}/design-proposals/{proposal}/revision', [DesignProposalController::class, 'requestRevision'])->name('projects.design.revision');
+        Route::get('projects/{project}/design-files/{file}', [DesignProposalController::class, 'file'])->name('projects.design.files.show');
+        Route::post('projects/{project}/contract/sign', [CustomerContractController::class, 'sign'])->name('projects.contract.sign');
+        Route::post('projects/{project}/contract/upload', [CustomerContractController::class, 'upload'])->name('projects.contract.upload');
+        Route::get('projects/{project}/contracts/{contract}/file', [CustomerContractController::class, 'file'])->name('projects.contract.file');
+        Route::get('billing', [CustomerBillingController::class, 'index'])->name('billing');
+        Route::get('billing/projects/{project}', [CustomerBillingController::class, 'project'])->name('billing.project');
+        Route::get('billing/{billing}', [CustomerBillingController::class, 'show'])->name('billing.show');
+        Route::post('billing/{billing}/payments', [CustomerBillingController::class, 'pay'])->name('billing.pay');
+        Route::post('billing/{billing}/dispute', [CustomerBillingController::class, 'dispute'])->name('billing.dispute');
+        Route::get('billing/{billing}/dispute-proof', [CustomerBillingController::class, 'disputeProof'])->name('billing.dispute-proof');
+        Route::get('payments/{payment}/receipt', [CustomerPaymentController::class, 'receipt'])->name('payments.receipt');
     });
 
 Route::middleware(['auth', 'verified', 'role:project_manager'])
@@ -80,14 +120,18 @@ Route::middleware(['auth', 'verified', 'role:project_manager'])
     ->name('project-manager.')
     ->group(function () {
         Route::inertia('/', 'project-manager/dashboard')->name('dashboard');
+        Route::inertia('service-requests', 'project-manager/service-requests')->name('service-requests');
+        Route::inertia('projects', 'project-manager/projects')->name('projects');
+        Route::inertia('projects/{project}', 'project-manager/project-show')->name('projects.show');
     });
 
 Route::middleware(['auth', 'verified', 'role:design_specialist'])
     ->prefix('design-specialist')
     ->name('design-specialist.')
     ->group(function () {
-        Route::inertia('/', 'design-specialist/dashboard')->name('dashboard');
-        Route::inertia('/projects/{project}', 'design-specialist/Assigned_Projects')->name('projects.show');
+        Route::get('/', [DesignSpecialist\DashboardController::class, 'index'])->name('dashboard');
+        Route::get('projects', [DesignSpecialist\ProjectController::class, 'index'])->name('projects');
+        Route::get('projects/{project}', [DesignSpecialist\ProjectController::class, 'show'])->name('projects.show');
     });
 
 Route::middleware(['auth', 'verified', 'role:owner'])
@@ -102,6 +146,11 @@ Route::middleware(['auth', 'verified', 'role:bookkeeper'])
     ->name('bookkeeper.')
     ->group(function () {
         Route::inertia('/', 'bookkeeper/dashboard')->name('dashboard');
+
+        Route::get('/expenses', [ExpenseController::class, 'index'])->name('expenses.index');
+        Route::post('/expenses', [ExpenseController::class, 'store'])->name('expenses.store');
+
+        Route::get('/financial-reports', [FinancialReportController::class, 'index'])->name('financial-reports');
     });
 
 require __DIR__.'/settings.php';

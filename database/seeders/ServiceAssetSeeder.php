@@ -60,7 +60,7 @@ class ServiceAssetSeeder extends Seeder
             return;
         }
 
-        foreach (['Corporate', 'Wedding', 'Birthday', 'Debut', 'Mall Activation'] as $name) {
+        foreach (['Corporate', 'Wedding', 'Birthday', 'Debut'] as $name) {
             EventType::create(['event_type_name' => $name]);
         }
     }
@@ -83,7 +83,6 @@ class ServiceAssetSeeder extends Seeder
             ['Party Corner', 'Birthday', 'indoor', 'Modern', 80],
             ['Rustic Garden Party', 'Birthday', 'outdoor', 'Rustic', 100],
             ['Debut Glam', 'Debut', 'indoor', 'Futuristic', 200],
-            ['Mall Display Booth', 'Mall Activation', 'indoor', 'Modern', 1000],
         ];
 
         foreach ($themes as [$name, $eventType, $venue, $style, $maxGuests]) {
