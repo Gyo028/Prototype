@@ -115,7 +115,7 @@ export default function CustomFabrication() {
 
     return (
         <div className="min-h-screen bg-[#FBF9F5] font-sans text-black">
-            <Head title="Custom Fabrication - Gr3at A's Events Styling & Services">
+            <Head title="Custom Projects - Gr3at A's Events Styling & Services">
                 <meta
                     name="description"
                     content="Custom backdrops, props, furniture, signage, and themed event structures designed, fabricated, and installed by GR3AT A's Event Styling Services."
@@ -154,7 +154,7 @@ export default function CustomFabrication() {
                             <h1 className="font-['DM_Serif_Display',serif] text-[clamp(3rem,8.5vw,6.25rem)] leading-[1.02] font-normal tracking-tight">
                                 Custom
                                 <br />
-                                <span className="text-[#F2C75C]">Fabrication</span>
+                                <span className="text-[#F2C75C]">Projects</span>
                             </h1>
                             <p className="mt-6 max-w-xl text-base leading-8 text-white/80 md:text-lg">
                                 Design and production of customized backdrops, props, and themed event structures, built exactly to your

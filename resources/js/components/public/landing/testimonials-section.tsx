@@ -22,7 +22,7 @@ const reviews: Review[] = [
     },
     {
         name: 'Carmela Lazaro',
-        role: 'Custom Fabrication Client',
+        role: 'Custom Projects Client',
         quote: 'The live venue styling was picture-perfect!',
         rating: 5,
         avatarColor: 'bg-[#1F2023]',

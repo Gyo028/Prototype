@@ -94,7 +94,7 @@ const moreServices = [
         href: '/services/corporate-events',
     },
     {
-        title: 'Custom Fabrication',
+        title: 'Custom Projects',
         text: 'Design and production of customized backdrops, props, and themed event structures.',
         image: '/images/works/work-8.webp',
         href: '/services/custom-fabrication',
