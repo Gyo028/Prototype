@@ -18,6 +18,7 @@ export type OwnerProjectSummary = {
     customerName: string;
     eventType: string;
     eventDate: string; // 'YYYY-MM-DD'
+    submittedAt: string; // ISO date-time the service request was submitted (Project Manager dashboard)
     venue: string;
     status: OwnerProjectStatus;
     currentStep: string | null; // e.g. "Step 6 of 8 · Contract"; null when completed or closed
@@ -36,6 +37,7 @@ export function toOwnerSummary(p: Project): OwnerProjectSummary {
         customerName: p.customer.name,
         eventType: p.eventType,
         eventDate: p.eventDate,
+        submittedAt: p.submittedAt,
         venue: p.venue,
         status: projectStatus(p),
         currentStep: index >= 0 ? `Step ${index + 1} of ${STEPS.length} · ${STEPS[index].title}` : null,
