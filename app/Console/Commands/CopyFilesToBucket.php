@@ -36,12 +36,24 @@ class CopyFilesToBucket extends Command
         $to = Storage::disk((string) $this->option('to'));
         $dryRun = (bool) $this->option('dry-run');
 
+        // Reach the bucket first, even with nothing to copy, so this also tests the set-up.
+        try {
+            $to->fileExists('.connection-check');
+        } catch (Throwable $e) {
+            $this->error('Could not reach the bucket: '.self::reason($e));
+            $this->line('Check SUPABASE_S3_* in .env, then run php artisan config:clear.');
+
+            return self::FAILURE;
+        }
+
+        $this->info('Connected to the bucket.');
+
         $files = collect($from->allFiles())
             ->reject(fn (string $path) => str_starts_with(basename($path), '.'))
             ->values();
 
         if ($files->isEmpty()) {
-            $this->info('No files to copy.');
+            $this->info('No files on this computer to copy. The set-up is working.');
 
             return self::SUCCESS;
         }
@@ -75,7 +87,7 @@ class CopyFilesToBucket extends Command
                 $this->line("  copied  {$path}");
                 $copied++;
             } catch (Throwable $e) {
-                $this->error("  failed  {$path}: {$e->getMessage()}");
+                $this->error("  failed  {$path}: ".self::reason($e));
                 $failed++;
             }
         }
@@ -84,5 +96,21 @@ class CopyFilesToBucket extends Command
         $this->info(($dryRun ? 'Would copy' : 'Copied')." {$copied}, skipped {$skipped} already in the bucket, failed {$failed}.");
 
         return $failed > 0 ? self::FAILURE : self::SUCCESS;
+    }
+
+    /**
+     * The underlying error. Flysystem wraps it ("Unable to check existence for …"),
+     * which hides the real cause (an SSL problem, a wrong key, region or bucket).
+     */
+    private static function reason(Throwable $e): string
+    {
+        while ($e->getPrevious() !== null) {
+            $e = $e->getPrevious();
+        }
+
+        $message = $e->getMessage();
+
+        // The AWS SDK's messages can be long: the first line or so is the useful part.
+        return mb_strimwidth(trim((string) strtok($message, "\n")), 0, 300, '…');
     }
 }
