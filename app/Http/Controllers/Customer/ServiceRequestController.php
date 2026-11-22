@@ -153,7 +153,8 @@ class ServiceRequestController extends Controller
                 }
 
                 foreach ($request->file('files', []) as $file) {
-                    $path = $file->store("service-requests/{$serviceRequest->service_request_id}");
+                    // Like every customer file: customers/{customer}/requests/{request}/…
+                    $path = $file->store("customers/{$customer->customer_id}/requests/{$serviceRequest->service_request_id}");
                     $storedPaths[] = $path;
 
                     $serviceRequest->files()->create([

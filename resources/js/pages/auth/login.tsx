@@ -70,7 +70,7 @@ export default function Login({ status, canResetPassword }: Props) {
                                 <InputError message={errors.password} />
                             </div>
 
-                            {/* Figma: Remember me on the left, Forgot Password? on the right */}
+                            {/* Remember me on the left, Forgot Password? on the right */}
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center space-x-3">
                                     <Checkbox

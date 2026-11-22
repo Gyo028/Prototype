@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import LegalBlocks from '@/components/legal/legal-blocks';
 import LandingFooter from '@/components/public/landing/landing-footer';
 import LandingNav from '@/components/public/landing/landing-nav';
-import { COMPANY, EFFECTIVE_DATE, privacyPolicy, termsAndConditions } from '@/data/legal';
+import { COMPANY, privacyPolicy, termsAndConditions } from '@/data/legal';
 import type { LegalDocument } from '@/data/legal';
 
 const sectionId = (index: number) => `section-${index + 1}`;
@@ -18,7 +18,6 @@ export default function LegalPage({ doc }: { doc: LegalDocument }) {
     const other = isTerms ? privacyPolicy : termsAndConditions;
     const Icon = isTerms ? FileText : ShieldCheck;
 
-    // Highlight the section currently being read in the contents list.
     useEffect(() => {
         const targets = doc.sections.map((_, i) => document.getElementById(sectionId(i))).filter(Boolean) as HTMLElement[];
 
@@ -46,7 +45,7 @@ export default function LegalPage({ doc }: { doc: LegalDocument }) {
 
             <LandingNav isHome={false} loginStyle="gold" />
 
-            {/* Hero banner */}
+
             <section className="relative overflow-hidden bg-[#1F2023] pt-28 pb-16 lg:pt-40 lg:pb-24">
                 <div
                     aria-hidden="true"
@@ -79,14 +78,14 @@ export default function LegalPage({ doc }: { doc: LegalDocument }) {
                     <div className="mt-8 h-px w-24 bg-gradient-to-r from-[#C99A2E] to-transparent" />
 
                     <p className="mt-6 text-sm tracking-wide text-white/60">
-                        {COMPANY.name} <span className="mx-2 text-[#C99A2E]">&middot;</span> Effective {EFFECTIVE_DATE}
+                        {COMPANY.name}
                     </p>
                 </div>
             </section>
 
-            {/* Body */}
+
             <main className="mx-auto grid max-w-[1240px] gap-10 px-5 py-12 md:px-8 lg:grid-cols-[280px_1fr] lg:gap-14 lg:px-12 lg:py-20">
-                {/* Contents */}
+  
                 <aside className="hidden lg:block">
                     <div className="sticky top-28">
                         <p className="text-xs font-semibold tracking-[0.3em] text-[#C99A2E] uppercase">Contents</p>
@@ -127,7 +126,7 @@ export default function LegalPage({ doc }: { doc: LegalDocument }) {
                     </div>
                 </aside>
 
-                {/* Document */}
+
                 <article className="min-w-0">
                     <div className="border border-neutral-200 bg-white px-6 py-10 shadow-[0_20px_60px_-30px_rgba(31,32,35,0.25)] sm:px-10 lg:px-14 lg:py-14">
                         {doc.intro.map((text, i) => (
@@ -160,7 +159,7 @@ export default function LegalPage({ doc }: { doc: LegalDocument }) {
                         </p>
                     </div>
 
-                    {/* Cross-link to the other document */}
+
                     <Link
                         href={`/${other.slug}`}
                         className="group mt-8 flex items-center justify-between gap-6 bg-[#1F2023] px-8 py-7 text-white transition-shadow hover:shadow-[0_18px_50px_-20px_rgba(201,154,46,0.6)] print:hidden"

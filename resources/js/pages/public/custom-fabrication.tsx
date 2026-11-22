@@ -131,7 +131,6 @@ export default function CustomFabrication() {
             <LandingNav isHome={false} loginStyle="gold" />
 
             <main>
-                {/* HERO: full-bleed, left-aligned, sharp editorial */}
                 <section className="relative isolate flex min-h-[640px] items-end overflow-hidden bg-[#1F2023] text-white lg:min-h-[800px]">
                     <img
                         src={heroImage}
@@ -178,7 +177,6 @@ export default function CustomFabrication() {
                     </div>
                 </section>
 
-                {/* INTRO: headline + copy side by side, pillars in a row, wide image banner */}
                 <section className="bg-white py-20 lg:py-32">
                     <div className="mx-auto max-w-[1240px] px-5 md:px-8 lg:px-12">
                         <Reveal className="grid gap-10 lg:grid-cols-[1fr_1fr] lg:gap-20">
@@ -241,7 +239,6 @@ export default function CustomFabrication() {
                     </div>
                 </section>
 
-                {/* OFFERINGS: hairline-bordered grid */}
                 <section className="pt-28 pb-20 lg:pt-40 lg:pb-32">
                     <div className="mx-auto max-w-[1240px] px-5 md:px-8 lg:px-12">
                         <Reveal className="mx-auto max-w-2xl text-center">
@@ -281,7 +278,6 @@ export default function CustomFabrication() {
                     </div>
                 </section>
 
-                {/* SHOWCASE: dark bento grid with overlay captions */}
                 <section className="relative overflow-hidden bg-[#1F2023] py-20 text-white lg:py-32">
                     <div
                         aria-hidden="true"
@@ -333,7 +329,6 @@ export default function CustomFabrication() {
                     </div>
                 </section>
 
-                {/* PROCESS: heading on the left, vertical timeline on the right */}
                 <section className="bg-white py-20 lg:py-32">
                     <div className="mx-auto grid max-w-[1240px] gap-12 px-5 md:px-8 lg:grid-cols-[0.8fr_1.2fr] lg:gap-20 lg:px-12">
                         <Reveal>
@@ -367,7 +362,6 @@ export default function CustomFabrication() {
                     </div>
                 </section>
 
-                {/* CTA: full-bleed gold */}
                 <section className="relative isolate overflow-hidden bg-[#C99A2E] py-20 lg:py-28">
                     <div
                         aria-hidden="true"
@@ -407,7 +401,6 @@ export default function CustomFabrication() {
                     </Reveal>
                 </section>
 
-                {/* OTHER SERVICES */}
                 <section className="py-20 lg:py-28">
                     <div className="mx-auto max-w-[1240px] px-5 md:px-8 lg:px-12">
                         <Reveal>

@@ -6,7 +6,6 @@ import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from '@/com
 import { works } from '@/data/works';
 import { cn } from '@/lib/utils';
 
-// Placeholder until each work gets its own description from the Technical Admin editor.
 const DEFAULT_DESCRIPTION = "Custom event styling and fabrication by GR3AT A's Event Styling Services.";
 
 function ArrowButton({ direction, onClick }: { direction: 'prev' | 'next'; onClick: () => void }) {
@@ -27,7 +26,6 @@ function ArrowButton({ direction, onClick }: { direction: 'prev' | 'next'; onCli
     );
 }
 
-/** Auto-moving "Our Works" slider: centered card is enlarged with a gold glow, neighbours are dimmed. */
 export default function WorksSection() {
     const [api, setApi] = useState<CarouselApi>();
     const [selected, setSelected] = useState(0);
@@ -51,12 +49,11 @@ export default function WorksSection() {
 
     return (
         <section id="works" className="scroll-mt-16 overflow-hidden bg-[#1F2023] py-12 md:py-14">
-            <h2 className="mb-2 text-center font-['DM_Serif_Display',serif] text-4xl font-normal tracking-[0.04em] text-[#C9A77C] uppercase md:text-5xl">
+            <h2 className="mb-2 text-center font-['DM_Serif_Display',serif] text-4xl font-normal tracking-[0.04em] text-[#F2C75C] uppercase md:text-5xl">
                 Our Works
             </h2>
 
             <div className="relative">
-                {/* Longer "duration" = slower, softer slide easing */}
                 <Carousel
                     setApi={setApi}
                     opts={{ align: 'center', loop: true, duration: 45 }}
@@ -71,7 +68,6 @@ export default function WorksSection() {
                                     key={work.file}
                                     className="basis-[78%] pl-6 sm:basis-[55%] lg:basis-[31%]"
                                 >
-                                    {/* py-8 leaves room for the glow so the carousel viewport does not clip it */}
                                     <div
                                         onClick={() => api?.scrollTo(index)}
                                         className={cn(
@@ -104,7 +100,7 @@ export default function WorksSection() {
 
             {active && (
                 <div key={active.file} className="animate-in fade-in mx-auto mt-2 max-w-3xl px-6 text-center duration-700">
-                    <p className="font-['DM_Serif_Display',serif] text-2xl font-normal text-[#C9A77C]">{active.label}</p>
+                    <p className="font-['DM_Serif_Display',serif] text-2xl font-normal text-[#F2C75C]">{active.label}</p>
                     <p className="mt-1 text-sm text-white/70 md:text-base">{DEFAULT_DESCRIPTION}</p>
                 </div>
             )}
@@ -112,7 +108,7 @@ export default function WorksSection() {
             <div className="mt-5 text-center">
                 <a
                     href="/our-works"
-                    className="group inline-flex items-center gap-1.5 text-base text-[#C9A77C] transition-colors hover:text-[#E3C48D]"
+                    className="group inline-flex items-center gap-1.5 text-base text-[#F2C75C] transition-colors hover:text-white"
                 >
                     Explore More
                     <ArrowUpRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />

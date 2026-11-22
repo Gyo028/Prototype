@@ -17,6 +17,7 @@ use App\Http\Controllers\Customer\ProjectController as CustomerProjectController
 use App\Http\Controllers\Customer\BillingController as CustomerBillingController;
 use App\Http\Controllers\Customer\ConsultationController;
 use App\Http\Controllers\Customer\ContractController as CustomerContractController;
+use App\Http\Controllers\Customer\DashboardController as CustomerDashboardController;
 use App\Http\Controllers\Customer\DesignProposalController;
 use App\Http\Controllers\Customer\OcularVisitController;
 use App\Http\Controllers\Customer\PaymentController as CustomerPaymentController;
@@ -24,6 +25,7 @@ use App\Http\Controllers\Customer\RequestController as CustomerRequestController
 use App\Http\Controllers\DesignSpecialist;
 use App\Http\Controllers\Bookkeeper\ExpenseController;
 use App\Http\Controllers\Bookkeeper\FinancialReportController;
+use App\Http\Controllers\ProjectExpenseRecordController;
 
 
 
@@ -85,7 +87,7 @@ Route::middleware(['auth', 'verified', 'role:customer'])
     ->prefix('customer')
     ->name('customer.')
     ->group(function () {
-        Route::inertia('/', 'customer/dashboard')->name('dashboard');
+        Route::get('/', [CustomerDashboardController::class, 'index'])->name('dashboard');
         Route::get('new-request', [ServiceRequestController::class, 'create'])->name('new-request');
         Route::post('new-request', [ServiceRequestController::class, 'store'])->name('new-request.store');
         Route::get('projects', [CustomerProjectController::class, 'index'])->name('projects');
@@ -151,8 +153,20 @@ Route::middleware(['auth', 'verified', 'role:bookkeeper'])
 
         Route::get('/expenses', [ExpenseController::class, 'index'])->name('expenses.index');
         Route::post('/expenses', [ExpenseController::class, 'store'])->name('expenses.store');
+        Route::post('/expenses/{expense}', [ExpenseController::class, 'update'])->name('expenses.update');
+        Route::patch('/expenses/{expense}/archive', [ExpenseController::class, 'archive'])->name('expenses.archive');
+        Route::patch('/expenses/{expense}/restore', [ExpenseController::class, 'restore'])->name('expenses.restore');
 
         Route::get('/financial-reports', [FinancialReportController::class, 'index'])->name('financial-reports');
+    });
+
+// An expense's receipt and change trail, viewable by the Bookkeeper, Owner and Project Manager.
+Route::middleware(['auth', 'verified', 'role:bookkeeper,owner,project_manager'])
+    ->prefix('project-expenses')
+    ->name('project-expenses.')
+    ->group(function () {
+        Route::get('/{expense}/history', [ProjectExpenseRecordController::class, 'history'])->name('history');
+        Route::get('/{expense}/receipt', [ProjectExpenseRecordController::class, 'receipt'])->name('receipt');
     });
 
 require __DIR__.'/settings.php';

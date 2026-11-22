@@ -2,7 +2,7 @@ export default function HeroSection() {
     return (
         <section
             id="home"
-            className="relative flex min-h-[560px] items-center overflow-hidden bg-white md:h-screen md:min-h-[620px]"
+            className="relative flex min-h-[min(100svh,560px)] items-center overflow-hidden bg-white md:h-[100svh] md:max-h-[1100px] md:min-h-[min(100svh,620px)] portrait:md:items-start"
         >
             <img
                 src="/images/hero-bg.webp"
@@ -16,8 +16,8 @@ export default function HeroSection() {
             />
             <div aria-hidden="true" className="absolute inset-0 bg-white/30 md:hidden" />
 
-            <div className="relative z-10 mx-auto w-full max-w-7xl px-6 pt-16 md:px-1">
-                <h1 className="font-['DM_Serif_Display',serif] text-[40px] leading-[1.12] font-normal tracking-tight text-[#111111] sm:text-5xl md:text-6xl lg:text-[72px]">
+            <div className="relative z-10 mx-auto w-full max-w-[1400px] px-6 pt-16 lg:px-12 portrait:md:pt-[24svh]">
+                <h1 className="font-['DM_Serif_Display',serif] text-[clamp(40px,min(8vw,9svh),72px)] leading-[1.12] font-normal tracking-tight text-[#111111]">
                     Your Vision,
                     <br />
                     Our Creative Touch

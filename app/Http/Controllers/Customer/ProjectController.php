@@ -449,7 +449,7 @@ class ProjectController extends Controller
      * The "What to do now" line on My Projects: the project's next action, or
      * the review status of a request that has no project yet.
      *
-     * @return array{title: string, detail: string, actionNeeded: bool}|null
+     * @return array{title: string, detail: string, actionNeeded: bool, button: string|null, billId: int|null}|null
      */
     private function listAction(ServiceRequest $r): ?array
     {
@@ -458,7 +458,7 @@ class ProjectController extends Controller
         }
 
         return $r->request_status === ServiceRequest::STATUS_PENDING
-            ? ['title' => 'Waiting for review', 'detail' => 'Our Project Manager is reviewing your request.', 'actionNeeded' => false]
+            ? ['title' => 'Waiting for review', 'detail' => 'Our Project Manager is reviewing your request.', 'actionNeeded' => false, 'button' => null, 'billId' => null]
             : null;
     }
 

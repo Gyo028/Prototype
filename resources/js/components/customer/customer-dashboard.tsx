@@ -1,230 +1,380 @@
 import { Link } from '@inertiajs/react';
-import { ArrowRight, Check, ImageIcon, Plus } from 'lucide-react';
-import { Panel, Pill, cx } from '@/components/dashboard/ui';
+import { CalendarDays, ChevronLeft, ChevronRight, ClipboardCheck, FilePlus, Info, Sparkles } from 'lucide-react';
+import { useState } from 'react';
+import type { ReactNode } from 'react';
+import { formatDate, formatTime, fromISO } from '@/components/customer/project-types';
+import { cx } from '@/components/dashboard/ui';
 
+/*
+ * Customer > Dashboard, across all of the customer's projects:
+ *
+ *   Welcome
+ *   Event countdown           the next event, with where the project is
+ *   Action needed | Upcoming  what waits on the customer (3 a page) |
+ *                             the next 3 consultations and ocular visits
+ *
+ * A new customer (no requests yet) sees "Start your first project" and how it
+ * works instead. Phones: one column in the same order.
+ */
 
+export type DashboardStep = { label: string; state: 'done' | 'current' | 'locked' | 'skipped' | 'cancelled' };
 
-const STAGES = ['Booking', 'Design', 'Fabrication', 'Setup', 'Completed'];
-
-//temporaty data for dashboard
-type Project = {
-    id: number;
-    name: string;
-    eventDate: string; 
-    venue?: string;
-    type: string;
-    theme: string;
-    stage: number;
-    status: string;
+export type DashboardData = {
+    profileMissing: boolean;
+    firstName: string | null;
+    hasRequests: boolean;
+    countdown: {
+        code: string;
+        title: string;
+        url: string;
+        date: string;
+        endDate: string;
+        startTime: string;
+        endTime: string;
+        venue: string;
+        daysLeft: number;
+        steps: DashboardStep[];
+        currentStep: string;
+        currentNumber: number;
+        onHold: boolean;
+    } | null;
+    actions: {
+        projectCode: string;
+        projectTitle: string;
+        title: string;
+        /** Amount and due date for a payment, else a short hint. */
+        note: string;
+        button: string;
+        payment: boolean;
+        url: string;
+    }[];
+    pending: { code: string; title: string; submittedOn: string; url: string }[];
+    upcoming: {
+        id: number;
+        type: 'consultation' | 'ocular_visit';
+        date: string;
+        startTime: string;
+        endTime: string;
+        where: string;
+        pending: boolean;
+        code: string;
+        title: string;
+        url: string;
+    }[];
 };
 
-const projects: Project[] = [
-    { id: 1, name: 'Santos Wedding', eventDate: '2026-11-14', venue: 'Grand Palace Events Hall', type: 'Wedding', theme: 'Rustic Garden', stage: 2, status: 'In Progress' },
-    { id: 2, name: 'Mary Birthday Styling', eventDate: '2026-11-28', type: 'Birthday Party', theme: 'Pastel Balloons', stage: 1, status: 'In Progress' },
-];
+const card = 'rounded-2xl border border-black/10 bg-white shadow-sm';
+const goldLink = 'inline-flex items-center justify-center gap-2 rounded-lg bg-gold px-4 py-2 text-sm font-bold text-white transition hover:bg-gold-dark';
+const outlineLink = 'inline-flex items-center justify-center gap-2 rounded-lg border border-gold bg-white px-4 py-2 text-sm font-bold text-ink transition hover:bg-gold/10';
 
-const actions = [
-    { id: 1, title: 'Design Approval Needed', detail: 'Santos Wedding backdrop proposal v2', button: 'Review Design', href: '/customer/projects' },
-    { id: 2, title: 'Final Billing Due', detail: '₱60,000 due on Nov 13, 2026', button: 'Pay Now', href: '/customer/billing' },
-];
+export default function CustomerDashboard(props: DashboardData) {
+    const name = props.firstName ? `, ${props.firstName}` : '';
 
-const payment = { total: 85000, paid: 25000 };
+    if (!props.hasRequests) {
+        return <NewCustomer name={name} profileMissing={props.profileMissing} />;
+    }
 
-const notifications = [
-    { id: 1, title: 'Design proposal ready for review', detail: 'Santos Wedding backdrop proposal v2', time: 'Today, 9:14 AM', dot: 'bg-gold' },
-    { id: 2, title: 'Payment Reminder', detail: '₱60,000 final billing is due on Nov 13, 2026', time: 'Yesterday, 3:15 PM', dot: 'bg-red-300' },
-    { id: 3, title: 'Ocular visit confirmed', detail: 'Santos Wedding, Oct 5, 2026 at 10:00 AM', time: '2 days ago', dot: 'bg-teal-300' },
-];
-
-const appointment = { title: 'Ocular Visit: Santos Wedding', when: 'Oct 5, 2026 — 10:00 AM', booked: 'Booked Sep 19, 2026' };
-
-
-
-const peso = (n: number) => `₱${n.toLocaleString('en-PH')}`;
-const formatDate = (iso: string) =>
-    new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-
-function ProgressTracker({ stage }: { stage: number }) {
     return (
-        <ol className="flex items-start" aria-label="Project progress">
-            {STAGES.map((label, i) => {
-                const done = i < stage;
-                const current = i === stage;
-                return (
-                    <li key={label} className="relative flex flex-1 flex-col items-center">
-                        {/* connector to the previous step */}
-                        {i > 0 && (
-                            <span
-                                className={cx(
-                                    'absolute top-3 right-1/2 h-0.5 w-full -translate-y-1/2',
-                                    i <= stage ? 'bg-gold' : 'bg-neutral-300',
-                                )}
-                            />
-                        )}
-                        <span
-                            className={cx(
-                                'relative z-10 flex size-6 items-center justify-center rounded-full text-white',
-                                done && 'bg-gold',
-                                current && 'bg-ink',
-                                !done && !current && 'bg-neutral-300',
-                            )}
-                        >
-                            {(done || current) && <Check className="size-3.5" strokeWidth={3} />}
-                        </span>
-                        <span className="mt-1.5 text-[10px] text-ink-soft">{label}</span>
-                    </li>
-                );
-            })}
-        </ol>
+        <div className="space-y-5 md:space-y-6">
+            <header>
+                <h1 className="text-2xl font-bold text-ink md:text-3xl">Welcome back{name}</h1>
+                <p className="mt-1 text-sm text-ink-soft md:text-base">Here&apos;s what&apos;s happening with your projects.</p>
+            </header>
+
+            {props.countdown && <Countdown event={props.countdown} />}
+
+            {/*
+              Same height side by side; rows keep their own height, spare space stays at the bottom.
+              grid-cols-1 (minmax(0, 1fr)) on phones: without it the column grows to fit the longest
+              single-line text (the truncated project names) and pushes the cards past the screen.
+            */}
+            <div className="grid grid-cols-1 items-stretch gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+                <ActionNeeded actions={props.actions} pending={props.pending} />
+                <Upcoming items={props.upcoming} />
+            </div>
+        </div>
     );
 }
 
+/* ---------------- New customer ---------------- */
 
+const HOW_IT_WORKS = [
+    ['Send a service request', 'Your event details, budget and, for standard events, a layout of the decor you like.'],
+    ['Consultation', 'Book a 1-hour meeting with our Project Manager, online or face to face.'],
+    ['Ocular visit', 'Pay the reservation fee, then we visit the venue to check the space.'],
+    ['Design', 'Review the design and quotation. Approve it or ask for changes.'],
+    ['Contract', 'Sign the contract online and pay the down payment.'],
+    ['Fabrication and installation', 'We build your decor and set it up at the venue, with photos when each is done.'],
+    ['Your event', 'Enjoy the day, then tell us how we did.'],
+] as const;
 
-export default function CustomerDashboard() {
-    const nextEvent = [...projects].sort((a, b) => a.eventDate.localeCompare(b.eventDate))[0];
-    const outstanding = payment.total - payment.paid;
+function NewCustomer({ name, profileMissing }: { name: string; profileMissing: boolean }) {
+    return (
+        <div className="space-y-5 md:space-y-6">
+            <header>
+                <h1 className="text-2xl font-bold text-ink md:text-3xl">Welcome{name}</h1>
+                <p className="mt-1 text-sm text-ink-soft md:text-base">Thanks for joining GR3AT A&apos;s. Here&apos;s how we&apos;ll style your event together.</p>
+            </header>
+
+            {profileMissing && (
+                <p className="flex items-start gap-2 rounded-xl border border-gold/40 bg-cream px-4 py-3 text-sm text-ink">
+                    <Info className="mt-0.5 size-4 shrink-0 text-gold-dark" />
+                    Your customer profile isn&apos;t set up yet, so you can&apos;t send a request. Please contact us.
+                </p>
+            )}
+
+            <section className="flex flex-col gap-4 rounded-2xl border border-gold-light bg-cream p-5 md:flex-row md:items-center md:gap-6 md:p-7">
+                <div aria-hidden className="hidden size-24 shrink-0 items-center justify-center rounded-2xl border border-gold-light bg-white text-gold-dark md:flex">
+                    <Sparkles className="size-10" strokeWidth={1.5} />
+                </div>
+                <div className="min-w-0 flex-1">
+                    <h2 className="text-xl font-bold text-ink md:text-2xl">Start your first project</h2>
+                    <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink md:text-[15px]">
+                        Tell us about your event: the date, venue and budget. You can also pick a design theme and arrange its decor in our layout tool to see an
+                        estimate. Our Project Manager reviews your request and contacts you to set up a consultation.
+                    </p>
+                </div>
+                {!profileMissing && (
+                    <Link href="/customer/new-request" className={cx(goldLink, 'min-h-11 shrink-0 px-5 md:min-h-0 md:py-3')}>
+                        <FilePlus className="size-4" /> New Service Request
+                    </Link>
+                )}
+            </section>
+
+            <section className={card} aria-labelledby="how-it-works">
+                <div className="border-b border-black/10 px-5 py-4">
+                    <h2 id="how-it-works" className="text-lg font-bold text-ink">
+                        How it works
+                    </h2>
+                    <p className="mt-0.5 text-sm text-ink-soft">Every project follows the same steps. You&apos;ll see where you are on each project&apos;s page.</p>
+                </div>
+                <ol className="grid gap-x-8 gap-y-5 p-5 md:grid-cols-2">
+                    {HOW_IT_WORKS.map(([title, text], i) => (
+                        <li key={title} className="flex items-start gap-3.5">
+                            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-cream text-sm font-bold text-gold-dark">{i + 1}</span>
+                            <span className="min-w-0">
+                                <span className="block font-bold text-ink">{title}</span>
+                                <span className="mt-0.5 block text-sm leading-relaxed text-ink-soft">{text}</span>
+                            </span>
+                        </li>
+                    ))}
+                </ol>
+            </section>
+        </div>
+    );
+}
+
+/* ---------------- Event countdown ---------------- */
+
+function Countdown({ event }: { event: NonNullable<DashboardData['countdown']> }) {
+    const d = fromISO(event.date);
+    const days = event.daysLeft;
+    const headline = days === 0 ? `Your ${event.title} is today` : days === 1 ? `Your ${event.title} is tomorrow` : `Your ${event.title} is in ${days} days`;
+    const longDate = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    const multiDay = event.endDate !== event.date;
 
     return (
-        <div className="space-y-5">
-            {/* Summary cards + Start Project */}
-            <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="grid flex-1 gap-4 sm:grid-cols-3">
-                    <Panel className="p-5">
-                        <p className="text-sm text-ink">Active Projects</p>
-                        <p className="mt-1 text-2xl font-bold text-gold-dark">{projects.length}</p>
-                    </Panel>
-                    <Panel className="p-5">
-                        <p className="text-sm text-ink">Next Event</p>
-                        <p className="mt-1 text-xl font-bold text-gold-dark">
-                            {nextEvent ? formatDate(nextEvent.eventDate) : '—'}
-                        </p>
-                    </Panel>
-                    <Panel className="p-5">
-                        <p className="text-sm text-ink">Outstanding Balance</p>
-                        <p className="mt-1 text-xl font-bold text-gold-dark">{peso(outstanding)}</p>
-                    </Panel>
-                </div>
-
-                <Link
-                    href="/customer/new-request"
-                    className="inline-flex items-center gap-1.5 self-end rounded-md bg-gold px-4 py-2 text-sm font-bold text-white transition hover:bg-gold-dark"
-                >
-                    Start Project <Plus className="size-4" />
-                </Link>
+        <section aria-label="Your next event" className="flex flex-col gap-4 rounded-2xl border border-gold-light bg-cream p-5 md:flex-row md:items-center md:gap-6 md:p-6">
+            <div
+                aria-hidden
+                className="flex shrink-0 items-center gap-2 md:size-28 md:flex-col md:justify-center md:gap-0 md:rounded-2xl md:border md:border-gold-light md:bg-white"
+            >
+                <span className="text-sm font-extrabold tracking-wide text-gold-dark uppercase">{d.toLocaleDateString('en-US', { month: 'short' })}</span>
+                <span className="text-2xl font-extrabold text-ink md:text-4xl md:leading-tight">{d.getDate()}</span>
+                <span className="text-sm font-bold text-gold-dark">{d.toLocaleDateString('en-US', { weekday: 'long' })}</span>
             </div>
 
-            {/* My projects */}
-            <Panel className="p-6">
-                <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-bold text-ink">My projects</h2>
-                    <Link href="/customer/projects" className="inline-flex items-center gap-2 text-sm font-bold text-gold underline">
-                        View all <ArrowRight className="size-4 no-underline" />
-                    </Link>
+            <div className="min-w-0 flex-1">
+                <p className="text-xs font-bold tracking-wide text-gold-dark uppercase">Your next event</p>
+                <h2 className="mt-1 text-xl font-bold text-ink md:text-2xl">{headline}</h2>
+                <p className="mt-1 text-sm text-ink">
+                    {multiDay ? `${formatDate(event.date)} – ${formatDate(event.endDate)}` : `${longDate} · ${formatTime(event.startTime)} – ${formatTime(event.endTime)}`}
+                    {event.venue && ` · ${event.venue}`}
+                </p>
+
+                <div className="mt-3 max-w-md">
+                    <div className="flex gap-1" aria-hidden>
+                        {event.steps.map((s) => (
+                            <span
+                                key={s.label}
+                                className={cx(
+                                    'h-1.5 flex-1 rounded-full',
+                                    (s.state === 'done' || s.state === 'skipped') && 'bg-gold',
+                                    s.state === 'current' && 'bg-ink',
+                                    s.state === 'locked' && 'border border-gold-light bg-white',
+                                    s.state === 'cancelled' && 'bg-red-400',
+                                )}
+                            />
+                        ))}
+                    </div>
+                    <p className="mt-1.5 text-xs text-ink">
+                        {event.code} · Now at {event.currentStep} (step {event.currentNumber} of {event.steps.length})
+                        {event.onHold && ' · On hold'}
+                    </p>
                 </div>
-
-                {projects.length > 0 ? (
-                    <ul className="mt-4 divide-y divide-black/10 border-t border-black/10">
-                        {projects.map((p) => (
-                            <li key={p.id} className="flex flex-col gap-4 py-5 md:flex-row md:items-center">
-                                <div className="flex h-16 w-24 shrink-0 items-center justify-center rounded bg-neutral-200 text-neutral-400">
-                                    <ImageIcon className="size-8" />
-                                </div>
-
-                                <div className="min-w-0 flex-1">
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div>
-                                            <p className="font-bold text-ink">{p.name}</p>
-                                            <p className="text-sm text-ink">
-                                                {[formatDate(p.eventDate), p.venue, p.type, p.theme].filter(Boolean).join(' — ')}
-                                            </p>
-                                        </div>
-                                        <Pill tone="cream" className="shrink-0 rounded-sm">
-                                            {p.status}
-                                        </Pill>
-                                    </div>
-                                    <div className="mt-4">
-                                        <ProgressTracker stage={p.stage} />
-                                    </div>
-                                </div>
-                            </li>
-                        ))}
-                    </ul>
-                ) : (
-                    <p className="mt-4 text-sm text-ink-soft">No projects yet. Use Start Project to submit your first request.</p>
-                )}
-            </Panel>
-
-            {/* Bottom row */}
-            <div className="grid gap-5 lg:grid-cols-3">
-                {/* Payment summary */}
-                <Panel className="flex flex-col p-6">
-                    <div className="flex items-center justify-between">
-                        <h2 className="font-bold text-ink">Billing Summary</h2>
-                        <Link href="/customer/billing" className="text-[11px] font-bold text-gold underline">
-                            View details
-                        </Link>
-                    </div>
-                    <dl className="mt-4 flex-1 divide-y divide-black/10 border-t border-black/10 text-xs font-bold text-ink">
-                        <div className="flex justify-between py-2.5">
-                            <dt>Total Amount</dt>
-                            <dd>{peso(payment.total)}</dd>
-                        </div>
-                        <div className="flex justify-between py-2.5">
-                            <dt>Total Paid</dt>
-                            <dd>{peso(payment.paid)}</dd>
-                        </div>
-                        <div className="flex justify-between py-2.5">
-                            <dt>Outstanding Balance</dt>
-                            <dd>{peso(outstanding)}</dd>
-                        </div>
-                    </dl>
-                    <Link
-                        href="/customer/billing"
-                        className="mt-5 block rounded-md bg-gold py-2.5 text-center text-sm font-bold text-white transition hover:bg-gold-dark"
-                    >
-                        Pay Now
-                    </Link>
-                </Panel>
-
-                {/* Recent notifications */}
-                <Panel className="p-6">
-                    <div className="flex items-center justify-between">
-                        <h2 className="font-bold text-ink">Recent Notifications</h2>
-                        <Link href="/customer/notifications" className="text-[11px] font-bold text-gold underline">
-                            View all
-                        </Link>
-                    </div>
-                    <ul className="mt-4 space-y-4">
-                        {notifications.map((n) => (
-                            <li key={n.id} className="flex items-start gap-3">
-                                <span className={cx('mt-1.5 size-3 shrink-0 rounded-full', n.dot)} />
-                                <div>
-                                    <p className="text-sm font-bold text-ink">{n.title}</p>
-                                    <p className="text-[11px] text-ink-soft">{n.detail}</p>
-                                    <p className="text-[11px] text-ink-soft">{n.time}</p>
-                                </div>
-                            </li>
-                        ))}
-                    </ul>
-                </Panel>
-
-                {/* My appointment */}
-                <Panel className="self-start p-6">
-                    <h2 className="font-bold text-ink">Upcoming Appointment</h2>
-                    <div className="mt-4 border-t border-black/10 pt-4">
-                        <p className="text-sm font-bold text-ink">{appointment.title}</p>
-                        <p className="mt-1 text-[11px] text-ink-soft">{appointment.when}</p>
-                        <p className="text-[11px] text-ink-soft">{appointment.booked}</p>
-                    </div>
-                    <Link
-                        href="/customer/projects"
-                        className="mt-5 block rounded-lg border border-gold bg-white py-1.5 text-center text-xs font-bold text-ink transition hover:bg-gold/10"
-                    >
-                        View project
-                    </Link>
-                </Panel>
             </div>
+
+            <Link href={event.url} className={cx(outlineLink, 'min-h-11 shrink-0 md:min-h-0')}>
+                Open project <ChevronRight className="size-4" />
+            </Link>
+        </section>
+    );
+}
+
+/* ---------------- Action needed ---------------- */
+
+function SectionHead({ id, title, count, aside }: { id: string; title: string; count?: number; aside?: ReactNode }) {
+    return (
+        <div className="flex items-center justify-between gap-3 border-b border-black/10 px-5 py-4">
+            <h2 id={id} className="flex items-center gap-2.5 text-lg font-bold text-ink">
+                {title}
+                {count !== undefined && count > 0 && <span className="rounded-full bg-gold px-2 py-0.5 text-xs font-extrabold text-white">{count}</span>}
+            </h2>
+            {aside}
         </div>
+    );
+}
+
+function Empty({ icon, title, children }: { icon: ReactNode; title: string; children?: ReactNode }) {
+    return (
+        <div className="flex flex-1 flex-col items-center justify-center gap-1.5 px-5 py-8 text-center">
+            <span className="text-gold-dark">{icon}</span>
+            <p className="font-bold text-ink">{title}</p>
+            {children && <div className="text-sm text-ink-soft">{children}</div>}
+        </div>
+    );
+}
+
+const PER_PAGE = 3;
+
+function ActionNeeded({ actions, pending }: { actions: DashboardData['actions']; pending: DashboardData['pending'] }) {
+    const [page, setPage] = useState(1);
+    const pages = Math.max(1, Math.ceil(actions.length / PER_PAGE));
+    const current = Math.min(page, pages);
+    const shown = actions.slice((current - 1) * PER_PAGE, current * PER_PAGE);
+
+    return (
+        <section className={cx(card, 'flex min-w-0 flex-col')} aria-labelledby="action-needed">
+            <SectionHead id="action-needed" title="Action needed" count={actions.length} />
+
+            {actions.length > 0 ? (
+                <>
+                    <ul className="divide-y divide-black/10">
+                        {shown.map((a) => (
+                            <li key={`${a.projectCode}-${a.title}`} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:gap-4">
+                                {/* Icon beside the details on every screen; the button goes below on phones. */}
+                                <div className="flex min-w-0 flex-1 items-start gap-3.5">
+                                    <span aria-hidden className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-cream font-bold text-gold-dark">
+                                        {a.payment ? '₱' : <ClipboardCheck className="size-5" />}
+                                    </span>
+                                    <div className="min-w-0">
+                                        <p className="font-bold text-ink">{a.title}</p>
+                                        <p className="mt-0.5 text-xs font-semibold text-ink-soft">
+                                            {a.projectCode} · {a.projectTitle}
+                                        </p>
+                                        <p className="mt-0.5 text-sm text-ink">{a.note}</p>
+                                    </div>
+                                </div>
+                                <Link href={a.url} className={cx(a.payment ? goldLink : outlineLink, 'min-h-11 shrink-0 sm:min-h-0')}>
+                                    {a.button}
+                                </Link>
+                            </li>
+                        ))}
+                    </ul>
+
+                    {pages > 1 && (
+                        <div className="mt-auto flex items-center justify-center gap-3 border-t border-black/10 px-5 py-3">
+                            <button
+                                type="button"
+                                aria-label="Previous page"
+                                disabled={current === 1}
+                                onClick={() => setPage(current - 1)}
+                                className="flex size-9 items-center justify-center rounded-lg border border-black/15 bg-white disabled:opacity-35"
+                            >
+                                <ChevronLeft className="size-4" />
+                            </button>
+                            <span className="text-sm font-bold text-ink" aria-live="polite">
+                                {current} / {pages}
+                            </span>
+                            <button
+                                type="button"
+                                aria-label="Next page"
+                                disabled={current === pages}
+                                onClick={() => setPage(current + 1)}
+                                className="flex size-9 items-center justify-center rounded-lg border border-black/15 bg-white disabled:opacity-35"
+                            >
+                                <ChevronRight className="size-4" />
+                            </button>
+                        </div>
+                    )}
+                </>
+            ) : pending.length > 0 ? (
+                <Empty icon={<ClipboardCheck className="size-7" />} title={pending.length === 1 ? 'Your request is being reviewed' : 'Your requests are being reviewed'}>
+                    {pending.map((r) => (
+                        <p key={r.code}>
+                            <Link href={r.url} className="font-semibold text-gold-dark hover:underline">
+                                {r.code} · {r.title}
+                            </Link>
+                            , sent {formatDate(r.submittedOn)}
+                        </p>
+                    ))}
+                    <p className="mt-1">We&apos;ll contact you to schedule your consultation.</p>
+                </Empty>
+            ) : (
+                <Empty icon={<ClipboardCheck className="size-7" />} title="You're all caught up">
+                    Nothing needs you right now. We&apos;ll show it here when something does.
+                </Empty>
+            )}
+        </section>
+    );
+}
+
+/* ---------------- Upcoming ---------------- */
+
+const UPCOMING_LABEL: Record<DashboardData['upcoming'][number]['type'], string> = {
+    consultation: 'Consultation',
+    ocular_visit: 'Ocular visit',
+};
+
+function Upcoming({ items }: { items: DashboardData['upcoming'] }) {
+    return (
+        <section className={cx(card, 'flex min-w-0 flex-col')} aria-labelledby="upcoming">
+            <SectionHead id="upcoming" title="Upcoming" aside={<span className="text-sm text-ink-soft">Next 30 days</span>} />
+
+            {items.length > 0 ? (
+                <ul className="divide-y divide-black/10">
+                    {items.map((u) => {
+                        const d = fromISO(u.date);
+                        return (
+                            <li key={u.id}>
+                                <Link href={u.url} className="flex items-center gap-3.5 px-5 py-3.5 transition hover:bg-gold/5">
+                                    <span className="w-12 shrink-0 rounded-xl border border-black/15 py-1 text-center">
+                                        <span className="block text-[11px] font-bold text-gold-dark uppercase">{d.toLocaleDateString('en-US', { month: 'short' })}</span>
+                                        <span className="block text-lg leading-tight font-extrabold text-ink">{d.getDate()}</span>
+                                    </span>
+                                    <span className="min-w-0 flex-1">
+                                        <span className="block font-bold text-ink">
+                                            {UPCOMING_LABEL[u.type]}
+                                            {u.pending && <span className="ml-2 text-xs font-semibold text-gold-dark">Pending</span>}
+                                        </span>
+                                        <span className="mt-0.5 block text-xs text-ink-soft">
+                                            {d.toLocaleDateString('en-US', { weekday: 'short' })} · {formatTime(u.startTime)} – {formatTime(u.endTime)} · {u.where}
+                                        </span>
+                                        <span className="block truncate text-xs text-ink-soft">
+                                            {u.code} · {u.title}
+                                        </span>
+                                    </span>
+                                    <ChevronRight aria-hidden className="size-4 shrink-0 text-ink-soft" />
+                                </Link>
+                            </li>
+                        );
+                    })}
+                </ul>
+            ) : (
+                <Empty icon={<CalendarDays className="size-7" />} title="Nothing scheduled in the next 30 days">
+                    Your consultations and ocular visits show here.
+                </Empty>
+            )}
+        </section>
     );
 }
