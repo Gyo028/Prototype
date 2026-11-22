@@ -33,6 +33,8 @@ Route::inertia('/', 'public/landing')->name('home');
 Route::inertia('/faq', 'public/faq')->name('faq');
 Route::inertia('/our-works', 'public/our-works')->name('our-works');
 Route::inertia('/services/corporate-events', 'public/corporate-events')->name('services.corporate-events');
+Route::inertia('/services/special-occasions', 'public/special-occasions')->name('services.special-occasions');
+Route::inertia('/services/custom-fabrication', 'public/custom-fabrication')->name('services.custom-fabrication');
 Route::inertia('/terms', 'public/terms')->name('terms');
 Route::inertia('/privacy', 'public/privacy')->name('privacy');
 

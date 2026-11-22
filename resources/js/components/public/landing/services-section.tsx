@@ -9,12 +9,12 @@ const services = [
     {
         title: 'Special Occasions',
         description: 'Creative setups for weddings, birthdays, debuts, and milestone celebrations.',
-        href: '#services',
+        href: '/services/special-occasions',
     },
     {
         title: 'Custom Fabrication',
         description: 'Design and production of customized backdrops, props, and themed event structures.',
-        href: '#services',
+        href: '/services/custom-fabrication',
     },
 ];
 

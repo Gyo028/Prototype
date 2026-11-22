@@ -13,8 +13,8 @@ const quickLinks = [
 
 const serviceLinks = [
     { label: 'Corporate Events', href: '/services/corporate-events' },
-    { label: 'Special Occasions', href: '/#services' },
-    { label: 'Custom Fabrication', href: '/#services' },
+    { label: 'Special Occasions', href: '/services/special-occasions' },
+    { label: 'Custom Fabrication', href: '/services/custom-fabrication' },
 ];
 
 const contacts = [

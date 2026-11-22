@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { UserRound } from 'lucide-react';
+import { ArrowLeft, UserRound } from 'lucide-react';
 import BrandLogo from '@/components/brand-logo';
 import { home } from '@/routes';
 import type { AuthLayoutProps } from '@/types';
@@ -50,7 +50,20 @@ export default function AuthSimpleLayout({
                 </>
             )}
 
-            <div className={`w-full rounded-2xl p-8 md:p-10 ${cardStyles[variant]}`}>
+            <div
+                className={`relative w-full rounded-2xl p-8 md:p-10 ${cardStyles[variant]}`}
+            >
+                {/* Login / register: back to the home page */}
+                {isFramed && (
+                    <Link
+                        href={home()}
+                        className="absolute top-4 left-4 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold text-[#C99A2E] transition-colors hover:bg-[#C99A2E]/10 hover:text-[#A67C1F] focus-visible:ring-2 focus-visible:ring-[#C99A2E]/40 focus-visible:outline-none md:top-5 md:left-5"
+                    >
+                        <ArrowLeft className="size-4" aria-hidden="true" />
+                        Back
+                    </Link>
+                )}
+
                 <div className="flex flex-col gap-8">
                     {variant === 'default' && (
                         <div className="flex flex-col items-center gap-6">
