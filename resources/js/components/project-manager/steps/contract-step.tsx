@@ -114,7 +114,7 @@ export default function ContractStep({ project, usingSample, managerName, onSave
                 <div className="grid gap-4">
                     {contract.status === 'Approved' && (
                         <CompletedNotice>
-                            <b>Contract verified.</b> Project planning is complete, and project execution can now be scheduled.
+                            <b>Contract verified.</b> Once the down payment is paid (Payments below), fabrication can be scheduled.
                         </CompletedNotice>
                     )}
                     {contract.status === 'Rejected' && waiting && (

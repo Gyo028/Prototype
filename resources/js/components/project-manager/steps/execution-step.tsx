@@ -152,6 +152,13 @@ export default function ExecutionStep({ project, usingSample, managerName, onSav
                             {!phase.completion && ` Send ${phase.headName} the work order below.`}
                         </CompletedNotice>
                         <PhaseSummary title={info.title} headLabel={info.head} phase={phase} />
+                        {canReschedule && (
+                            <div className="flex justify-end">
+                                <OutlineButton onClick={startReschedule}>
+                                    <CalendarClock className="size-4" /> Reschedule {info.title}
+                                </OutlineButton>
+                            </div>
+                        )}
                         <WorkOrderPanel
                             project={project}
                             usingSample={usingSample}
@@ -221,13 +228,7 @@ export default function ExecutionStep({ project, usingSample, managerName, onSav
                                 <Send className="size-4" /> {saving ? 'Saving...' : mode === 'reschedule' ? 'Save New Schedule' : 'Save Schedule'}
                             </GoldButton>
                         </>
-                    ) : (
-                        canReschedule && (
-                            <OutlineButton onClick={startReschedule}>
-                                <CalendarClock className="size-4" /> Reschedule {info.title}
-                            </OutlineButton>
-                        )
-                    )}
+                        ) : null}
                 </div>
             </div>
         </>
