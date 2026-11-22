@@ -2,28 +2,21 @@ import { CheckCircle2, FolderKanban, Hourglass, XCircle } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { PageHeader, Panel, Pill, cx, inputClass } from '@/components/dashboard/ui';
-import type { PillTone } from '@/components/dashboard/ui';
+import { projectStatusTone } from '@/components/project-manager/project-status';
 import { formatDate } from '@/components/project-manager/request-details';
 import { ONGOING_STATUSES, getSampleOwnerProjects } from '@/data/owner/projects';
-import type { OwnerProjectStatus, OwnerProjectSummary } from '@/data/owner/projects';
+import type { OwnerProjectSummary } from '@/data/owner/projects';
 
 /*
  * Backlog #39: the Owner's dashboard overview of all ongoing and completed projects.
  *   - Shows every project with its current status (acceptance criterion 1).
  *   - With no project records at all, shows "No project records available." (acceptance criterion 2).
  * Read only: the Owner monitors projects; the Project Manager updates them.
+ * The Project Manager dashboard reuses this overview (revision, Nov 22).
  */
 
 type Filter = 'Ongoing' | 'Completed' | 'All';
 const FILTERS: Filter[] = ['Ongoing', 'Completed', 'All'];
-
-const statusTone: Record<OwnerProjectStatus, PillTone> = {
-    'In Progress': 'yellow',
-    Rescheduled: 'blue',
-    Completed: 'green',
-    Cancelled: 'red',
-    'Not Proceeding': 'red',
-};
 
 const isOngoing = (p: OwnerProjectSummary) => ONGOING_STATUSES.includes(p.status);
 
@@ -42,9 +35,28 @@ function StatCard({ label, value, icon, tone }: { label: string; value: number; 
 type Props = {
     /** Sent by the controller. Leave it out to use the sample data. */
     projects?: OwnerProjectSummary[];
+    /** The Project Manager dashboard reuses this overview with its own heading. */
+    title?: string;
+    description?: string;
+    /** Shown between the heading and the project cards (e.g. the Project Manager's to-do cards). */
+    children?: ReactNode;
+    /** When given, clicking a row opens that project (Project Manager only; the Owner only views). */
+    onOpen?: (project: OwnerProjectSummary) => void;
+    /**
+     * Project Manager dashboard (revision, Nov 22): only Number, Project Title, Date and Status,
+     * in queue order (first come, first served), like the Projects page.
+     */
+    compact?: boolean;
 };
 
-export default function ProjectOverview({ projects }: Props) {
+export default function ProjectOverview({
+    projects,
+    title = 'Owner Dashboard',
+    description = 'An overview of all ongoing and completed projects and their current status.',
+    children,
+    onOpen,
+    compact = false,
+}: Props) {
     const all = projects ?? getSampleOwnerProjects();
 
     const [filter, setFilter] = useState<Filter>('Ongoing');
@@ -52,7 +64,7 @@ export default function ProjectOverview({ projects }: Props) {
 
     const ongoing = all.filter(isOngoing).length;
     const completed = all.filter((p) => p.status === 'Completed').length;
-    const closed = all.filter((p) => p.status === 'Cancelled' || p.status === 'Not Proceeding').length;
+    const closed = all.filter((p) => p.status === 'Cancelled').length;
     const count = (f: Filter) => (f === 'Ongoing' ? ongoing : f === 'Completed' ? completed : all.length);
 
     const q = query.trim().toLowerCase();
@@ -62,15 +74,19 @@ export default function ProjectOverview({ projects }: Props) {
             (p) =>
                 !q ||
                 p.code.toLowerCase().includes(q) ||
-                p.customerName.toLowerCase().includes(q) ||
                 p.eventType.toLowerCase().includes(q) ||
-                p.venue.toLowerCase().includes(q),
+                (!compact && (p.customerName.toLowerCase().includes(q) || p.venue.toLowerCase().includes(q))),
         )
-        .sort((a, b) => a.eventDate.localeCompare(b.eventDate));
+        // Compact (Project Manager): queue order, oldest request first. Owner: by event date.
+        .sort((a, b) => (compact ? a.submittedAt.localeCompare(b.submittedAt) : a.eventDate.localeCompare(b.eventDate)));
 
-            return (
+    const columns = compact ? 4 : 7;
+
+    return (
         <>
-            <PageHeader title="Owner Dashboard" description="An overview of all ongoing and completed projects and their current status." />
+            <PageHeader title={title} description={description} />
+
+            {children}
 
             {/* Acceptance criterion 2: no project records at all */}
             {all.length === 0 ? (
@@ -85,7 +101,7 @@ export default function ProjectOverview({ projects }: Props) {
                         <StatCard label="Total projects" value={all.length} icon={<FolderKanban className="size-5" />} tone="bg-gold/15 text-gold-dark" />
                         <StatCard label="Ongoing" value={ongoing} icon={<Hourglass className="size-5" />} tone="bg-amber-100 text-amber-700" />
                         <StatCard label="Completed" value={completed} icon={<CheckCircle2 className="size-5" />} tone="bg-green-100 text-green-700" />
-                        <StatCard label="Cancelled / Not proceeding" value={closed} icon={<XCircle className="size-5" />} tone="bg-red-100 text-red-700" />
+                        <StatCard label="Cancelled" value={closed} icon={<XCircle className="size-5" />} tone="bg-red-100 text-red-700" />
                     </div>
 
                     {/* Toolbar */}
@@ -111,7 +127,7 @@ export default function ProjectOverview({ projects }: Props) {
                             <input
                                 value={query}
                                 onChange={(e) => setQuery(e.target.value)}
-                                placeholder="Search by project no., customer, event or venue..."
+                                placeholder={compact ? 'Search by number or project title...' : 'Search by project no., customer, event or venue...'}
                                 aria-label="Search projects"
                                 className={inputClass}
                             />
@@ -120,36 +136,63 @@ export default function ProjectOverview({ projects }: Props) {
 
                     {/* Acceptance criterion 1: every project with its current status */}
                     <Panel className="overflow-x-auto p-0">
-                        <table className="w-full min-w-[860px] text-left text-sm">
+                        <table className={cx('w-full text-left text-sm', compact ? 'min-w-[520px]' : 'min-w-[860px]')}>
                             <thead className="bg-neutral-200/70 text-xs text-ink-soft uppercase">
-                                <tr>
-                                    <th className="px-4 py-3 font-medium">Project No.</th>
-                                    <th className="px-2 py-3 font-medium">Customer</th>
-                                    <th className="px-2 py-3 font-medium">Event</th>
-                                    <th className="px-2 py-3 font-medium">Event Date</th>
-                                    <th className="px-2 py-3 font-medium">Venue</th>
-                                    <th className="px-2 py-3 font-medium">Current Step</th>
-                                    <th className="px-2 py-3 pr-4 font-medium">Status</th>
-                                </tr>
+                                {compact ? (
+                                    <tr>
+                                        <th className="px-4 py-3 font-medium">Number</th>
+                                        <th className="px-2 py-3 font-medium">Project Title</th>
+                                        <th className="px-2 py-3 font-medium">Date</th>
+                                        <th className="px-2 py-3 pr-4 font-medium">Status</th>
+                                    </tr>
+                                ) : (
+                                    <tr>
+                                        <th className="px-4 py-3 font-medium">Project No.</th>
+                                        <th className="px-2 py-3 font-medium">Customer</th>
+                                        <th className="px-2 py-3 font-medium">Event</th>
+                                        <th className="px-2 py-3 font-medium">Event Date</th>
+                                        <th className="px-2 py-3 font-medium">Venue</th>
+                                        <th className="px-2 py-3 font-medium">Current Step</th>
+                                        <th className="px-2 py-3 pr-4 font-medium">Status</th>
+                                    </tr>
+                                )}
                             </thead>
                             <tbody className="divide-y divide-black/10">
                                 {visible.length === 0 ? (
                                     <tr>
-                                        <td colSpan={7} className="px-4 py-10 text-center text-ink-soft">
+                                        <td colSpan={columns} className="px-4 py-10 text-center text-ink-soft">
                                             {q ? 'No projects match your search.' : `No ${filter.toLowerCase()} projects.`}
                                         </td>
                                     </tr>
                                 ) : (
                                     visible.map((p) => (
-                                        <tr key={p.id}>
+                                        <tr
+                                            key={p.id}
+                                            {...(onOpen && {
+                                                tabIndex: 0,
+                                                'aria-label': `Open ${p.code}`,
+                                                onClick: () => onOpen(p),
+                                                onKeyDown: (e: { key: string }) => e.key === 'Enter' && onOpen(p),
+                                                className: 'cursor-pointer transition hover:bg-gold/10 focus-visible:bg-gold/10 focus-visible:outline-none',
+                                            })}
+                                        >
                                             <td className="px-4 py-3 font-semibold whitespace-nowrap text-ink">{p.code}</td>
-                                            <td className="px-2 py-3 text-ink">{p.customerName}</td>
-                                            <td className="px-2 py-3 text-ink">{p.eventType}</td>
-                                            <td className="px-2 py-3 whitespace-nowrap text-ink">{formatDate(p.eventDate)}</td>
-                                            <td className="px-2 py-3 text-ink-soft">{p.venue}</td>
-                                            <td className="px-2 py-3 text-ink">{p.currentStep ?? '—'}</td>
+                                            {compact ? (
+                                                <>
+                                                    <td className="px-2 py-3 text-ink">{p.eventType}</td>
+                                                    <td className="px-2 py-3 whitespace-nowrap text-ink">{formatDate(p.submittedAt.slice(0, 10))}</td>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <td className="px-2 py-3 text-ink">{p.customerName}</td>
+                                                    <td className="px-2 py-3 text-ink">{p.eventType}</td>
+                                                    <td className="px-2 py-3 whitespace-nowrap text-ink">{formatDate(p.eventDate)}</td>
+                                                    <td className="px-2 py-3 text-ink-soft">{p.venue}</td>
+                                                    <td className="px-2 py-3 text-ink">{p.currentStep ?? '—'}</td>
+                                                </>
+                                            )}
                                             <td className="px-2 py-3 pr-4 whitespace-nowrap">
-                                                <Pill tone={statusTone[p.status]}>{p.status}</Pill>
+                                                <Pill tone={projectStatusTone[p.status]}>{p.status}</Pill>
                                             </td>
                                         </tr>
                                     ))

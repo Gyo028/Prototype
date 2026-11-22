@@ -1,8 +1,9 @@
 import { Head, Link, usePage } from '@inertiajs/react';
-import { ArrowLeft, ArrowRight, Check, ChevronDown, Clock, Lock, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Ban, Check, ChevronDown, Clock, Lock, X } from 'lucide-react';
 import { useState } from 'react';
-import { GoldButton, Panel, Pill, cx } from '@/components/dashboard/ui';
-import type { PillTone } from '@/components/dashboard/ui';
+import type { ReactNode } from 'react';
+import { DangerButton, GoldButton, Panel, Pill, cx } from '@/components/dashboard/ui';
+import ProjectStatusPanel, { CancelProjectForm, projectStatusTone } from '@/components/project-manager/project-status';
 import { RequestDetails, formatDate } from '@/components/project-manager/request-details';
 import ConsultationStep from '@/components/project-manager/steps/consultation-step';
 import ContractStep from '@/components/project-manager/steps/contract-step';
@@ -20,26 +21,24 @@ import {
     SAMPLE_SPECIALISTS,
     STEPS,
     activeStep,
+    executionStatus,
     getSampleProject,
+    isNotProceeding,
+    isStepComplete,
     projectStatus,
     saveSampleProject,
     stepStates,
 } from '@/data/project-manager/projects';
-import type { DesignSpecialist, Project, ProjectStatus, StepKey, StepState } from '@/data/project-manager/projects';
+import type { DesignSpecialist, PartKey, Project, StepKey, StepState } from '@/data/project-manager/projects';
 
 /*
  * The project wizard: one page per project, with the planning steps across the top.
- * A step can only be opened once the step before it is complete. Completed steps can
- * still be opened to view or update them.
+ * Revision (leader, Nov 19): 7 steps. Some steps hold two parts, shown one under the other:
+ *   Ocular Visit = Reservation Fee + Site Assessment, Design = Design Assignment + Design Proposal,
+ *   Contract = Contract + Payments.
+ * A step (and a part inside a step) can only be opened once the one before it is complete.
+ * "Cancel Project" at the top works from any step.
  */
-
-const statusTone: Record<ProjectStatus, PillTone> = {
-    'In Progress': 'yellow',
-    Rescheduled: 'blue',
-    Completed: 'green',
-    Cancelled: 'red',
-    'Not Proceeding': 'red',
-};
 
 const stateLabel: Record<StepState, string> = {
     done: 'Completed',
@@ -50,8 +49,33 @@ const stateLabel: Record<StepState, string> = {
     closed: 'Closed',
 };
 
-// A cancelled project's Execution step stays open so its status history can be seen.
-const canOpen = (state: StepState, key?: StepKey) => state !== 'locked' && (state !== 'closed' || key === 'execution');
+const PART_TITLES: Record<PartKey, string> = {
+    consultation: 'Consultation',
+    reservationFee: 'Reservation Fee',
+    siteAssessment: 'Site Assessment',
+    designAssignment: 'Design Assignment',
+    designProposal: 'Design Proposal',
+    contract: 'Contract',
+    payments: 'Payments',
+    fabrication: 'Fabrication',
+    installation: 'Installation',
+    completed: 'Completed',
+};
+
+// A cancelled project's Completed step stays open so its status history can be seen.
+const canOpen = (state: StepState, key?: StepKey) => state !== 'locked' && (state !== 'closed' || key === 'completed');
+
+/** Shown in place of a part that cannot be opened yet. */
+function LockedPart({ title, after }: { title: string; after: string }) {
+    return (
+        <div className="flex items-start gap-3 rounded-xl border border-dashed border-black/15 bg-neutral-50 p-4 text-sm text-ink-soft">
+            <Lock className="mt-0.5 size-4 shrink-0" />
+            <p>
+                <b className="text-ink">{title}</b> opens once the {after.toLowerCase()} is done.
+            </p>
+        </div>
+    );
+}
 
 type Props = {
     /** Sent by the controller. Leave it out to use the sample data. */
@@ -70,8 +94,9 @@ export default function ProjectWizard({ project: serverProject, specialists, set
     const [sampleProject, setSampleProject] = useState(() => getSampleProject(projectId));
     const project = serverProject ?? sampleProject;
 
-    const [selected, setSelected] = useState<StepKey>(() => (project ? (activeStep(project) ?? 'consultation') : 'consultation'));
+    const [selected, setSelected] = useState<StepKey>(() => (project ? (activeStep(project) ?? 'completed') : 'consultation'));
     const [showDetails, setShowDetails] = useState(false);
+    const [cancelling, setCancelling] = useState(false);
 
     if (!project) {
         return (
@@ -86,9 +111,13 @@ export default function ProjectWizard({ project: serverProject, specialists, set
 
     const states = stepStates(project);
     const status = projectStatus(project);
+    const notProceeding = isNotProceeding(project);
+    const heads = setUpHeads ?? SAMPLE_SET_UP_HEADS;
+    const canCancel = !notProceeding && executionStatus(project) === null;
+
     const selectedIndex = STEPS.findIndex((s) => s.key === selected);
     const nextStep = STEPS[selectedIndex + 1];
-    const canGoNext = nextStep !== undefined && canOpen(states[nextStep.key]);
+    const canGoNext = nextStep !== undefined && canOpen(states[nextStep.key], nextStep.key);
 
     // Sample mode: save to the in-memory store so the Projects list sees the change too.
     const onSaved = (updated: Project) => {
@@ -98,7 +127,16 @@ export default function ProjectWizard({ project: serverProject, specialists, set
 
     const stepProps: StepProps = { project, usingSample, managerName, onSaved };
 
-    return (
+    /** A part of the selected step: shown only once the part before it is complete. */
+    const part = (key: PartKey, before: PartKey | null, content: ReactNode) => (
+        <div key={key} className="border-b border-black/10 pb-6 last:border-0 last:pb-0">
+            {before && !isStepComplete(project, before) ? <LockedPart title={PART_TITLES[key]} after={PART_TITLES[before]} /> : content}
+        </div>
+    );
+
+    const ocularNotRequired = project.consultation?.ocularVisit.required === false;
+
+        return (
         <>
             <Head title={`${project.code} · Projects`} />
 
@@ -113,22 +151,31 @@ export default function ProjectWizard({ project: serverProject, specialists, set
                         <h1 className="text-2xl font-bold text-ink">
                             {project.code} · {project.eventType}
                         </h1>
-                        <Pill tone={statusTone[status]}>{status}</Pill>
+                        <Pill tone={projectStatusTone[status]}>{status}</Pill>
                     </div>
                     <p className="text-sm text-ink-soft">
                         {project.customer.name} · {formatDate(project.eventDate)} · {project.venue}
                     </p>
                 </div>
-                <button
-                    type="button"
-                    onClick={() => setShowDetails((s) => !s)}
-                    aria-expanded={showDetails}
-                    className="inline-flex items-center gap-1 rounded-lg border border-black/15 bg-white px-3 py-2 text-sm font-semibold text-ink transition hover:border-gold"
-                >
-                    Request details
-                    <ChevronDown className={cx('size-4 transition-transform', showDetails && 'rotate-180')} />
-                </button>
+                <div className="flex flex-wrap gap-2">
+                    {canCancel && !cancelling && (
+                        <DangerButton onClick={() => setCancelling(true)}>
+                            <Ban className="size-4" /> Cancel Project
+                        </DangerButton>
+                    )}
+                    <button
+                        type="button"
+                        onClick={() => setShowDetails((s) => !s)}
+                        aria-expanded={showDetails}
+                        className="inline-flex items-center gap-1 rounded-lg border border-black/15 bg-white px-3 py-2 text-sm font-semibold text-ink transition hover:border-gold"
+                    >
+                        Request details
+                        <ChevronDown className={cx('size-4 transition-transform', showDetails && 'rotate-180')} />
+                    </button>
+                </div>
             </div>
+
+            {cancelling && canCancel && <CancelProjectForm {...stepProps} setUpHeads={heads} onClose={() => setCancelling(false)} />}
 
             {showDetails && (
                 <Panel className="mb-5">
@@ -136,12 +183,13 @@ export default function ProjectWizard({ project: serverProject, specialists, set
                 </Panel>
             )}
 
-            {status === 'Cancelled' && (
+            {executionStatus(project) === 'Cancelled' && (
                 <div role="status" className="mb-5 rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-ink">
                     <b>This project was cancelled.</b> {project.statusUpdates.at(-1)?.remarks ?? ''} The remaining steps are closed.
                 </div>
             )}
-            {status === 'Not Proceeding' && (
+
+                        {notProceeding && (
                 <div role="status" className="mb-5 rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-ink">
                     <b>This project will not proceed.</b> {project.consultation?.decisionReason ?? ''} The remaining steps are closed.
                 </div>
@@ -149,10 +197,10 @@ export default function ProjectWizard({ project: serverProject, specialists, set
 
             {/* Stepper */}
             <Panel className="mb-5 overflow-x-auto p-4">
-                <ol className="flex min-w-[1080px] items-start">
+                <ol className="flex min-w-[880px] items-start">
                     {STEPS.map((step, index) => {
                         const state = states[step.key];
-                        const open = canOpen(state, step.key) && !(state === 'closed' && status === 'Not Proceeding');
+                        const open = canOpen(state, step.key) && !(state === 'closed' && notProceeding);
                         const isSelected = step.key === selected;
                         const finished = state === 'done' || state === 'skipped';
 
@@ -206,18 +254,55 @@ export default function ProjectWizard({ project: serverProject, specialists, set
                 </ol>
             </Panel>
 
-            {/* Selected step */}
+                        {/* Selected step */}
             <Panel>
-                {selected === 'consultation' && <ConsultationStep key={project.id} {...stepProps} />}
-                {selected === 'reservationFee' && <ReservationFeeStep key={project.id} {...stepProps} />}
-                {selected === 'siteAssessment' && <SiteAssessmentStep key={project.id} {...stepProps} />}
-                {selected === 'designAssignment' && (
-                    <DesignAssignmentStep key={project.id} {...stepProps} specialists={specialists ?? SAMPLE_SPECIALISTS} />
-                )}
-                {selected === 'designProposal' && <DesignProposalStep key={project.id} {...stepProps} />}
-                {selected === 'contract' && <ContractStep key={project.id} {...stepProps} />}
-                {selected === 'payments' && <PaymentsStep key={project.id} {...stepProps} />}
-                {selected === 'execution' && <ExecutionStep key={project.id} {...stepProps} setUpHeads={setUpHeads ?? SAMPLE_SET_UP_HEADS} />}
+                <div className="grid gap-6">
+                    {selected === 'consultation' && <ConsultationStep key={project.id} {...stepProps} />}
+
+                    {selected === 'ocularVisit' && (
+                        <>
+                            {part('reservationFee', null, <ReservationFeeStep key={project.id} {...stepProps} />)}
+                            {part(
+                                'siteAssessment',
+                                'reservationFee',
+                                ocularNotRequired ? (
+                                    <p className="rounded-xl border border-black/10 p-4 text-sm text-ink-soft">
+                                        <b className="text-ink">Site Assessment:</b> not required. No ocular visit was needed for this project.
+                                    </p>
+                                ) : (
+                                    <SiteAssessmentStep key={project.id} {...stepProps} />
+                                ),
+                            )}
+                        </>
+                    )}
+
+                    {selected === 'design' && (
+                        <>
+                            {part(
+                                'designAssignment',
+                                null,
+                                <DesignAssignmentStep key={project.id} {...stepProps} specialists={specialists ?? SAMPLE_SPECIALISTS} />,
+                            )}
+                            {part('designProposal', 'designAssignment', <DesignProposalStep key={project.id} {...stepProps} />)}
+                        </>
+                    )}
+
+                    {selected === 'contract' && (
+                        <>
+                            {part('contract', null, <ContractStep key={project.id} {...stepProps} />)}
+                            {part('payments', 'contract', <PaymentsStep key={project.id} {...stepProps} />)}
+                        </>
+                    )}
+
+                    {selected === 'fabrication' && (
+                        <ExecutionStep key={`${project.id}-fabrication`} {...stepProps} setUpHeads={heads} phaseKey="fabrication" />
+                    )}
+                    {selected === 'installation' && (
+                        <ExecutionStep key={`${project.id}-installation`} {...stepProps} setUpHeads={heads} phaseKey="installation" />
+                    )}
+
+                    {selected === 'completed' && <ProjectStatusPanel key={project.id} {...stepProps} setUpHeads={heads} />}
+                </div>
 
                 {/* Move on once the next step is unlocked */}
                 {canGoNext && (

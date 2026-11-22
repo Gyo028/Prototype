@@ -46,6 +46,14 @@ export type PhaseSchedule = {
     activities: ScheduleActivity[];
     workOrder?: WorkOrder | null; // null = not sent yet (or the schedule changed since)
     completion?: { completedBy: string; completedAt: string } | null; // the assignment's completion (backlog #35)
+    changes?: ScheduleChange[]; // reschedules of this phase, oldest first
+};
+
+/** Rescheduling a phase after the schedule was saved needs a reason (revision, Nov 19). */
+export type ScheduleChange = {
+    reason: string;
+    changedBy: string;
+    changedAt: string; // ISO date-time
 };
 
 export type ExecutionSchedule = Record<PhaseKey, PhaseSchedule> & {
@@ -110,11 +118,11 @@ export function workOrderProblems(phase: PhaseSchedule, head: SetUpHead | undefi
 /* ---------- project status (backlog #35) ---------- */
 
 /** The project's execution status. Completed and Cancelled are final. */
-export const EXECUTION_STATUSES = ['In Progress', 'Rescheduled', 'Completed', 'Cancelled'] as const;
+export const EXECUTION_STATUSES = ['Completed', 'Cancelled'] as const;
 export type ExecutionStatus = (typeof EXECUTION_STATUSES)[number];
 
 /** Acceptance criterion 1: these statuses cannot be saved without remarks. */
-export const STATUSES_NEEDING_REMARKS: ExecutionStatus[] = ['Rescheduled', 'Cancelled'];
+export const STATUSES_NEEDING_REMARKS: ExecutionStatus[] = ['Cancelled'];
 
 export type StatusUpdate = {
     status: ExecutionStatus;

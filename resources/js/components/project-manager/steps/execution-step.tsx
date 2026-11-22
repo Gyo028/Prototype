@@ -1,25 +1,27 @@
 import { router } from '@inertiajs/react';
-import { CalendarDays, Pencil, Plus, Send, Trash2 } from 'lucide-react';
+import { CalendarDays, CalendarClock, Plus, Send, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { Field, GoldButton, OutlineButton, cx, inputClass, selectClass } from '@/components/dashboard/ui';
+import { Field, GoldButton, OutlineButton, cx, inputClass, selectClass, textareaClass } from '@/components/dashboard/ui';
 import { Section, formatDate, formatDateTime } from '@/components/project-manager/request-details';
-import { CompletedNotice, PROJECTS_URL, StepIntro } from '@/components/project-manager/steps/step-ui';
+import { CompletedNotice, PROJECTS_URL, StepIntro, WaitingNotice } from '@/components/project-manager/steps/step-ui';
 import WorkOrderPanel from '@/components/project-manager/work-order';
-import ProjectStatusPanel, { PhaseCompletion } from '@/components/project-manager/project-status';
+import { PhaseCompletion } from '@/components/project-manager/project-status';
 import type { StepProps } from '@/components/project-manager/steps/step-ui';
 import { EXECUTION_PHASES, hasScheduleErrors, validateSchedule } from '@/data/project-manager/execution';
 import type { ExecutionSchedule, PhaseKey, PhaseSchedule, ScheduleErrors, SetUpHead } from '@/data/project-manager/execution';
 import { executionStatus } from '@/data/project-manager/projects';
 
 /*
- * Step 8 · Execution (backlog #32).
- * Opens once the signed contract is approved (it does not wait for Payments).
- * The Project Manager schedules fabrication and installation and assigns the
- * Fabrication Head and the Installation Head ("Manage Project Execution" use case).
- *   - The schedule is saved with every activity, scheduled date and target completion date,
- *     and a work order is sent to each Head (acceptance criterion 1).
- *   - A missing Head, activity or date blocks saving (acceptance criterion 2).
+ * Step 5 · Fabrication and Step 6 · Installation (backlogs #32, #33, #35).
+ * Revision (leader, Nov 19): Execution is split into two steps.
+ *   - Fabrication opens once the contract is approved and the down payment is paid.
+ *     Its first visit saves the whole schedule: both Heads, every activity and date (#32).
+ *   - Installation opens once fabrication is marked as completed.
+ *   - Each step shows its own schedule, work order (#33) and completion (#35).
+ *   - Rescheduling a phase after it was saved needs a reason, and its work order must be re-sent.
+ * #32 acceptance criteria: the schedule is saved with every required detail (1);
+ * a missing Head, activity or date blocks saving (2).
  */
 
 type Draft = Pick<ExecutionSchedule, PhaseKey>;
@@ -28,21 +30,25 @@ const newId = () => `act-${Date.now()}-${Math.random().toString(36).slice(2, 7)}
 const emptyPhase = (): PhaseSchedule => ({ headId: null, headName: null, activities: [{ id: newId(), activity: '', scheduledDate: '', targetDate: '' }] });
 const noErrors = (): ScheduleErrors => ({ fabrication: { activities: {} }, installation: { activities: {} } });
 
-type Props = StepProps & { setUpHeads: SetUpHead[] };
+type Props = StepProps & { setUpHeads: SetUpHead[]; phaseKey: PhaseKey };
 
-export default function ExecutionStep({ project, usingSample, managerName, onSaved, setUpHeads }: Props) {
+export default function ExecutionStep({ project, usingSample, managerName, onSaved, setUpHeads, phaseKey }: Props) {
     const saved = project.execution;
-    const [editing, setEditing] = useState(saved === null);
+    const info = EXECUTION_PHASES.find((x) => x.key === phaseKey)!;
+    const phase = saved?.[phaseKey];
+
+    // null = viewing; 'new' = first schedule (both phases); 'reschedule' = changing this phase only
+    const [mode, setMode] = useState<'new' | 'reschedule' | null>(saved === null && phaseKey === 'fabrication' ? 'new' : null);
     const [draft, setDraft] = useState<Draft>(() => saved ?? { fabrication: emptyPhase(), installation: emptyPhase() });
-    const [errors, setErrors] = useState<ScheduleErrors>(noErrors);
+    const [reason, setReason] = useState('');
+    const [reasonError, setReasonError] = useState('');
+        const [errors, setErrors] = useState<ScheduleErrors>(noErrors);
     const [saving, setSaving] = useState(false);
 
     const tried = hasScheduleErrors(errors);
 
-        // The schedule is locked once work is recorded as done or the project is completed / cancelled (backlog #35).
-    const locked =
-        Boolean(saved?.fabrication.completion || saved?.installation.completion) ||
-        ['Completed', 'Cancelled'].includes(executionStatus(project));
+    // A phase can no longer be rescheduled once its work is done or the project is completed / cancelled.
+    const canReschedule = Boolean(phase) && !phase?.completion && executionStatus(project) === null;
 
     // Re-check as the Project Manager types, but only after a failed save.
     const change = (next: Draft) => {
@@ -52,36 +58,70 @@ export default function ExecutionStep({ project, usingSample, managerName, onSav
 
     const updatePhase = (key: PhaseKey, changes: Partial<PhaseSchedule>) => change({ ...draft, [key]: { ...draft[key], ...changes } });
 
-    const save = () => {
-        // Acceptance criterion 2: incomplete scheduling information is never saved.
+    const startReschedule = () => {
+        if (saved) setDraft(saved);
+        setReason('');
+        setReasonError('');
+        setErrors(noErrors());
+        setMode('reschedule');
+    };
+
+    const cancelEdit = () => {
+        if (saved) setDraft(saved);
+        setErrors(noErrors());
+        setReasonError('');
+        setMode(null);
+    };
+
+        const save = () => {
+        // #32 acceptance criterion 2: incomplete scheduling information is never saved.
         const e = validateSchedule(draft);
         setErrors(e);
-        if (hasScheduleErrors(e)) return;
+        const text = reason.trim();
+        const missingReason = mode === 'reschedule' && !text;
+        setReasonError(missingReason ? 'Give the reason for rescheduling.' : '');
+        if (hasScheduleErrors(e) || missingReason) return;
 
-        const wasSaved = saved !== null;
+        const now = new Date().toISOString();
+        const next: ExecutionSchedule =
+            mode === 'new' || !saved
+                ? {
+                      fabrication: { ...draft.fabrication, workOrder: null },
+                      installation: { ...draft.installation, workOrder: null },
+                      savedBy: managerName,
+                      savedAt: now,
+                  }
+                : {
+                      ...saved,
+                      // A changed phase needs a new work order (#33), so its sent one is cleared.
+                      [phaseKey]: {
+                          ...draft[phaseKey],
+                          workOrder: null,
+                          changes: [...(saved[phaseKey].changes ?? []), { reason: text, changedBy: managerName, changedAt: now }],
+                      },
+                  };
+
         const finish = () => {
             toast.success(
-                `${wasSaved ? 'Schedule updated' : 'Schedule saved'}. Send the work orders to ${draft.fabrication.headName} (Fabrication) and ${draft.installation.headName} (Installation) below.`,
+                mode === 'reschedule'
+                    ? `${info.title} rescheduled. Send the updated work order to ${draft[phaseKey].headName} below.`
+                    : `Schedule saved. Send the work order to ${draft.fabrication.headName} below.`,
             );
-            setEditing(false);
+            setMode(null);
         };
 
-        // Acceptance criterion 1: the schedule is saved with every required detail.
+        // #32 acceptance criterion 1: the schedule is saved with every required detail.
         if (usingSample) {
-            onSaved({
-                ...project,
-                execution: {
-                    fabrication: { ...draft.fabrication, workOrder: null },
-                    installation: { ...draft.installation, workOrder: null },
-                    savedBy: managerName,
-                    savedAt: new Date().toISOString(),
-                },
-            });
+            onSaved({ ...project, execution: next });
             finish();
             return;
         }
 
-        router.put(`${PROJECTS_URL}/${project.id}/execution-schedule`, draft, {
+        const url =
+            mode === 'reschedule'
+                ? `${PROJECTS_URL}/${project.id}/execution-schedule/${phaseKey}/reschedule`
+                : `${PROJECTS_URL}/${project.id}/execution-schedule`;
+        router.put(url, mode === 'reschedule' ? { ...draft[phaseKey], reason: text } : draft, {
             preserveScroll: true,
             onStart: () => setSaving(true),
             onFinish: () => setSaving(false),
@@ -89,106 +129,111 @@ export default function ExecutionStep({ project, usingSample, managerName, onSav
         });
     };
 
-    const cancel = () => {
-        if (saved) setDraft(saved);
-        setErrors(noErrors());
-        setEditing(false);
-    };
+    // Which phases the editor shows: both for the first schedule, only this one when rescheduling.
+    const editing = mode === 'new' ? EXECUTION_PHASES : mode === 'reschedule' ? [info] : [];
 
-    return (
+        return (
         <>
-            <StepIntro title="Execution">
-                Schedule fabrication and installation and assign the responsible Heads. This step opens once the contract is approved and runs
-                alongside Payments.
+            <StepIntro title={info.title}>
+                {phaseKey === 'fabrication'
+                    ? 'Schedule fabrication and installation, assign the Heads, and send the Fabrication Head the work order.'
+                    : 'Send the Installation Head the work order and record when installation is done.'}
             </StepIntro>
 
             <div className="grid gap-4">
-                {saved && !editing && (
-                    <CompletedNotice>
-                        <b>The fabrication and installation schedule is saved.</b> Work orders were sent to the assigned Heads. Saved by{' '}
-                        {saved.savedBy} on {formatDateTime(saved.savedAt)}.
-                    </CompletedNotice>
+                {!saved && phaseKey === 'installation' && (
+                    <WaitingNotice>The schedule has not been saved yet. Save it in the Fabrication step first.</WaitingNotice>
                 )}
 
-                {EXECUTION_PHASES.map(({ key, title, head }) =>
-                    editing ? (
-                        <PhaseEditor
-                            key={key}
-                            phaseKey={key}
-                            title={title}
-                            headLabel={head}
-                            phase={draft[key]}
-                            errors={errors[key]}
-                            heads={setUpHeads.filter((h) => h.phase === key)}
-                            onChange={(changes) => updatePhase(key, changes)}
-                        />
-                    ) : (
-                        saved && (
-                            <div key={key} className="grid gap-3">
-                                <PhaseSummary title={title} headLabel={head} phase={saved[key]} />
-                                <WorkOrderPanel
-                                    project={project}
-                                    usingSample={usingSample}
-                                    managerName={managerName}
-                                    onSaved={onSaved}
-                                    phaseKey={key}
-                                    title={title}
-                                    setUpHeads={setUpHeads}
-                                />
-                                <PhaseCompletion
-                                    project={project}
-                                    usingSample={usingSample}
-                                    managerName={managerName}
-                                    onSaved={onSaved}
-                                    phaseKey={key}
-                                    title={title}
-                                />
+                {saved && phase && mode === null && (
+                    <>
+                        <CompletedNotice>
+                            <b>The {info.title.toLowerCase()} schedule is saved.</b> Saved by {saved.savedBy} on {formatDateTime(saved.savedAt)}.
+                            {!phase.completion && ` Send ${phase.headName} the work order below.`}
+                        </CompletedNotice>
+                        <PhaseSummary title={info.title} headLabel={info.head} phase={phase} />
+                        {canReschedule && (
+                            <div className="flex justify-end">
+                                <OutlineButton onClick={startReschedule}>
+                                    <CalendarClock className="size-4" /> Reschedule {info.title}
+                                </OutlineButton>
                             </div>
-                        )
-                    ),
+                        )}
+                        <WorkOrderPanel
+                            project={project}
+                            usingSample={usingSample}
+                            managerName={managerName}
+                            onSaved={onSaved}
+                            phaseKey={phaseKey}
+                            title={info.title}
+                            setUpHeads={setUpHeads}
+                        />
+                        <PhaseCompletion
+                            project={project}
+                            usingSample={usingSample}
+                            managerName={managerName}
+                            onSaved={onSaved}
+                            phaseKey={phaseKey}
+                            title={info.title}
+                        />
+                    </>
                 )}
 
-                {editing && tried && (
+                {editing.map(({ key, title, head }) => (
+                    <PhaseEditor
+                        key={key}
+                        phaseKey={key}
+                        title={title}
+                        headLabel={head}
+                        phase={draft[key]}
+                        errors={errors[key]}
+                        heads={setUpHeads.filter((h) => h.phase === key)}
+                        onChange={(changes) => updatePhase(key, changes)}
+                    />
+                ))}
+
+                                {mode === 'reschedule' && (
+                    <Field label="Reason for rescheduling" htmlFor="reschedule-reason" required error={reasonError}>
+                        <textarea
+                            id="reschedule-reason"
+                            value={reason}
+                            onChange={(e) => {
+                                setReason(e.target.value);
+                                if (reasonError) setReasonError('');
+                            }}
+                            placeholder="e.g. The venue moved the set-up day to Feb 13."
+                            className={cx(textareaClass, reasonError && 'border-red-500')}
+                        />
+                    </Field>
+                )}
+
+                {mode !== null && (tried || reasonError) && (
                     <p role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-700">
-                        The schedule was not saved. Assign both Heads and fill in every activity, scheduled date and target completion date.
+                        The schedule was not saved.{' '}
+                        {mode === 'new'
+                            ? 'Assign both Heads and fill in every activity, scheduled date and target completion date.'
+                            : 'Fill in every activity and date, and give the reason for rescheduling.'}
                     </p>
                 )}
 
                 <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                    {editing ? (
+                    {mode !== null ? (
                         <>
                             {saved && (
-                                <OutlineButton onClick={cancel} disabled={saving}>
+                                <OutlineButton onClick={cancelEdit} disabled={saving}>
                                     Cancel
                                 </OutlineButton>
                             )}
                             <GoldButton onClick={save} disabled={saving}>
-                                <Send className="size-4" /> {saving ? 'Saving...' : saved ? 'Save Changes' : 'Save Schedule'}
+                                <Send className="size-4" /> {saving ? 'Saving...' : mode === 'reschedule' ? 'Save New Schedule' : 'Save Schedule'}
                             </GoldButton>
                         </>
-                                        ) : (
-                        !locked && (
-                            <OutlineButton onClick={() => setEditing(true)}>
-                                <Pencil className="size-4" /> Edit Schedule
-                            </OutlineButton>
-                        )
-                    )}
+                        ) : null}
                 </div>
-
-                {!editing && (
-                    <ProjectStatusPanel
-                        project={project}
-                        usingSample={usingSample}
-                        managerName={managerName}
-                        onSaved={onSaved}
-                        setUpHeads={setUpHeads}
-                    />
-                )}
             </div>
         </>
     );
 }
-
 /* ---------- one phase (Fabrication or Installation) ---------- */
 
 type EditorProps = {
@@ -342,6 +387,21 @@ function PhaseSummary({ title, headLabel, phase }: { title: string; headLabel: s
                     </tbody>
                 </table>
             </div>
+                        {phase.changes && phase.changes.length > 0 && (
+                <div className="mt-4">
+                    <p className="mb-2 text-xs font-bold tracking-wide text-ink-soft uppercase">Rescheduled</p>
+                    <ul className="grid gap-2">
+                        {[...phase.changes].reverse().map((c) => (
+                            <li key={c.changedAt} className="rounded-lg border border-black/10 p-3 text-sm">
+                                <p className="text-ink">Reason: {c.reason}</p>
+                                <p className="text-xs text-ink-soft">
+                                    by {c.changedBy} on {formatDateTime(c.changedAt)}
+                                </p>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
         </Section>
     );
 }

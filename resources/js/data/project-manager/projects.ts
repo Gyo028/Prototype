@@ -148,29 +148,45 @@ export type Project = ProjectRequest & {
     execution: ExecutionSchedule | null; // fabrication and installation schedule (backlog #32)
     statusUpdates: StatusUpdate[]; // project status history, oldest first (backlog #35)
 };
+/* ---------- wizard steps (revision, Nov 19) ---------- */
 
-/* ---------- wizard steps ---------- */
+/**
+ * The pieces of planning work. Each wizard step groups one or more of them:
+ *   Ocular Visit = Reservation Fee + Site Assessment
+ *   Design       = Design Assignment + Design Proposal
+ *   Contract     = Contract + Payments
+ */
+export type PartKey =
+    | 'consultation'
+    | 'reservationFee'
+    | 'siteAssessment'
+    | 'designAssignment'
+    | 'designProposal'
+    | 'contract'
+    | 'payments'
+    | 'fabrication'
+    | 'installation'
+    | 'completed';
 
 export const STEPS = [
-    { key: 'consultation', title: 'Consultation' },
-    { key: 'reservationFee', title: 'Reservation Fee' },
-    { key: 'siteAssessment', title: 'Site Assessment' },
-    { key: 'designAssignment', title: 'Design Assignment' },
-    { key: 'designProposal', title: 'Design Proposal' },
-    { key: 'contract', title: 'Contract' },
-    { key: 'payments', title: 'Payments' },
-    { key: 'execution', title: 'Execution' },
-] as const;
+    { key: 'consultation', title: 'Consultation', parts: ['consultation'] },
+    { key: 'ocularVisit', title: 'Ocular Visit', parts: ['reservationFee', 'siteAssessment'] },
+    { key: 'design', title: 'Design', parts: ['designAssignment', 'designProposal'] },
+    { key: 'contract', title: 'Contract', parts: ['contract', 'payments'] },
+    { key: 'fabrication', title: 'Fabrication', parts: ['fabrication'] },
+    { key: 'installation', title: 'Installation', parts: ['installation'] },
+    { key: 'completed', title: 'Completed', parts: ['completed'] },
+] as const satisfies readonly { key: string; title: string; parts: readonly PartKey[] }[];
 
 export type StepKey = (typeof STEPS)[number]['key'];
 
 /**
  * done     = completed
- * skipped  = not needed for this project (e.g. no ocular visit) and counts as completed
+ * skipped  = not needed for this project and counts as completed
  * current  = the Project Manager can work on it now
  * waiting  = open, but waiting for the customer or the Design Specialist first
  * locked   = the step before it is not complete yet
- * closed   = the project will not proceed
+ * closed   = the project is cancelled or will not proceed
  */
 export type StepState = 'done' | 'skipped' | 'current' | 'waiting' | 'locked' | 'closed';
 
@@ -178,13 +194,19 @@ const peso = (n: number) => `₱${n.toLocaleString('en-PH')}`;
 
 export const isNotProceeding = (p: Project) => p.consultation?.decision === 'Do not proceed';
 
-/** The latest execution status (backlog #35). Projects start In Progress. */
-export const executionStatus = (p: Project): ExecutionStatus => p.statusUpdates.at(-1)?.status ?? 'In Progress';
+/** The last status the Project Manager set (Completed or Cancelled), or null (backlog #35). */
+export const executionStatus = (p: Project): ExecutionStatus | null => p.statusUpdates.at(-1)?.status ?? null;
+
+export const isCancelled = (p: Project) => executionStatus(p) === 'Cancelled';
 
 const ocularRequired = (p: Project) => p.consultation?.ocularVisit.required ?? true;
 
-/** Whether a step's work is finished. */
-export function isStepComplete(p: Project, key: StepKey): boolean {
+/** Fabrication can start once the contract is approved AND the down payment is paid (revision, Nov 19). */
+export const downPaymentPaid = (p: Project) =>
+    p.billings.some((b) => b.type === 'Down Payment' && billingStatus(b, p.payments) === 'Paid');
+
+/** Whether one piece of the planning work is finished. */
+export function isStepComplete(p: Project, key: PartKey): boolean {
     switch (key) {
         case 'consultation':
             return p.consultation !== null;
@@ -200,13 +222,17 @@ export function isStepComplete(p: Project, key: StepKey): boolean {
             return p.contract?.status === 'Approved';
         case 'payments':
             return p.billings.length > 0 && p.billings.every((b) => billingStatus(b, p.payments) === 'Paid');
-        case 'execution':
+        case 'fabrication':
+            return Boolean(p.execution?.fabrication.completion);
+        case 'installation':
+            return Boolean(p.execution?.installation.completion);
+        case 'completed':
             return executionStatus(p) === 'Completed';
     }
 }
 
-/** Why an open step cannot be worked on yet, or null when the Project Manager can act. */
-export function waitingReason(p: Project, key: StepKey): string | null {
+/** Why an open piece of work cannot be done yet, or null when the Project Manager can act. */
+export function waitingReason(p: Project, key: PartKey): string | null {
     switch (key) {
         case 'reservationFee': {
             const pending = p.payments.some((x) => x.type === 'Reservation Fee' && x.status === 'For Verification');
@@ -240,23 +266,37 @@ export function waitingReason(p: Project, key: StepKey): string | null {
     }
 }
 
+const partsOf = (key: StepKey): readonly PartKey[] => STEPS.find((s) => s.key === key)?.parts ?? [];
+
+/**
+ * Whether a whole wizard step is finished.
+ * Contract: the contract is approved and the down payment is paid. The other bills are
+ * still collected inside the Contract step (completion and payment are tracked separately).
+ */
+export function isWizardStepComplete(p: Project, key: StepKey): boolean {
+    if (key === 'contract') return isStepComplete(p, 'contract') && downPaymentPaid(p);
+    return partsOf(key).every((part) => isStepComplete(p, part));
+}
+
+/** The waiting reason of the first unfinished piece of a step. */
+function stepWaitingReason(p: Project, key: StepKey): string | null {
+    const part = partsOf(key).find((x) => !isStepComplete(p, x));
+    return part ? waitingReason(p, part) : null;
+}
+
 /** The state of every step, in order. A step unlocks only when the one before it is complete. */
 export function stepStates(p: Project): Record<StepKey, StepState> {
     const states = {} as Record<StepKey, StepState>;
-    const closed = isNotProceeding(p);
     let previousComplete = true;
 
     STEPS.forEach(({ key }, index) => {
-        const complete = isStepComplete(p, key);
+        const complete = isWizardStepComplete(p, key);
 
-        // Execution opens once the Contract is approved; it does not wait for Payments (Use Case).
-        const ready = key === 'execution' ? states.contract === 'done' : previousComplete;
-
-        if (closed && index > 0) states[key] = 'closed';
-        else if (executionStatus(p) === 'Cancelled' && !complete) states[key] = 'closed'; // a cancelled project stops here
-        else if (!ready) states[key] = 'locked';
-        else if (complete) states[key] = key === 'siteAssessment' && !ocularRequired(p) ? 'skipped' : 'done';
-        else states[key] = waitingReason(p, key) ? 'waiting' : 'current';
+        if (isNotProceeding(p) && index > 0) states[key] = 'closed';
+        else if (isCancelled(p) && !complete) states[key] = 'closed'; // a cancelled project stops here
+        else if (!previousComplete) states[key] = 'locked';
+        else if (complete) states[key] = 'done';
+        else states[key] = stepWaitingReason(p, key) ? 'waiting' : 'current';
 
         previousComplete = complete;
     });
@@ -264,20 +304,28 @@ export function stepStates(p: Project): Record<StepKey, StepState> {
     return states;
 }
 
-/** The first step that is not finished yet, or null when planning is complete or closed. */
+/** The first step that is not finished yet, or null when the project is completed, cancelled or not proceeding. */
 export function activeStep(p: Project): StepKey | null {
-    if (isNotProceeding(p) || executionStatus(p) === 'Cancelled') return null;
-    return STEPS.find(({ key }) => !isStepComplete(p, key))?.key ?? null;
+    if (isNotProceeding(p) || isCancelled(p)) return null;
+    return STEPS.find(({ key }) => !isWizardStepComplete(p, key))?.key ?? null;
 }
 
-export type ProjectStatus = ExecutionStatus | 'Not Proceeding';
+/**
+ * The project status shown on the lists = the step the project is in (revision, Nov 19),
+ * plus Completed and Cancelled. "Do not proceed" after the consultation counts as Cancelled.
+ */
+export type ProjectStatus = (typeof STEPS)[number]['title'] | 'Cancelled';
 
-/** Completion and payment are tracked separately: a project can be Completed with an unpaid balance (Use Case). */
+export const PROJECT_STATUSES: ProjectStatus[] = [...STEPS.map((s) => s.title), 'Cancelled'];
+
 export function projectStatus(p: Project): ProjectStatus {
-    if (isNotProceeding(p)) return 'Not Proceeding';
-    return executionStatus(p);
+    if (isNotProceeding(p) || isCancelled(p)) return 'Cancelled';
+    const key = activeStep(p);
+    if (key === null) return 'Completed';
+    // Installation is done but the Project Manager has not marked the project as Completed yet.
+    if (key === 'completed') return 'Installation';
+    return STEPS.find((s) => s.key === key)?.title ?? 'Consultation';
 }
-
 /* ---------- sample data ---------- */
 
 export const SAMPLE_SPECIALISTS: DesignSpecialist[] = [
@@ -287,6 +335,20 @@ export const SAMPLE_SPECIALISTS: DesignSpecialist[] = [
 ];
 
 type SampleInput = Pick<Project, 'id' | 'code' | 'customer' | 'eventType' | 'eventDate' | 'venue'> & Partial<Project>;
+
+/**
+ * Sample date submitted, worked out from the request number so the numbers follow the
+ * queue (first come, first served): REQ-0001 → Sep 1, REQ-0002 → Sep 3, REQ-0004 → Sep 7 ...
+ * Matches the dates on the Service Requests sample data.
+ */
+function sampleSubmittedAt(code: string) {
+    const n = Number(code.replace(/\D/g, ''));
+    const date = new Date(2026, 8, 2 * n - 1); // month 8 = September
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}T09:00:00+08:00`;
+}
 
 /** Fills in the fields every sample shares, so each sample only lists what is different. */
 function sample(p: SampleInput): Project {
@@ -305,7 +367,7 @@ function sample(p: SampleInput): Project {
         assets: [{ id: 'entrance-arch', name: 'Entrance Arch', category: 'Structures' }],
         files: [],
         layoutSnapshotUrl: null,
-        submittedAt: '2026-10-15T10:00:00+08:00',
+        submittedAt: sampleSubmittedAt(p.code),
         status: 'Approved',
         decision: { remarks: 'Approved. Please book a consultation.', decidedBy: 'Project Manager', decidedAt: '2026-10-16T09:00:00+08:00' },
         consultation: null,
