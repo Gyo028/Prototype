@@ -2,7 +2,7 @@ import { router } from '@inertiajs/react';
 import { useState } from 'react';
 import { PageHeader, Panel, Pill, cx, inputClass } from '@/components/dashboard/ui';
 import { formatDate, statusTone } from '@/components/project-manager/request-details';
-import { getSampleRequests } from '@/data/project-manager/project-requests';
+import { getSampleRequests, requestTitle } from '@/data/project-manager/project-requests';
 import type { ProjectRequest, RequestStatus } from '@/data/project-manager/project-requests';
 
 /*
@@ -35,7 +35,7 @@ export default function ProjectRequestReview({ requests }: Props) {
     const q = query.trim().toLowerCase();
     const visibleRequests = allRequests
         .filter((r) => filter === 'All' || r.status === filter)
-        .filter((r) => !q || r.code.toLowerCase().includes(q) || r.eventType.toLowerCase().includes(q))
+        .filter((r) => !q || r.code.toLowerCase().includes(q) || requestTitle(r).toLowerCase().includes(q))
         // Queue: first come, first served. The oldest request is at the top.
         .sort((a, b) => a.submittedAt.localeCompare(b.submittedAt));
 
@@ -110,7 +110,7 @@ export default function ProjectRequestReview({ requests }: Props) {
                                     className="cursor-pointer transition hover:bg-gold/10 focus-visible:bg-gold/10 focus-visible:outline-none"
                                 >
                                     <td className="px-4 py-3 font-semibold whitespace-nowrap text-ink">{r.code}</td>
-                                    <td className="px-2 py-3 text-ink">{r.eventType}</td>
+                                    <td className="px-2 py-3 text-ink">{requestTitle(r)}</td>
                                     <td className="px-2 py-3 whitespace-nowrap text-ink">{formatDate(r.submittedAt.slice(0, 10))}</td>
                                                                         <td className="px-2 py-3 pr-4">
                                         <Pill tone={statusTone[r.status]}>{r.status}</Pill>

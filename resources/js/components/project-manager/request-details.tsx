@@ -80,15 +80,17 @@ export function RequestDetails({ request: r }: { request: ProjectRequest }) {
 
             <Section title="Event Details">
                 <div className="grid grid-cols-2 gap-3">
-                    <Detail label="Event date">{formatDate(r.eventDate)}</Detail>
-                    <Detail label="Time">
-                        {formatTime(r.startTime)} – {formatTime(r.endTime)}
+                    <Detail label={r.endDate && r.endDate !== r.eventDate ? 'Event dates' : 'Event date'}>
+                        {formatDate(r.eventDate)}
+                        {r.endDate && r.endDate !== r.eventDate && ` – ${formatDate(r.endDate)}`}
                     </Detail>
+                    <Detail label="Time">{r.startTime && r.endTime ? `${formatTime(r.startTime)} – ${formatTime(r.endTime)}` : 'Not applicable'}</Detail>
                     <Detail label="Guests">{r.guests ?? 'Not applicable'}</Detail>
                     <Detail label="Budget">{r.budget}</Detail>
                     <div className="col-span-2">
                         <Detail label="Venue">
-                            {r.venue} ({r.venueSetting})
+                            {r.venue}
+                            {r.venueSetting && ` (${r.venueSetting})`}
                         </Detail>
                     </div>
                 </div>
@@ -173,8 +175,9 @@ export function RequestDetails({ request: r }: { request: ProjectRequest }) {
 /** One line of the preliminary quotation. Per-guest services are multiplied by the guest count. */
 export function quotationLines(r: ProjectRequest) {
     return r.services.map((s) => {
-        const quantity = s.unit === 'pax' ? (r.guests ?? 0) : 1;
-        return { id: s.id, name: s.name, unitLabel: s.unit ? `${peso(s.price)} / ${s.unit}` : peso(s.price), quantity, total: s.price * quantity };
+                // The backend sends the customer's quantity and subtotal; the sample data works them out.
+        const quantity = s.quantity ?? (s.unit === 'pax' ? (r.guests ?? 0) : 1);
+        return { id: s.id, name: s.name, unitLabel: s.unit ? `${peso(s.price)} / ${s.unit}` : peso(s.price), quantity, total: s.subtotal ?? s.price * quantity };
     });
 }
 
@@ -250,6 +253,7 @@ function PreliminaryLayoutAndQuotation({ request: r }: { request: ProjectRequest
 /** Read-only view of a saved consultation. */
 export function ConsultationSummary({ consultation: c }: { consultation: Consultation }) {
     const proceed = c.decision === 'Proceed';
+    const decisionTone = proceed ? 'blue' : c.decision === 'On hold' ? 'yellow' : 'red';
 
     return (
         <Section title="Consultation">
@@ -257,7 +261,7 @@ export function ConsultationSummary({ consultation: c }: { consultation: Consult
                 <Detail label="Outcome">{c.outcome}</Detail>
                 <Detail label="Ocular visit">{c.ocularVisit.required ? 'Required' : 'Not required'}</Detail>
                 <Detail label="Project decision">
-                    <Pill tone={proceed ? 'blue' : 'red'}>{proceed ? 'Proceed' : 'Do not proceed'}</Pill>
+                    <Pill tone={decisionTone}>{c.decision}</Pill>
                 </Detail>
                 <div className="sm:col-span-3">
                     <Detail label="Summary">{c.summary}</Detail>
@@ -267,7 +271,7 @@ export function ConsultationSummary({ consultation: c }: { consultation: Consult
                         <Detail label="Additional details">{c.additionalNotes}</Detail>
                     </div>
                 )}
-                {!proceed && c.decisionReason && (
+                {c.decision === 'Do not proceed' && c.decisionReason && (
                     <div className="sm:col-span-3">
                         <Detail label="Reason for not proceeding">{c.decisionReason}</Detail>
                     </div>

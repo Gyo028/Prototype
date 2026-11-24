@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { DangerButton, Field, GoldButton, OutlineButton, Panel, Pill, cx, textareaClass } from '@/components/dashboard/ui';
 import { REQUESTS_URL } from '@/components/project-manager/project-request-review';
 import { RequestDetails, formatDateTime, statusTone } from '@/components/project-manager/request-details';
-import { getSampleRequest, saveSampleRequest } from '@/data/project-manager/project-requests';
+import { getSampleRequest, requestTitle, saveSampleRequest } from '@/data/project-manager/project-requests';
 import type { ProjectRequest, RequestStatus } from '@/data/project-manager/project-requests';
 
 /*
@@ -109,7 +109,7 @@ export default function ProjectRequestDetail({ request: serverRequest, requestId
             <div className="mb-5">
                 <div className="flex flex-wrap items-center gap-3">
                     <h1 className="text-2xl font-bold text-ink">
-                        {request.code} · {request.eventType}
+                        {request.code} · {requestTitle(request)}
                     </h1>
                     <Pill tone={statusTone[request.status]}>{request.status}</Pill>
                 </div>

@@ -147,6 +147,14 @@ export type Project = ProjectRequest & {
     disputes: BillingDispute[]; // billing disputes raised by the customer (backlog #31)
     execution: ExecutionSchedule | null; // fabrication and installation schedule (backlog #32)
     statusUpdates: StatusUpdate[]; // project status history, oldest first (backlog #35)
+    
+    /* Sent by the backend only (left out in the sample data). */
+    requestCode?: string; // the service request's number, e.g. "REQ-26-0011" (the project's own is `code`, e.g. "PRJ-26-0004")
+    statusName?: ProjectStatus; // the status saved in the database
+    stage?: StepKey | null; // the step the database says the project is on; null when completed or cancelled
+    onHold?: boolean; // the customer is still deciding after the consultation
+    consultationAt?: string | null; // 'YYYY-MM-DDTHH:mm', the consultation the customer booked; null when none is booked
+    consultationNote?: string | null; // why the last booking was closed (rescheduled / did not attend)
 };
 /* ---------- wizard steps (revision, Nov 19) ---------- */
 
@@ -197,7 +205,7 @@ export const isNotProceeding = (p: Project) => p.consultation?.decision === 'Do 
 /** The last status the Project Manager set (Completed or Cancelled), or null (backlog #35). */
 export const executionStatus = (p: Project): ExecutionStatus | null => p.statusUpdates.at(-1)?.status ?? null;
 
-export const isCancelled = (p: Project) => executionStatus(p) === 'Cancelled';
+export const isCancelled = (p: Project) => executionStatus(p) === 'Cancelled' || (p.statusName === 'Cancelled' && !isNotProceeding(p));
 
 const ocularRequired = (p: Project) => p.consultation?.ocularVisit.required ?? true;
 
@@ -209,7 +217,7 @@ export const downPaymentPaid = (p: Project) =>
 export function isStepComplete(p: Project, key: PartKey): boolean {
     switch (key) {
         case 'consultation':
-            return p.consultation !== null;
+            return p.consultation !== null && p.consultation.decision !== 'On hold'; // On hold: the customer is still deciding
         case 'reservationFee':
             return p.reservationFee.paid;
         case 'siteAssessment':
@@ -234,6 +242,11 @@ export function isStepComplete(p: Project, key: PartKey): boolean {
 /** Why an open piece of work cannot be done yet, or null when the Project Manager can act. */
 export function waitingReason(p: Project, key: PartKey): string | null {
     switch (key) {
+        case 'consultation':
+            if (p.consultation?.decision === 'On hold') return 'The customer is still deciding whether to proceed (on hold).';
+            // consultationAt is only sent by the backend; the sample data leaves it out.
+            if (!p.consultation && p.consultationAt === null) return 'Waiting for the customer to book the consultation.';
+            return null;
         case 'reservationFee': {
             const pending = p.payments.some((x) => x.type === 'Reservation Fee' && x.status === 'For Verification');
             if (!pending) return `Waiting for the customer to pay the reservation fee (${peso(p.reservationFee.amount)}) and upload the receipt.`;
@@ -274,6 +287,15 @@ const partsOf = (key: StepKey): readonly PartKey[] => STEPS.find((s) => s.key ==
  * still collected inside the Contract step (completion and payment are tracked separately).
  */
 export function isWizardStepComplete(p: Project, key: StepKey): boolean {
+        // Real data: the steps before the one the database says the project is on are done,
+    // even when their details are not connected to the page yet.
+    if (p.statusName === 'Completed') return true;
+    if (p.stage) {
+        const index = STEPS.findIndex((s) => s.key === key);
+        const stageIndex = STEPS.findIndex((s) => s.key === p.stage);
+        if (index < stageIndex) return true;
+        if (index > stageIndex) return false;
+    }
     if (key === 'contract') return isStepComplete(p, 'contract') && downPaymentPaid(p);
     return partsOf(key).every((part) => isStepComplete(p, part));
 }
@@ -319,6 +341,7 @@ export type ProjectStatus = (typeof STEPS)[number]['title'] | 'Cancelled';
 export const PROJECT_STATUSES: ProjectStatus[] = [...STEPS.map((s) => s.title), 'Cancelled'];
 
 export function projectStatus(p: Project): ProjectStatus {
+    if (p.statusName) return p.statusName; // real data: the status saved in the database
     if (isNotProceeding(p) || isCancelled(p)) return 'Cancelled';
     const key = activeStep(p);
     if (key === null) return 'Completed';

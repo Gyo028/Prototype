@@ -27,6 +27,9 @@ use App\Http\Controllers\DesignSpecialist;
 use App\Http\Controllers\Bookkeeper\ExpenseController;
 use App\Http\Controllers\Bookkeeper\FinancialReportController;
 use App\Http\Controllers\ProjectExpenseRecordController;
+use App\Http\Controllers\ProjectManager\ServiceRequestController as PmServiceRequestController;
+use App\Http\Controllers\ProjectManager\ProjectController as PmProjectController;
+use App\Http\Controllers\ProjectManager\ConsultationController as PmConsultationController;
 
 
 
@@ -132,11 +135,17 @@ Route::middleware(['auth', 'verified', 'role:project_manager'])
     ->name('project-manager.')
     ->group(function () {
         Route::inertia('/', 'project-manager/dashboard')->name('dashboard');
-        Route::inertia('service-requests', 'project-manager/service-requests')->name('service-requests');
-        Route::inertia('service-requests/{serviceRequest}', 'project-manager/service-request-show')->name('service-requests.show');
-        Route::inertia('projects', 'project-manager/projects')->name('projects');
+                // Backlog #13: Service Requests
+        Route::get('service-requests', [PmServiceRequestController::class, 'index'])->name('service-requests');
+        Route::get('service-requests/{serviceRequest}', [PmServiceRequestController::class, 'show'])->name('service-requests.show');
+        Route::patch('service-requests/{serviceRequest}/approve', [PmServiceRequestController::class, 'approve'])->name('service-requests.approve');
+        Route::patch('service-requests/{serviceRequest}/reject', [PmServiceRequestController::class, 'reject'])->name('service-requests.reject');
+        Route::get('service-requests/{serviceRequest}/files/{file}', [PmServiceRequestController::class, 'file'])->name('service-requests.file');
+                // Projects (connected step by step) and backlog #16: Consultation
+        Route::get('projects', [PmProjectController::class, 'index'])->name('projects');
+        Route::get('projects/{project}', [PmProjectController::class, 'show'])->name('projects.show');
+        Route::patch('projects/{project}/consultation', [PmConsultationController::class, 'update'])->name('projects.consultation');
         Route::inertia('billing-payments', 'project-manager/billing-payments')->name('billing-payments');
-        Route::inertia('projects/{project}', 'project-manager/project-show')->name('projects.show');
     });
 
 Route::middleware(['auth', 'verified', 'role:design_specialist'])
