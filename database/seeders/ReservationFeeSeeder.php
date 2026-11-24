@@ -23,8 +23,8 @@ use Illuminate\Support\Facades\DB;
  * Sample reservation fee bills (Plan Project step 2), until the Project
  * Manager side issues and verifies them.
  *
- *  - Sample projects from Booked onward get a paid bill with a verified
- *    GCash payment.
+ *  - Sample projects from Booked onward (every customer's) get a paid bill
+ *    with a verified GCash payment.
  *  - Two new sample projects for customer@example.com, both just after
  *    the consultation:
  *      · "fee due"      the bill is issued and waiting for payment
@@ -61,7 +61,7 @@ class ReservationFeeSeeder extends Seeder
         $today = Carbon::today();
 
         DB::transaction(function () use ($fees, $customer, $customerUser, $manager, $today) {
-            $this->payExistingProjects($fees, $customer, $customerUser);
+            $this->payExistingProjects($fees, $customerUser);
 
             // Fee due: consultation 2 days ago, bill issued yesterday (due in 6 days).
             $feeDue = $this->newProject($customer, $manager, 'Birthday', 80, '17:00', '22:00', 120, 100000, 250000, 'Seda Vertis North Ballroom, Quezon City', consultedDaysAgo: 2);
@@ -83,14 +83,14 @@ class ReservationFeeSeeder extends Seeder
     }
 
     /** A paid bill with a verified payment for every sample project past the consultation. */
-    private function payExistingProjects(ReservationFees $fees, Customer $customer, User $customerUser): void
+    private function payExistingProjects(ReservationFees $fees, User $customerUser): void
     {
         $statusIds = ProjectStatus::query()->whereIn('status_name', self::PAID_STATUSES)->pluck('status_id');
 
+        // Every customer's projects (customer@example.com and the SampleCustomersSeeder accounts).
         $projects = Project::query()
-            ->with(['schedules', 'serviceRequest'])
+            ->with(['schedules', 'serviceRequest.customer'])
             ->whereIn('current_status_id', $statusIds)
-            ->whereHas('serviceRequest', fn ($q) => $q->where('customer_id', $customer->customer_id))
             ->get();
 
         foreach ($projects as $i => $project) {
@@ -111,7 +111,7 @@ class ReservationFeeSeeder extends Seeder
                 'submitted_at' => $issuedAt->copy()->addDays(2)->setTime(11, 20),
                 'payment_method' => Payment::METHOD_GCASH,
                 'status' => Payment::STATUS_VERIFIED,
-                'recorded_by' => $customerUser->id,
+                'recorded_by' => $project->serviceRequest->customer->user_id ?? $customerUser->id,
                 'verified_at' => $issuedAt->copy()->addDays(3)->setTime(9, 0),
             ]);
         }

@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Sample projects for the Project Manager's projects table and project
- * folder (Plan Project, Slice 0). Until the "approve request" action is
+ * folder. Until the "approve request" action is
  * built, approved requests and their projects come from here.
  *
  * Ten projects: one per status, plus a second Consultation project that is
@@ -27,17 +27,18 @@ use Illuminate\Support\Facades\DB;
  * current. Plus one pending request (no project yet) for the review screen.
  *
  * Needs CustomerSeeder, StaffEmployeeSeeder and ServiceAssetSeeder first.
- * Skips if any project already exists.
+ * Skips if any project already exists. SampleCustomersSeeder reuses the
+ * helpers below (standard, custom, project, schedule) for other customers.
  */
 class ProjectSeeder extends Seeder
 {
-    private Carbon $today;
+    protected Carbon $today;
 
-    private Customer $customer;
+    protected Customer $customer;
 
-    private Employee $projectManager;
+    protected Employee $projectManager;
 
-    private Employee $designSpecialist;
+    protected Employee $designSpecialist;
 
     public function run(): void
     {
@@ -180,7 +181,7 @@ class ProjectSeeder extends Seeder
         $this->standard('Debut', 65, '18:00', '23:30', 100, 100000, 250000, 'Okada Manila Grand Ballroom, Parañaque', approved: false, requestedDaysAgo: 1);
     }
 
-    private function standard(
+    protected function standard(
         string $eventType,
         int $inDays,
         string $from,
@@ -225,7 +226,7 @@ class ProjectSeeder extends Seeder
         return $request;
     }
 
-    private function custom(string $title, int $startInDays, int $endInDays, int $budgetMin, ?int $budgetMax, string $venue): ServiceRequest
+    protected function custom(string $title, int $startInDays, int $endInDays, int $budgetMin, ?int $budgetMax, string $venue): ServiceRequest
     {
         return ServiceRequest::create([
             'customer_id' => $this->customer->customer_id,
@@ -242,7 +243,7 @@ class ProjectSeeder extends Seeder
     }
 
     /** @return array<string, mixed> */
-    private function decided(bool $approved, int $requestedDaysAgo): array
+    protected function decided(bool $approved, int $requestedDaysAgo): array
     {
         return $approved
             ? ['request_status' => ServiceRequest::STATUS_APPROVED, 'reviewed_at' => $this->today->copy()->subDays(max($requestedDaysAgo - 1, 0))->setTime(10, 0)]
@@ -253,7 +254,7 @@ class ProjectSeeder extends Seeder
      * Creates the project and its event schedule. The event is 'confirmed' from
      * Booked onward (reservation fee verified), 'tentative' before that.
      */
-    private function project(
+    protected function project(
         ServiceRequest $request,
         string $status,
         ?string $decision = null,
@@ -289,7 +290,7 @@ class ProjectSeeder extends Seeder
         return $project;
     }
 
-    private function schedule(Project $project, string $type, int $inDays, string $from, string $to, string $status, ?int $endDay = null): void
+    protected function schedule(Project $project, string $type, int $inDays, string $from, string $to, string $status, ?int $endDay = null): void
     {
         $project->schedules()->create([
             'schedule_type' => $type,
@@ -299,7 +300,7 @@ class ProjectSeeder extends Seeder
         ]);
     }
 
-    private function employeeFor(Role $role): ?Employee
+    protected function employeeFor(Role $role): ?Employee
     {
         $user = User::query()->where('email', $role->value.'@example.com')->first();
 

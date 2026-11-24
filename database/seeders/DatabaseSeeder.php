@@ -9,6 +9,13 @@ use Illuminate\Database\Seeder;
 class DatabaseSeeder extends Seeder
 {
     /**
+     * The extra customer accounts (SampleCustomersSeeder). Left out of the
+     * automated tests by default, which count the sample data of
+     * customer@example.com; a test that needs them sets this to true.
+     */
+    public static ?bool $withSampleCustomers = null;
+
+    /**
      * One verified test account per role, e.g. technical_admin@example.com.
      * Password for all of them: "password". Safe to run more than once.
      * Change or remove these before the system is used with real data.
@@ -31,6 +38,12 @@ class DatabaseSeeder extends Seeder
         $this->call(CustomerSeeder::class);
         $this->call(StaffEmployeeSeeder::class);
         $this->call(ProjectSeeder::class);
+
+        if (self::$withSampleCustomers ?? ! app()->runningUnitTests()) {
+            // Before ReservationFeeSeeder and the rest, so their projects get bills, designs, contracts…
+            $this->call(SampleCustomersSeeder::class);
+        }
+
         $this->call(ReservationFeeSeeder::class);
         $this->call(SiteAccessDocumentSeeder::class);
         $this->call(SiteAssessmentSeeder::class);
