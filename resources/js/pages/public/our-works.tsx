@@ -15,7 +15,7 @@ type Project = {
 
 const projects: Project[] = [
     { image: '/images/works/work-7.webp', title: 'A Night in Paris', category: 'Themed Event', size: 'feature' },
-    { image: '/images/works/work-8.webp', title: 'Garden Signage', category: 'Custom Fabrication', size: 'tall' },
+    { image: '/images/works/work-8.webp', title: 'Garden Signage', category: 'Custom Projects', size: 'tall' },
     { image: '/images/works/work-11.webp', title: 'A Celebration in Bloom', category: 'Event Styling', size: 'regular' },
     { image: '/images/works/work-14.webp', title: 'Wellness Place', category: 'Mall Activation', size: 'regular' },
     { image: '/images/works/work-4.webp', title: 'Corporate Launch', category: 'Corporate Event', size: 'wide' },
@@ -25,7 +25,7 @@ const projects: Project[] = [
     { image: '/images/works/work-19.webp', title: 'Paper Blooms', category: 'Mall Activation', size: 'regular' },
     { image: '/images/works/work-15.webp', title: 'Wedding of Joy & Jordan', category: 'Wedding Styling', size: 'tall' },
     { image: '/images/works/work-2.webp', title: 'Gala Night', category: 'Corporate Event', size: 'feature' },
-    { image: '/images/works/work-16.webp', title: 'The Mirror Arch', category: 'Custom Fabrication', size: 'tall' },
+    { image: '/images/works/work-16.webp', title: 'The Mirror Arch', category: 'Custom Projects', size: 'tall' },
 ];
 
 const sizeClasses: Record<TileSize, string> = {

@@ -5,7 +5,7 @@ export type ServiceKey = 'corporate-events' | 'special-occasions' | 'custom-fabr
 const services: { key: ServiceKey; label: string; href: string }[] = [
     { key: 'corporate-events', label: 'Corporate Events', href: '/services/corporate-events' },
     { key: 'special-occasions', label: 'Special Occasions', href: '/services/special-occasions' },
-    { key: 'custom-fabrication', label: 'Custom Fabrication', href: '/services/custom-fabrication' },
+    { key: 'custom-fabrication', label: 'Custom Projects', href: '/services/custom-fabrication' },
 ];
 
 type Props = {

@@ -12,7 +12,7 @@ const services = [
         href: '/services/special-occasions',
     },
     {
-        title: 'Custom Fabrication',
+        title: 'Custom Projects',
         description: 'Design and production of customized backdrops, props, and themed event structures.',
         href: '/services/custom-fabrication',
     },
