@@ -43,7 +43,7 @@ test('the verification email is branded and has the verify link', function () {
         ->and($html)->toContain(config('app.name'))
         ->toContain('Hi Andrea Santos')
         ->toContain('images/contract-logo.jpg')
-        ->toContain('/email/verify/'.$user->id.'/');
+        ->toContain('/email/verify-link/'.$user->id.'/'); // works without logging in
 });
 
 test('an unverified customer is sent to the verification page', function () {

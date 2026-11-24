@@ -1,6 +1,8 @@
 import { Form, Head, router } from '@inertiajs/react';
 import { useEffect } from 'react';
 import { GoogleButton, OrDivider } from '@/components/auth/google-button';
+import VerificationModal from '@/components/auth/verification-modal';
+import type { Verification } from '@/components/auth/verification-modal';
 import InputError from '@/components/input-error';
 import PasswordInput from '@/components/password-input';
 import TextLink from '@/components/text-link';
@@ -16,9 +18,11 @@ import { request } from '@/routes/password';
 type Props = {
     status?: string;
     canResetPassword: boolean;
+    /** "Verify your email": after registering, or logging in before verifying. */
+    verification?: Verification | null;
 };
 
-export default function Login({ status, canResetPassword }: Props) {
+export default function Login({ status, canResetPassword, verification }: Props) {
     useEffect(() => {
         // Already logged in (e.g. pressed Back)? The server redirects to the dashboard.
         router.reload({ replace: true });
@@ -27,6 +31,7 @@ export default function Login({ status, canResetPassword }: Props) {
     return (
         <>
             <Head title="Log in" />
+            <VerificationModal verification={verification} />
 
             {status && (
                 <div className="mb-4 text-center text-sm font-medium text-green-600">

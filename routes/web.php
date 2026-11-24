@@ -3,6 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
+use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\TechnicalAdmin\UserAccountController;
 use App\Http\Controllers\TechnicalAdmin\EmployeeController;
 use App\Http\Controllers\TechnicalAdmin\FaqController;
@@ -30,6 +31,13 @@ use App\Http\Controllers\ProjectExpenseRecordController;
 
 
 Route::inertia('/', 'public/landing')->name('home');
+
+// Email verification without logging in (the login page's "Verify your email" modal).
+Route::post('/email/verification/resend', [EmailVerificationController::class, 'resend'])
+    ->middleware(['guest', 'throttle:6,1'])->name('verification.resend');
+// The link in the verification email: signed, expires after 60 minutes.
+Route::get('/email/verify-link/{id}/{hash}', [EmailVerificationController::class, 'verify'])
+    ->middleware(['signed', 'throttle:6,1'])->whereNumber('id')->name('verification.verify.guest');
 Route::inertia('/faq', 'public/faq')->name('faq');
 Route::inertia('/our-works', 'public/our-works')->name('our-works');
 Route::inertia('/services/corporate-events', 'public/corporate-events')->name('services.corporate-events');
