@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\ResetUserPassword;
+use App\Http\Controllers\Auth\EmailVerificationController;
+use App\Http\Responses\RegisterResponse;
 use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -12,7 +14,9 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
+use Laravel\Fortify\Contracts\RegisterResponse as RegisterResponseContract;
 use Laravel\Fortify\Features;
 use Laravel\Fortify\Fortify;
 
@@ -23,7 +27,8 @@ class FortifyServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // After registering: back to the login page with the "Check your email" modal.
+        $this->app->singleton(RegisterResponseContract::class, RegisterResponse::class);
     }
 
     /**
@@ -46,14 +51,22 @@ class FortifyServiceProvider extends ServiceProvider
 
         // Login check: correct email + password, and the account must not be disabled.
         // Returning null makes Fortify show "Invalid credentials." (lang/en/auth.php).
+        // Correct but not verified yet: not logged in; the login page shows the
+        // "Verify your email first" modal (EmailVerificationController).
         Fortify::authenticateUsing(function (Request $request) {
             $user = User::where('email', $request->input(Fortify::username()))->first();
 
-            if ($user && $user->isActive() && Hash::check((string) $request->input('password'), $user->password)) {
-                return $user;
+            if (! $user || ! $user->isActive() || ! Hash::check((string) $request->input('password'), $user->password)) {
+                return null;
             }
 
-            return null;
+            if (! $user->hasVerifiedEmail()) {
+                EmailVerificationController::remember($request, $user, 'login');
+
+                throw ValidationException::withMessages(['verification' => 'Verify your email first.']);
+            }
+
+            return $user;
         });
     }
 
@@ -65,6 +78,8 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::loginView(fn (Request $request) => Inertia::render('auth/login', [
             'canResetPassword' => Features::enabled(Features::resetPasswords()),
             'status' => $request->session()->get('status'),
+            // The "Verify your email" modal, after registering or logging in unverified.
+            'verification' => EmailVerificationController::modal($request),
         ]));
 
         Fortify::resetPasswordView(fn (Request $request) => Inertia::render('auth/reset-password', [

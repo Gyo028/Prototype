@@ -12,14 +12,17 @@ test('registration screen can be rendered', function () {
     $response->assertOk();
 });
 
-test('new users can register', function () {
+test('new users can register, then verify their email before logging in', function () {
     $response = $this->post(route('register.store'), [
         'name' => 'Test User',
         'email' => 'test@example.com',
         'password' => 'password',
         'password_confirmation' => 'password',
+        'terms' => '1',
     ]);
 
-    $this->assertAuthenticated();
-    $response->assertRedirect(route('dashboard', absolute: false));
+    // Not logged in: back to the login page with the "Check your email" modal.
+    $this->assertGuest();
+    $response->assertRedirect(route('login', absolute: false));
+    expect(\App\Models\User::where('email', 'test@example.com')->exists())->toBeTrue();
 });

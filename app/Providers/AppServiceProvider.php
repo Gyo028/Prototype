@@ -4,9 +4,14 @@ namespace App\Providers;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Notifications\VerifyEmail;
+use Illuminate\Notifications\Events\NotificationSent;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 
@@ -35,6 +40,20 @@ class AppServiceProvider extends ServiceProvider
      */
     protected function configureEmails(): void
     {
+        // The link works without logging in (EmailVerificationController::verify).
+        VerifyEmail::createUrlUsing(fn (object $notifiable) => URL::temporarySignedRoute(
+            'verification.verify.guest',
+            Carbon::now()->addMinutes((int) config('auth.verification.expire', 60)),
+            ['id' => $notifiable->getKey(), 'hash' => sha1($notifiable->getEmailForVerification())],
+        ));
+
+        // A line in storage/logs/laravel.log for every verification email sent, to trace delivery.
+        Event::listen(NotificationSent::class, function (NotificationSent $event) {
+            if ($event->notification instanceof VerifyEmail && $event->channel === 'mail') {
+                Log::info('Verification email sent to '.$event->notifiable->email.' via '.config('mail.default'));
+            }
+        });
+
         VerifyEmail::toMailUsing(fn (object $notifiable, string $url) => (new MailMessage)
             ->subject('Verify your email · '.config('app.name'))
             ->view(['html' => 'mail.verify-email', 'text' => 'mail.verify-email-text'], [
