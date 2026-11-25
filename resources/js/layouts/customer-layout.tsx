@@ -1,6 +1,6 @@
 import { Link } from '@inertiajs/react';
 import { Menu, X } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import BrandLogo from '@/components/brand-logo';
 import CustomerSidebar from '@/components/dashboard/customer-sidebar';
@@ -18,11 +18,32 @@ export default function CustomerLayout({
 }) {
     const [open, setOpen] = useState(false);
 
+    // Phones and tablets: the top bar slides away while scrolling down and comes back when scrolling up.
+    // On desktop (lg) it always stays, since the sidebar sits right under it.
+    const [barHidden, setBarHidden] = useState(false);
+    const lastY = useRef(0);
+
+    useEffect(() => {
+        const onScroll = () => {
+            const y = window.scrollY;
+            const delta = y - lastY.current;
+            if (Math.abs(delta) < 6) return; // ignore tiny jitters
+            setBarHidden(delta > 0 && y > 80);
+            lastY.current = y;
+        };
+        window.addEventListener('scroll', onScroll, { passive: true });
+        return () => window.removeEventListener('scroll', onScroll);
+    }, []);
+
     return (
         <div className="flex min-h-svh flex-col bg-neutral-100">
             {/* Top bar: the logo, and on phones and tablets the menu button on the right.
                 Notifications and My Profile are in the sidebar. */}
-            <header className="sticky top-0 z-30 flex h-20 items-center justify-between gap-4 bg-white px-4 shadow-md md:px-8">
+            <header
+                className={`sticky top-0 z-30 flex h-20 items-center justify-between gap-4 bg-white px-4 shadow-md transition-transform duration-300 md:px-8 lg:translate-y-0 ${
+                    barHidden && !open ? '-translate-y-full' : 'translate-y-0'
+                }`}
+            >
                 <Link href="/" aria-label="Back to home page">
                     <BrandLogo />
                 </Link>

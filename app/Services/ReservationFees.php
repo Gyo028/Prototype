@@ -19,7 +19,8 @@ use Illuminate\Support\Facades\Storage;
  *
  *  - Issued after the consultation, once the customer decides to proceed
  *    (the Project Manager side calls issue(); sample bills come from a seeder).
- *  - Amount: 10% of the budget range (max, or min when there is no max).
+ *  - Amount: ServiceRequest::reservationFee(): 10% of the initial quotation
+ *    (standard) or of the exact budget / budget range's maximum (custom).
  *  - Due 7 days after it is issued (the due date itself still counts).
  *  - Paid in full, by GCash, with the reference number and a receipt.
  *  - One payment waiting for verification at a time. A rejected payment stays
@@ -55,7 +56,7 @@ class ReservationFees
                 'issued_at' => $issuedAt,
                 'due_date' => $issuedAt->copy()->addDays($this->dueDays())->toDateString(),
                 'status' => Billing::STATUS_ISSUED,
-                'description' => 'Reservation fee (10% of the budget range)',
+                'description' => 'Reservation fee (10% of '.str_replace('your ', 'the ', $project->serviceRequest->reservationFeeBasis()).')',
             ],
         );
     }

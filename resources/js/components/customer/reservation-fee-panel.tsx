@@ -9,7 +9,7 @@ import { Field, GoldButton, Pill, cx, inputClass } from '@/components/dashboard/
 /*
  * Pay the reservation fee — Plan Project step 2.
  *
- * The bill is 10% of the budget range, due 7 days after it is issued, and is
+ * The bill is 10% of the initial quotation (standard) or budget (custom), due 7 days after it is issued, and is
  * paid in full by GCash. The customer enters the GCash reference number, the
  * date paid and the amount, and uploads the receipt (PDF, JPG or PNG, up to
  * 5 MB). The Project Manager then verifies it; once verified the project is
@@ -37,7 +37,7 @@ type Texts = {
 };
 
 const RESERVATION_TEXTS: Texts = {
-    heading: 'Reservation fee · 10% of your budget',
+    heading: 'Reservation fee',
     dueNote: 'Pay in full by the due date. If it is not paid by then, your project is cancelled and the date is released.',
     pendingNote: 'Our Project Manager will check your payment. Your event date is confirmed once it is verified.',
     success: 'Payment sent. We will let you know once it is verified.',
@@ -114,7 +114,7 @@ export default function ReservationFeePanel({ projectId, fee, stepState, payUrl,
             <Notice>
                 {stepState === 'done'
                     ? 'Your reservation fee was paid and verified.'
-                    : `Your bill of ${peso(fee.expectedAmount)} (10% of your budget) is being prepared. You will be able to pay it here.`}
+                    : `Your bill of ${peso(fee.expectedAmount)} is being prepared. You will be able to pay it here.`}
             </Notice>
         );
     }

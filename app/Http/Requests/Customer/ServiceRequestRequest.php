@@ -17,14 +17,15 @@ use Illuminate\Validation\Rule;
  * Two request types:
  *  - standard: eventTypeId, eventDate, eventStartTime, eventEndTime, guests,
  *              serviceIds (optional add-ons), and the preliminary layout:
- *              themeId, slotPicks (slot key => asset id), extraAssetIds,
- *              customItems ("Other" items: category, name, description)
+ *              themeId, assetIds (the ticked library assets; none = the
+ *              theme's default set), customItems ("Other" items: category,
+ *              name, description)
  *  - custom:   projectTitle, startDate, endDate (no event type, times, guests or services)
  * Both:        requestType, venue, budget, description (optional), files (optional)
  *
  * Nothing has to be picked on Services & Assets: the Event Styling fee always
- * counts as a service, and an untouched layout is the theme's default set.
- * Whether a swap or an extra is allowed is checked by PreliminaryLayouts.
+ * counts as a service, and no ticked asset means the theme's default set.
+ * Whether an asset can be offered is checked by PreliminaryLayouts.
  */
 class ServiceRequestRequest extends FormRequest
 {
@@ -79,7 +80,12 @@ class ServiceRequestRequest extends FormRequest
         $common = [
             'requestType' => ['required', Rule::in([ServiceRequest::TYPE_STANDARD, ServiceRequest::TYPE_CUSTOM])],
             'venue' => ['required', 'string', 'max:255'],
-            'budget' => ['required', Rule::in(ServiceRequest::budgetChoices($type))],
+            // A range, or "exact" with the amount in budgetExact.
+            'budget' => ['required', Rule::in([...ServiceRequest::budgetChoices($type), ServiceRequest::BUDGET_EXACT])],
+            'budgetExact' => [
+                'nullable', 'required_if:budget,'.ServiceRequest::BUDGET_EXACT, 'numeric', 'decimal:0,2',
+                'min:'.ServiceRequest::MIN_EXACT_BUDGET[$type], 'max:99999999.99',
+            ],
             'description' => ['nullable', 'string', 'max:5000'],
             'files' => ['nullable', 'array', 'max:'.self::MAX_FILES],
             'files.*' => ['file', 'mimes:jpg,jpeg,png,pdf', 'max:'.(self::MAX_FILE_MB * 1024)],
@@ -129,10 +135,8 @@ class ServiceRequestRequest extends FormRequest
                     fn ($query) => $query->where('status', 'active')->where('event_type_id', (int) $this->input('eventTypeId'))
                 ),
             ],
-            'slotPicks' => ['nullable', 'array', 'max:50'],
-            'slotPicks.*' => ['integer'],
-            'extraAssetIds' => ['nullable', 'array', 'max:100'],
-            'extraAssetIds.*' => ['integer', 'distinct'],
+            'assetIds' => ['nullable', 'array', 'max:100'],
+            'assetIds.*' => ['integer', 'distinct'],
             'customItems' => ['nullable', 'array', 'max:'.self::MAX_CUSTOM_ITEMS],
             'customItems.*' => ['array'],
             'customItems.*.category' => ['required', Rule::in(LayoutAsset::CATEGORIES)],
@@ -189,6 +193,11 @@ class ServiceRequestRequest extends FormRequest
             'venue.required' => 'Venue is required.',
             'budget.required' => 'Choose a budget range.',
             'budget.in' => 'Choose one of the listed budget ranges.',
+            'budgetExact.required_if' => 'Enter your exact budget.',
+            'budgetExact.numeric' => 'Enter your exact budget in pesos.',
+            'budgetExact.decimal' => 'Use at most two decimal places.',
+            'budgetExact.min' => 'Your exact budget must be at least ₱'.number_format(ServiceRequest::MIN_EXACT_BUDGET[$this->isCustom() ? ServiceRequest::TYPE_CUSTOM : ServiceRequest::TYPE_STANDARD]).'.',
+            'budgetExact.max' => 'Enter a valid budget.',
             'description.max' => 'The description is too long.',
             'files.max' => 'You can upload up to '.self::MAX_FILES.' files.',
             'files.*.file' => 'The file could not be uploaded. Only JPG, PNG or PDF up to '.self::MAX_FILE_MB.' MB.',
@@ -214,9 +223,8 @@ class ServiceRequestRequest extends FormRequest
             'serviceIds.*.exists' => 'Choose only services from the list.',
             'themeId.exists' => 'Choose one of the design themes for your event type.',
             'themeId.integer' => 'Choose one of the design themes for your event type.',
-            'slotPicks.*.integer' => 'Choose only design assets from the list.',
-            'extraAssetIds.*.integer' => 'Choose only design assets from the list.',
-            'extraAssetIds.*.distinct' => 'Each design asset can be added once.',
+            'assetIds.*.integer' => 'Choose only design assets from the list.',
+            'assetIds.*.distinct' => 'Each design asset can be added once.',
             'customItems.max' => 'You can add up to '.self::MAX_CUSTOM_ITEMS.' "Other" items.',
             'customItems.*.category.required' => 'Choose a category for each "Other" item.',
             'customItems.*.category.in' => 'Choose a category for each "Other" item.',

@@ -190,7 +190,7 @@ function LayoutAndQuotation({ request: r, layout }: { request: RequestDetail; la
                         <>
                             {/* Fixed height: the canvas no longer stretches with the quotation. */}
                             <div className="flex h-72 flex-col sm:h-80">
-                                <LayoutPreview themeName={layout.theme?.name ?? null} items={previewItems} />
+                                <LayoutPreview themeName={layout.theme?.name ?? null} items={previewItems} expandable />
                             </div>
                         </>
                     ) : (
@@ -401,11 +401,11 @@ function VenueAndBudget({ request: r }: { request: RequestDetail }) {
             <SectionTitle icon={<MapPin className="size-4" />} title="Venue and budget" />
             <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                 <Row label={custom ? 'Venue or mall location' : 'Venue'} value={r.venue} wide />
-                <Row label="Budget range" value={budgetLabel(r.budgetMin, r.budgetMax)} />
+                <Row label={r.exactBudget ? 'Budget' : 'Budget range'} value={budgetLabel(r.budgetMin, r.budgetMax)} />
                 <Row label="Reservation fee" value={peso(r.reservationFee)} />
             </dl>
             <p className="mt-3 text-xs text-ink-soft">
-                The reservation fee is 10% of your budget, billed after your consultation once you decide to proceed. It reserves your date.
+                The reservation fee is 10% of {r.reservationFeeBasis}, billed after your consultation once you decide to proceed. It reserves your date.
             </p>
         </div>
     );

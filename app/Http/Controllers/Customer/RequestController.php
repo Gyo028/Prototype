@@ -64,6 +64,8 @@ class RequestController extends Controller
                 'budgetMin' => (float) $r->budget_min,
                 'budgetMax' => $r->budget_max === null ? null : (float) $r->budget_max,
                 'reservationFee' => $r->reservationFee(),
+                'reservationFeeBasis' => $r->reservationFeeBasis(),
+                'exactBudget' => $r->hasExactBudget(),
                 'description' => $r->project_description,
                 'services' => $services,
                 'servicesTotal' => round($services->sum('subtotal'), 2),

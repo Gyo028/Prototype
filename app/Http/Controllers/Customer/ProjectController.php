@@ -144,6 +144,7 @@ class ProjectController extends Controller
             'reservationFee' => $this->progress->feeOutstanding($project) ? [
                 'bill' => $project->reservationFee ? $this->billings->card($project->reservationFee) : null,
                 'expectedAmount' => $project->serviceRequest->reservationFee(),
+                'basis' => $project->serviceRequest->reservationFeeBasis(),
             ] : null,
             'ocularVisit' => $this->ocularVisitData($project, $request),
             'design' => $this->designData($project),

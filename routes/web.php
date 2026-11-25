@@ -101,6 +101,8 @@ Route::middleware(['auth', 'verified', 'role:customer'])
         Route::get('new-request', [ServiceRequestController::class, 'create'])->name('new-request');
         Route::post('new-request', [ServiceRequestController::class, 'store'])->name('new-request.store');
         Route::get('projects', [CustomerProjectController::class, 'index'])->name('projects');
+        // The layout canvas on its own, full screen, in a new tab (filled from the page that opened it).
+        Route::inertia('layout-view', 'customer/layout-view')->name('layout-view');
         Route::get('requests/{serviceRequest}', [CustomerRequestController::class, 'show'])->name('requests.show');
         Route::get('requests/{serviceRequest}/files/{file}', [CustomerRequestController::class, 'file'])->name('requests.files.show');
         Route::get('projects/{project}', [CustomerProjectController::class, 'show'])->name('projects.show');

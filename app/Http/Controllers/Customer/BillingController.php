@@ -147,7 +147,7 @@ class BillingController extends Controller
                 'issuedAt' => $billing->issued_at->toDateString(),
                 'status' => $billing->status,
                 'description' => $billing->description,
-                'texts' => $this->texts($kind),
+                'texts' => $this->texts($kind, $project->serviceRequest->reservationFeeBasis()),
             ],
             // The payment form and history (same shape as before, for the payment panel).
             'payment' => [
@@ -263,13 +263,13 @@ class BillingController extends Controller
     }
 
     /** Wording for the payment panel, per kind of bill. @return array<string, string> */
-    private function texts(string $kind): array
+    private function texts(string $kind, string $feeBasis = 'your budget'): array
     {
         $down = (int) config('contract.payment.down_payment_percent', 50);
 
         return match ($kind) {
             Billings::KIND_RESERVATION_FEE => [
-                'heading' => 'Reservation fee · 10% of your budget',
+                'heading' => "Reservation fee · 10% of {$feeBasis}",
                 'dueNote' => 'Pay in full by the due date. If it is not paid by then, your project is cancelled and the date is released.',
                 'pendingNote' => 'Our Project Manager will check your payment. Your event date is confirmed once it is verified.',
             ],

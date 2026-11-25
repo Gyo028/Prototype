@@ -101,18 +101,41 @@ class ServiceRequest extends Model
         return $type === self::TYPE_CUSTOM ? array_slice($labels, 1) : $labels;
     }
 
-    /** The reservation fee is this share of the budget range the customer chose. */
+    /** The reservation fee is this share of the request's initial quotation or budget. */
     public const RESERVATION_FEE_RATE = 0.10;
 
+    /** The "Exact amount" budget choice: the customer typed one amount instead of picking a range. */
+    public const BUDGET_EXACT = 'exact';
+
+    /** The lowest exact budget, per request type: the Event Styling fee, and custom projects' lowest range. */
+    public const MIN_EXACT_BUDGET = [self::TYPE_STANDARD => 10000, self::TYPE_CUSTOM => 50000];
+
+    /** An exact budget is saved as one amount in both columns (a range never has min = max). */
+    public function hasExactBudget(): bool
+    {
+        return $this->budget_max !== null && (float) $this->budget_min === (float) $this->budget_max;
+    }
+
     /**
-     * 10% of the budget range's maximum, or of its minimum for "Above ₱500,000"
-     * (no maximum). Below ₱50,000 → ₱5,000; Above ₱500,000 → ₱50,000.
+     * 10% of:
+     *  - Standard Event Styling: the initial quotation (the Event Styling fee,
+     *    services and priced assets saved with the preliminary layout);
+     *  - Custom Projects (and standard requests saved before layouts): the
+     *    exact budget, or the budget range's maximum, or its minimum for
+     *    "Above ₱500,000" (no maximum).
      */
     public function reservationFee(): float
     {
-        $base = $this->budget_max ?? $this->budget_min;
+        $layout = $this->isCustom() ? null : $this->preliminaryLayout;
+        $base = $layout !== null ? $layout->total_initial_cost : ($this->budget_max ?? $this->budget_min);
 
         return round((float) $base * (float) config('payments.reservation_fee.rate', self::RESERVATION_FEE_RATE), 2);
+    }
+
+    /** What the reservation fee is 10% of, for the customer's screens: "your initial quotation" or "your budget". */
+    public function reservationFeeBasis(): string
+    {
+        return ! $this->isCustom() && $this->preliminaryLayout !== null ? 'your initial quotation' : 'your budget';
     }
 
     public function isCustom(): bool

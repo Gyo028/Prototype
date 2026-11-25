@@ -1,10 +1,39 @@
+import { Maximize2 } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { cx } from '@/components/dashboard/ui';
 
 /*
- * The preliminary layout canvas, used on the request form (Services & Assets)
- * and on Request Details.
+ * The preliminary layout canvas, used on the request form (Services & Assets),
+ * on Request Details, and full screen on /customer/layout-view (a new tab).
  */
+
+/** Where the canvas is handed to the full-screen tab. */
+export const LAYOUT_VIEW_KEY = 'eventurepro.layout-view';
+
+export type LayoutViewData = { themeName: string | null; items: PreviewItem[] };
+
+/**
+ * Opens the canvas full screen in a new tab. The data goes through this
+ * browser's localStorage, so the tab shows exactly what is on screen (the
+ * form's layout isn't saved anywhere yet). The open tab follows later changes.
+ */
+export function openLayoutView(data: LayoutViewData) {
+    try {
+        window.localStorage.setItem(LAYOUT_VIEW_KEY, JSON.stringify(data));
+    } catch {
+        // Storage can be blocked (e.g. private mode): the tab then says so.
+    }
+    window.open('/customer/layout-view', '_blank', 'noopener');
+}
+
+/** Keeps an open full-screen tab in step with the canvas on this page. */
+export function syncLayoutView(data: LayoutViewData) {
+    try {
+        window.localStorage.setItem(LAYOUT_VIEW_KEY, JSON.stringify(data));
+    } catch {
+        // ignore
+    }
+}
 
 type ZoneId = 'stage' | 'entrance' | 'entertainment' | 'dining' | 'food' | 'photo' | 'lighting';
 
@@ -93,15 +122,40 @@ const gridBackground = {
  * spot in the area of the room it belongs to. Assets are gold, services black.
  * The drawn isometric layout replaces it once the asset artwork is ready.
  */
-export default function LayoutPreview({ themeName, items, className }: { themeName?: string | null; items: PreviewItem[]; className?: string }) {
+export default function LayoutPreview({
+    themeName,
+    items,
+    className,
+    expandable = false,
+}: {
+    themeName?: string | null;
+    items: PreviewItem[];
+    className?: string;
+    /** Click (or tap) opens the canvas full screen in a new tab. */
+    expandable?: boolean;
+}) {
     const placed = placeItems(items);
+    const open = () => openLayoutView({ themeName: themeName ?? null, items });
 
     return (
         <div
-            aria-label="Layout preview"
-            className={cx('relative min-h-72 flex-1 overflow-hidden rounded-lg border border-black/15 bg-neutral-50', className)}
+            aria-label={expandable ? 'Layout preview. Open full screen in a new tab' : 'Layout preview'}
+            role={expandable ? 'button' : undefined}
+            tabIndex={expandable ? 0 : undefined}
+            onClick={expandable ? open : undefined}
+            onKeyDown={expandable ? (e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), open()) : undefined}
+            className={cx(
+                'relative min-h-0 flex-1 overflow-hidden rounded-lg border border-black/15 bg-neutral-50',
+                expandable && 'group cursor-zoom-in focus-visible:ring-2 focus-visible:ring-gold focus-visible:outline-none',
+                className,
+            )}
             style={gridBackground}
         >
+            {expandable && (
+                <span className="absolute top-2 right-2 z-10 inline-flex items-center gap-1 rounded-md bg-white/90 px-2 py-1 text-[11px] font-bold text-ink shadow-sm ring-1 ring-black/10 transition group-hover:bg-gold group-hover:text-white">
+                    <Maximize2 className="size-3.5" /> Full view
+                </span>
+            )}
             {/* The design theme: the whole background */}
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-1 px-6 text-center">
                 <p className={themeName ? 'text-lg font-bold text-ink-soft' : 'text-sm text-ink-soft'}>{themeName ?? 'No theme selected yet'}</p>
@@ -119,14 +173,5 @@ export default function LayoutPreview({ themeName, items, className }: { themeNa
                 </span>
             ))}
         </div>
-    );
-}
-
-/** The key under a preview. */
-export function PreviewLegend() {
-    return (
-        <p className="mt-2 text-[11px] text-ink-soft">
-            <span className="font-bold text-gold-dark">Gold</span> = design asset · <span className="font-bold text-ink">black</span> = service
-        </p>
     );
 }

@@ -118,6 +118,7 @@ class ServiceRequestController extends Controller
                 'minLeadMonths' => ServiceRequestRequest::MIN_LEAD_MONTHS,
                 'customLeadMonths' => ServiceRequestRequest::MIN_CUSTOM_LEAD_MONTHS,
                 'minEventHours' => ServiceRequestRequest::MIN_EVENT_HOURS,
+                'minExactBudget' => ServiceRequest::MIN_EXACT_BUDGET,
                 'maxProjectDays' => ServiceRequestRequest::MAX_PROJECT_DAYS,
                 'maxFiles' => ServiceRequestRequest::MAX_FILES,
                 'maxFileMb' => ServiceRequestRequest::MAX_FILE_MB,
@@ -135,7 +136,10 @@ class ServiceRequestController extends Controller
 
         $data = $request->validated();
         $custom = $request->isCustom();
-        [$budgetMin, $budgetMax] = ServiceRequest::BUDGET_RANGES[$data['budget']];
+        // An exact budget is saved as one amount in both columns.
+        [$budgetMin, $budgetMax] = $data['budget'] === ServiceRequest::BUDGET_EXACT
+            ? [(float) $data['budgetExact'], (float) $data['budgetExact']]
+            : ServiceRequest::BUDGET_RANGES[$data['budget']];
 
         $storedPaths = [];
 
@@ -163,9 +167,9 @@ class ServiceRequestController extends Controller
                     $guests = (int) $data['guests'];
                     $servicesTotal = $this->saveServices($serviceRequest, $data['serviceIds'] ?? [], $guests);
 
-                    // The preliminary layout: the theme's default set with the customer's swaps, extras and "Other" items.
+                    // The preliminary layout: the ticked assets (none = the theme's default set) and "Other" items.
                     $theme = empty($data['themeId']) ? null : DesignTheme::find($data['themeId']);
-                    $items = $layouts->resolve($theme, $data['slotPicks'] ?? [], $data['extraAssetIds'] ?? [], $data['customItems'] ?? [], $guests);
+                    $items = $layouts->resolve($theme, $data['assetIds'] ?? [], $data['customItems'] ?? [], $guests);
                     $layouts->save($serviceRequest, $theme, $items, $servicesTotal);
                 }
 

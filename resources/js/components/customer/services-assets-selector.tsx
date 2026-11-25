@@ -1,9 +1,9 @@
-import { AlertTriangle, ChevronDown, Info, Plus, X } from 'lucide-react';
-import { useState } from 'react';
+import { AlertTriangle, ChevronDown, Info, ListChecks, Plus, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import LayoutPreview, { PreviewLegend } from '@/components/customer/layout-preview';
+import LayoutPreview, { syncLayoutView } from '@/components/customer/layout-preview';
 import type { CustomItem, LayoutChoice, LayoutLine } from '@/components/customer/layout-selection';
-import { assetPriceLabel, resolveLayout, usedAssetIds } from '@/components/customer/layout-selection';
+import { assetPriceLabel, resolveLayout, tickedAssetIds } from '@/components/customer/layout-selection';
 import type { BaseFee, CatalogAsset, CatalogService, CatalogTheme } from '@/components/customer/request-catalog';
 import { defaultThemeFor, isPerGuest, parseBudgetRange, peso, quantityFor, themeFits } from '@/components/customer/request-catalog';
 import { Field, GoldButton, OutlineButton, cx, inputClass, textareaClass } from '@/components/dashboard/ui';
@@ -16,10 +16,13 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
  * Design Preview, and Quotation. Everything comes from the database through
  * the page props.
  *
- * Design assets: the theme starts the layout with its default set (one asset
- * per slot). Each slot can be swapped for another asset of the same category,
- * but not emptied. The customer can add more assets, and "Other" items that
- * aren't in the library (priced later). Nothing picked = the default set.
+ * Design assets: plain cards like the services. The theme's default set
+ * starts ticked; the customer ticks and unticks freely, and can add "Other"
+ * items that aren't in the library (priced later). Nothing ticked = the
+ * theme's default set.
+ *
+ * Desktop: the three panels side by side, the canvas and quotation staying in
+ * view. Phones and tablets: tabs (Selection · Preview · Quotation total).
  * The layout rules live in layout-selection.ts, shared with the server's.
  */
 
@@ -93,6 +96,30 @@ function CollapsibleSection({
             </button>
             {open && <div className="mt-1">{children}</div>}
         </div>
+    );
+}
+
+function QuotationTotal({ label, value, className }: { label: string; value: string; className?: string }) {
+    return (
+        <div className={cx('flex items-center justify-between gap-2 py-1.5', className)}>
+            <dt className="min-w-0 truncate">{label}</dt>
+            <dd className="shrink-0 font-bold">{value}</dd>
+        </div>
+    );
+}
+
+function QuotationLine({ name, detail, note, amount, asset = false }: { name: string; detail: string; note?: string; amount: string; asset?: boolean }) {
+    return (
+        <li className="py-2.5">
+            <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                    <p className={cx('text-sm font-bold', asset ? 'text-gold-dark' : 'text-ink')}>{name}</p>
+                    <p className="text-xs text-ink-soft">{detail}</p>
+                    {note && <p className="mt-0.5 text-[11px] text-ink-soft">{note}</p>}
+                </div>
+                <p className={cx('shrink-0 text-sm font-bold', amount === 'To be priced' ? 'text-gold-dark' : 'text-ink')}>{amount}</p>
+            </div>
+        </li>
     );
 }
 
@@ -202,9 +229,12 @@ export default function ServicesAssetsSelector({
     onLayoutChoiceChange,
     layoutError,
 }: Props) {
-    const [servicesOpen, setServicesOpen] = useState(true);
-    const [themeOpen, setThemeOpen] = useState(false);
-    const [assetsOpen, setAssetsOpen] = useState(true);
+    // One section open at a time: opening one folds the others. Services first.
+    const [openSection, setOpenSection] = useState<'services' | 'theme' | 'assets' | null>('services');
+    const toggleSection = (section: 'services' | 'theme' | 'assets') => setOpenSection((open) => (open === section ? null : section));
+    const [quotationOpen, setQuotationOpen] = useState(false);
+    // Phones and tablets: one panel at a time, picked with the tabs. Desktop shows all three.
+    const [mobileTab, setMobileTab] = useState<'selection' | 'preview' | 'quotation'>('selection');
     const [venueFilter, setVenueFilter] = useState<VenueFilter>('all');
     const [otherCategory, setOtherCategory] = useState<string | null>(null);
 
@@ -216,11 +246,9 @@ export default function ServicesAssetsSelector({
 
     const selectedServices = services.filter((s) => serviceIds.includes(s.id));
 
-    // The layout: the theme's slots (default or swapped), extras, then "Other" items.
+    // The layout: the ticked assets (the theme's default set to start with), then "Other" items.
     const lines = resolveLayout(selectedTheme, assets, layoutChoice, guests);
-    const slotLines = lines.filter((l) => l.slot !== null);
-    const used = usedAssetIds(lines);
-    const slotAssetIds = new Set(slotLines.map((l) => l.assetId));
+    const ticked = tickedAssetIds(selectedTheme, assets, layoutChoice);
 
     // The admin's categories first, then any other category an asset uses.
     const categories = Array.from(new Set([...assetCategories, ...assets.map((a) => a.category)]));
@@ -230,17 +258,23 @@ export default function ServicesAssetsSelector({
         ...lines.map((l) => ({ key: l.key, name: l.name, category: l.category, kind: 'asset' as const })),
     ];
 
+    // A full-view tab opened from this canvas follows the changes made here.
+    const previewKey = JSON.stringify([selectedTheme?.name ?? null, previewItems]);
+    useEffect(() => {
+        syncLayoutView({ themeName: selectedTheme?.name ?? null, items: previewItems });
+        // previewKey stands for the theme and the items.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [previewKey]);
+
     const toggleService = (id: number) =>
         onServiceIdsChange(serviceIds.includes(id) ? serviceIds.filter((x) => x !== id) : [...serviceIds, id]);
 
-    const swapSlot = (slotKey: string, assetId: number) =>
-        onLayoutChoiceChange({ ...layoutChoice, slotPicks: { ...layoutChoice.slotPicks, [slotKey]: assetId } });
-
-    const toggleExtra = (id: number) =>
-        onLayoutChoiceChange({
-            ...layoutChoice,
-            extraAssetIds: layoutChoice.extraAssetIds.includes(id) ? layoutChoice.extraAssetIds.filter((x) => x !== id) : [...layoutChoice.extraAssetIds, id],
-        });
+    // Ticking works from what is ticked now (the default set at first). Unticking the last one
+    // brings the default set back, which is what an empty selection means.
+    const toggleAsset = (id: number) => {
+        const next = ticked.includes(id) ? ticked.filter((x) => x !== id) : [...ticked, id];
+        onLayoutChoiceChange({ ...layoutChoice, assetIds: next.length > 0 ? next : null });
+    };
 
     const addCustom = (item: CustomItem) => onLayoutChoiceChange({ ...layoutChoice, customItems: [...layoutChoice.customItems, item] });
     const removeCustom = (key: string) =>
@@ -252,8 +286,10 @@ export default function ServicesAssetsSelector({
         return { qty, total: s.price * qty };
     };
     const assetsTotal = lines.reduce((sum, l) => sum + (l.subtotal ?? 0), 0);
+    const servicesTotal = selectedServices.reduce((sum, s) => sum + lineFor(s).total, 0);
+    const pricedLines = lines.filter((l) => l.unitPrice !== null).length;
     const toBePriced = lines.filter((l) => l.unitPrice === null).length;
-    const estimatedTotal = (baseFee?.price ?? 0) + selectedServices.reduce((sum, s) => sum + lineFor(s).total, 0) + assetsTotal;
+    const estimatedTotal = (baseFee?.price ?? 0) + servicesTotal + assetsTotal;
 
     const budgetRange = budget ? parseBudgetRange(budget) : null;
     const budgetFlag =
@@ -268,17 +304,50 @@ export default function ServicesAssetsSelector({
               : null;
 
     return (
-        <div className="rounded-2xl border border-black/15 bg-neutral-50 p-4">
-            <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)_240px] lg:items-stretch">
+        // Desktop: a framed box. Phones and tablets: no frame, so the panels get the full width.
+        <div className="lg:rounded-2xl lg:border lg:border-black/15 lg:bg-neutral-50 lg:p-4">
+            {/* Phones and tablets: tabs, one panel at a time at full width. */}
+            <div role="tablist" aria-label="Services and assets" className="mb-3 grid grid-cols-3 gap-1 rounded-xl bg-neutral-200/70 p-1 lg:hidden">
+                {(
+                    [
+                        ['selection', 'Selection'],
+                        ['preview', 'Preview'],
+                        ['quotation', 'Quotation'],
+                    ] as const
+                ).map(([tab, label]) => (
+                    <button
+                        key={tab}
+                        type="button"
+                        role="tab"
+                        aria-selected={mobileTab === tab}
+                        onClick={() => setMobileTab(tab)}
+                        className={cx(
+                            'rounded-lg px-2 py-2 text-xs font-bold whitespace-nowrap transition',
+                            mobileTab === tab ? 'bg-white text-gold-dark shadow-sm' : 'text-ink-soft',
+                        )}
+                    >
+                        {label}
+                    </button>
+                ))}
+            </div>
+
+            {/* Desktop: the three panels share one fixed height. Only the selection list scrolls (inside its
+                panel), so the canvas and the quotation stay put and line up. */}
+            <div className="grid gap-4 lg:h-[36rem] lg:grid-cols-[280px_minmax(0,1fr)_240px]">
                 {/* ---- Selection Panel ---- */}
-                <div className="flex h-full flex-col rounded-xl border border-black/15 bg-white p-3">
+                <div
+                    className={cx(
+                        'min-h-0 flex-col rounded-xl border border-black/15 bg-white p-3 lg:flex lg:overflow-y-auto lg:overscroll-contain',
+                        mobileTab === 'selection' ? 'flex' : 'hidden',
+                    )}
+                >
                     <PanelHeader title="Selection Panel" />
 
                     <CollapsibleSection
                         title="Services Needed"
                         meta={`${selectedServices.length} selected`}
-                        open={servicesOpen}
-                        onToggle={() => setServicesOpen((o) => !o)}
+                        open={openSection === 'services'}
+                        onToggle={() => toggleSection('services')}
                     >
                         <p className="mb-3 text-[11px] text-ink-soft">
                             {baseFee ? `${baseFee.name} is already included with your request. ` : ''}Add anything else you need for the event
@@ -320,8 +389,8 @@ export default function ServicesAssetsSelector({
                     <CollapsibleSection
                         title="Design Theme"
                         meta={selectedTheme ? selectedTheme.name : 'None yet'}
-                        open={themeOpen}
-                        onToggle={() => setThemeOpen((o) => !o)}
+                        open={openSection === 'theme'}
+                        onToggle={() => toggleSection('theme')}
                     >
                         {themesForType.length === 0 ? (
                             <p className="text-[11px] text-ink-soft">
@@ -404,74 +473,31 @@ export default function ServicesAssetsSelector({
                     <CollapsibleSection
                         title="Design Assets"
                         meta={`${lines.length} on layout`}
-                        open={assetsOpen}
-                        onToggle={() => setAssetsOpen((o) => !o)}
+                        open={openSection === 'assets'}
+                        onToggle={() => toggleSection('assets')}
                     >
-                        {/* The theme's default set: swap only */}
-                        {slotLines.length > 0 ? (
-                            <div className="mb-4">
-                                <p className="mb-1 text-[10px] font-bold tracking-wide text-ink-soft uppercase">Included with {selectedTheme?.name}</p>
-                                <p className="mb-2 text-[11px] text-ink-soft">Swap any item for another of the same kind.</p>
-                                <div className="space-y-2">
-                                    {slotLines.map((line) => {
-                                        const slot = line.slot!;
-                                        const options = assets.filter(
-                                            (a) => a.category === slot.category && (a.id === line.assetId || !used.has(a.id)),
-                                        );
-                                        return (
-                                            <div key={line.key} className="rounded-lg border border-black/15 p-2">
-                                                <div className="mb-1 flex items-center justify-between gap-2">
-                                                    <label htmlFor={`slot-${slot.key}`} className="text-[11px] font-bold text-ink">
-                                                        {slot.label}
-                                                    </label>
-                                                    {line.isDefault && (
-                                                        <span className="rounded-full bg-gold/15 px-2 text-[10px] font-bold text-gold-dark">Default</span>
-                                                    )}
-                                                </div>
-                                                <select
-                                                    id={`slot-${slot.key}`}
-                                                    className="w-full rounded-md border border-black/15 bg-white px-2 py-1 text-[11px] text-ink"
-                                                    value={line.assetId ?? ''}
-                                                    onChange={(e) => swapSlot(slot.key, Number(e.target.value))}
-                                                >
-                                                    {options.map((a) => (
-                                                        <option key={a.id} value={a.id}>
-                                                            {a.name}
-                                                            {a.id === slot.defaultAssetId ? ' (default)' : ''}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                                <p className="mt-1 text-[10px] text-ink-soft">{lineDetail(line)}</p>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        ) : (
-                            <p className="mb-3 text-[11px] text-ink-soft">
-                                {selectedTheme
-                                    ? `${selectedTheme.name} has no default set yet. Add the assets you'd like below.`
-                                    : 'Choose a design theme to start with its default set, or add assets below.'}
-                            </p>
-                        )}
+                        <p className="mb-3 text-[11px] text-ink-soft">
+                            {selectedTheme
+                                ? `${selectedTheme.name}'s set is already picked for you. Tick or untick anything; with nothing ticked, the theme's set is used.`
+                                : 'Pick the design assets you would like.'}{' '}
+                            Quantities like chairs and tables follow your guest count.
+                        </p>
 
-                        {/* Extras and "Other" items, by category */}
-                        <p className="mb-2 text-[10px] font-bold tracking-wide text-ink-soft uppercase">Add more</p>
                         {categories.map((cat) => {
-                            const extras = assets.filter((a) => a.category === cat && !slotAssetIds.has(a.id));
+                            const inCategory = assets.filter((a) => a.category === cat);
                             const customs = layoutChoice.customItems.filter((c) => c.category === cat);
                             return (
                                 <div key={cat} className="mb-3 last:mb-0">
-                                    <p className="mb-1.5 text-[10px] font-bold text-ink-soft">{cat}</p>
+                                    <p className="mb-1.5 text-[10px] font-bold tracking-wide text-ink-soft uppercase">{cat}</p>
                                     <div className="grid grid-cols-2 gap-2">
-                                        {extras.map((a) => {
-                                            const on = layoutChoice.extraAssetIds.includes(a.id);
+                                        {inCategory.map((a) => {
+                                            const on = ticked.includes(a.id);
                                             return (
                                                 <button
                                                     key={a.id}
                                                     type="button"
                                                     aria-pressed={on}
-                                                    onClick={() => toggleExtra(a.id)}
+                                                    onClick={() => toggleAsset(a.id)}
                                                     className={cx(
                                                         'rounded-lg border p-2 text-left transition',
                                                         on ? 'border-gold bg-gold/10' : 'border-black/15 hover:bg-black/[0.02]',
@@ -493,7 +519,7 @@ export default function ServicesAssetsSelector({
                                     {customs.length > 0 && (
                                         <ul className="mt-2 space-y-1.5">
                                             {customs.map((c) => (
-                                                <li key={c.key} className="flex items-start justify-between gap-2 rounded-lg border border-gold/40 bg-gold/5 p-2">
+                                                <li key={c.key} className="flex items-start justify-between gap-2 rounded-lg border border-gold bg-gold/10 p-2">
                                                     <span className="min-w-0">
                                                         <span className="block text-[11px] font-bold break-words text-ink">{c.name}</span>
                                                         <span className="block text-[10px] break-words text-ink-soft">{c.description}</span>
@@ -518,77 +544,48 @@ export default function ServicesAssetsSelector({
                     {layoutError && <p className="mt-2 text-xs text-red-600" data-error="">{layoutError}</p>}
                 </div>
 
-                {/* ---- Design Preview: the canvas, text only ---- */}
-                <div className="flex h-full flex-col rounded-xl border border-black/15 bg-white p-3">
+                {/* ---- Design Preview: a fixed-height canvas that stays in view on wide screens (below the 5rem header) ---- */}
+                <div
+                    className={cx(
+                        'min-h-0 flex-col rounded-xl border border-black/15 bg-white p-3 lg:flex',
+                        mobileTab === 'preview' ? 'flex' : 'hidden',
+                    )}
+                >
                     <PanelHeader title="Design Preview" />
-                    <LayoutPreview themeName={selectedTheme?.name} items={previewItems} />
-                    <PreviewLegend />
+                    {/* Wide (landscape) on phones and tablets so the labels have room; a fixed height on desktop. */}
+                    <div className="flex aspect-[4/3] flex-col lg:aspect-auto lg:min-h-0 lg:flex-1">
+                        <LayoutPreview themeName={selectedTheme?.name} items={previewItems} expandable />
+                    </div>
                 </div>
 
-                {/* ---- Quotation Panel: running total ---- */}
-                <div className="flex h-full flex-col rounded-xl border border-black/15 bg-white p-4">
+                {/* ---- Quotation Panel: the totals; every line is in "View full quotation" ---- */}
+                <div
+                    className={cx(
+                        'min-h-0 flex-col rounded-xl border border-black/15 bg-white p-4 lg:flex lg:overflow-y-auto',
+                        mobileTab === 'quotation' ? 'flex' : 'hidden',
+                    )}
+                >
                     <PanelHeader title="Quotation Panel" />
 
-                    <ul className="divide-y divide-black/10">
-                        {baseFee && (
-                            <li className="py-2.5 first:pt-0">
-                                <div className="flex items-start justify-between gap-2">
-                                    <div className="min-w-0">
-                                        <p className="truncate text-xs font-bold text-ink">{baseFee.name}</p>
-                                        <p className="text-[11px] text-ink-soft">Included with every request</p>
-                                    </div>
-                                    <p className="shrink-0 text-xs font-bold text-ink">{peso(baseFee.price)}</p>
-                                </div>
-                            </li>
-                        )}
-
-                        {selectedServices.map((s) => {
-                            const { qty, total } = lineFor(s);
-                            const perGuest = isPerGuest(s);
-                            return (
-                                <li key={s.id} className="py-2.5 first:pt-0">
-                                    <div className="flex items-start justify-between gap-2">
-                                        <div className="min-w-0">
-                                            <p className="truncate text-xs font-bold text-ink">{s.name}</p>
-                                            <p className="text-[11px] text-ink-soft">
-                                                {peso(s.price)}
-                                                {s.unitType && `/${s.unitType}`}
-                                                {perGuest && ` × ${qty} pax`}
-                                            </p>
-                                        </div>
-                                        <p className="shrink-0 text-xs font-bold text-ink">{peso(total)}</p>
-                                    </div>
-                                    {s.pricingType === 'per_unit' && !perGuest && (
-                                        <p className="mt-1 text-[10px] text-ink-soft">Counted once here. The Project Manager confirms the quantity.</p>
-                                    )}
-                                </li>
-                            );
-                        })}
-
-                        {lines.map((l) => (
-                            <li key={l.key} className="py-2.5 first:pt-0">
-                                <div className="flex items-start justify-between gap-2">
-                                    <div className="min-w-0">
-                                        <p className="truncate text-xs font-bold text-gold-dark">{l.name}</p>
-                                        <p className="text-[11px] text-ink-soft">{lineDetail(l)}</p>
-                                    </div>
-                                    <p className="shrink-0 text-xs font-bold text-ink">{l.subtotal === null ? '—' : peso(l.subtotal)}</p>
-                                </div>
-                            </li>
-                        ))}
-                    </ul>
-
-                    <div className="mt-auto space-y-3 pt-4">
-                        <div className="flex items-center justify-between border-t border-black/10 pt-3">
-                            <p className="text-sm font-bold text-ink">Estimated Total</p>
-                            <p className="text-lg font-bold text-gold-dark">{peso(estimatedTotal)}</p>
-                        </div>
+                    <dl className="divide-y divide-black/5 text-xs">
+                        {baseFee && <QuotationTotal label={baseFee.name} value={peso(baseFee.price)} />}
+                        <QuotationTotal label={`Services (${selectedServices.length})`} value={peso(servicesTotal)} />
+                        <QuotationTotal label={`Design assets (${pricedLines})`} value={peso(assetsTotal)} />
                         {toBePriced > 0 && (
-                            <p className="text-[10px] text-ink-soft">
-                                Plus {toBePriced} {toBePriced === 1 ? 'item' : 'items'} to be priced.
-                            </p>
+                            <QuotationTotal label="To be priced" value={`${toBePriced} ${toBePriced === 1 ? 'item' : 'items'}`} className="text-gold-dark" />
                         )}
+                    </dl>
 
+                    <div className="mt-2 flex items-center justify-between border-t-2 border-black/15 pt-3">
+                        <p className="text-sm font-bold text-ink">Estimated Total</p>
+                        <p className="text-lg font-bold text-gold-dark">{peso(estimatedTotal)}</p>
+                    </div>
+
+                    <OutlineButton className="mt-3 w-full justify-center py-2 text-xs" onClick={() => setQuotationOpen(true)}>
+                        <ListChecks className="size-4" /> View full quotation
+                    </OutlineButton>
+
+                    <div className="mt-3 space-y-3">
                         {budgetFlag && (
                             <div className={cx('flex items-start gap-2 rounded-lg p-2.5', budgetFlag.tone === 'over' ? 'bg-red-50' : 'bg-sky-50')}>
                                 <budgetFlag.icon className={cx('mt-0.5 size-4 shrink-0', budgetFlag.tone === 'over' ? 'text-red-600' : 'text-sky-600')} />
@@ -600,13 +597,54 @@ export default function ServicesAssetsSelector({
 
                         <div className="rounded-lg bg-gold/10 p-2.5">
                             <p className="text-[10px] leading-relaxed text-ink">
-                                This layout and quotation are initial estimates only. Our Design Specialist prepares the final design, and your final
+                                <span className="font-bold">Initial estimate only.</span> Our Design Specialist prepares the final design, and your final
                                 quotation comes with the design proposal.
                             </p>
                         </div>
                     </div>
                 </div>
             </div>
+
+            <Dialog open={quotationOpen} onOpenChange={setQuotationOpen}>
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Initial quotation</DialogTitle>
+                        <DialogDescription>Today&apos;s prices for what is on your layout. Initial estimate only.</DialogDescription>
+                    </DialogHeader>
+
+                    <ul className="max-h-[60vh] divide-y divide-black/10 overflow-y-auto pr-1">
+                        {baseFee && <QuotationLine name={baseFee.name} detail="Included with every request" amount={peso(baseFee.price)} />}
+
+                        {selectedServices.map((s) => {
+                            const { qty, total } = lineFor(s);
+                            const perGuest = isPerGuest(s);
+                            return (
+                                <QuotationLine
+                                    key={s.id}
+                                    name={s.name}
+                                    detail={`${peso(s.price)}${s.unitType ? `/${s.unitType}` : ''}${perGuest ? ` × ${qty} pax` : ''}`}
+                                    note={s.pricingType === 'per_unit' && !perGuest ? 'Counted once here. The Project Manager confirms the quantity.' : undefined}
+                                    amount={peso(total)}
+                                />
+                            );
+                        })}
+
+                        {lines.map((l) => (
+                            <QuotationLine key={l.key} name={l.name} detail={lineDetail(l)} amount={l.subtotal === null ? 'To be priced' : peso(l.subtotal)} asset />
+                        ))}
+                    </ul>
+
+                    <div className="flex items-center justify-between border-t-2 border-black/15 pt-3">
+                        <span className="font-bold text-ink">Estimated Total</span>
+                        <span className="text-lg font-bold text-gold-dark">{peso(estimatedTotal)}</span>
+                    </div>
+                    {toBePriced > 0 && (
+                        <p className="-mt-2 text-xs text-ink-soft">
+                            Plus {toBePriced} {toBePriced === 1 ? 'item' : 'items'} to be priced.
+                        </p>
+                    )}
+                </DialogContent>
+            </Dialog>
 
             <OtherItemDialog category={otherCategory} onClose={() => setOtherCategory(null)} onAdd={addCustom} />
         </div>

@@ -341,7 +341,7 @@ function ReservationFeeBlock({ fee }: { fee: NonNullable<ReservationFeeCard> }) 
     if (!fee.bill) {
         return (
             <p className="mb-4 rounded-xl border border-dashed border-black/15 p-4 text-sm text-ink-soft">
-                Your reservation fee bill of {peso(fee.expectedAmount)} (10% of your budget) is being prepared. You will be able to pay it on Billing &amp;
+                Your reservation fee bill of {peso(fee.expectedAmount)} (10% of {fee.basis ?? 'your budget'}) is being prepared. You will be able to pay it on Billing &amp;
                 Payments.
             </p>
         );

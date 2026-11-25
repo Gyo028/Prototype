@@ -52,6 +52,8 @@ export type RequestLimits = {
     /** A custom project must start at least this many months from today. */
     customLeadMonths: number;
     minEventHours: number;
+    /** The lowest exact budget per request type (₱10,000 standard, ₱50,000 custom). */
+    minExactBudget: Record<RequestType, number>;
     maxProjectDays: number;
     maxFiles: number;
     maxFileMb: number;
@@ -72,13 +74,20 @@ export type RequestCatalog = {
 
 export const peso = (n: number) => `₱${n.toLocaleString('en-PH')}`;
 
-/** "₱50,000 – ₱100,000" → { min: 50000, max: 100000 }. "Above ₱500,000" has no maximum. */
+/**
+ * "₱50,000 – ₱100,000" → { min: 50000, max: 100000 }. "Above ₱500,000" has no maximum.
+ * An exact budget ("₱180,000") is one amount: { min: 180000, max: 180000 }.
+ */
 export function parseBudgetRange(budget: string): { min: number; max: number | null } | null {
     if (!budget) return null;
-    const num = (text: string) => Number(text.replace(/[^\d]/g, ''));
+    const num = (text: string) => Number(text.replace(/[^\d.]/g, ''));
 
     if (budget.startsWith('Below')) return { min: 0, max: num(budget) };
     if (budget.startsWith('Above')) return { min: num(budget), max: null };
+    if (!budget.includes('–')) {
+        const exact = num(budget);
+        return Number.isFinite(exact) && exact > 0 ? { min: exact, max: exact } : null;
+    }
 
     const [lo, hi] = budget.split('–').map(num);
     return Number.isFinite(lo) && Number.isFinite(hi) ? { min: lo, max: hi } : null;

@@ -14,10 +14,9 @@ use Illuminate\Validation\ValidationException;
  * asset part of its initial quotation.
  *
  * A layout is made of:
- *  - the theme's default set: one asset per slot. The customer can swap a
- *    slot's asset for another of the same category, but not leave it empty.
- *    Nothing swapped = the full default set.
- *  - extras: more library assets the customer adds.
+ *  - the library assets the customer ticked. The theme's default set (one
+ *    asset per slot) starts ticked; the customer ticks and unticks freely.
+ *    Nothing ticked = the theme's default set.
  *  - "Other" items: things not in the library, described by the customer.
  *    They have no price yet ("To be priced").
  *
@@ -41,66 +40,42 @@ class PreliminaryLayouts
     }
 
     /**
-     * Works out the layout's items from the customer's choices. A swap or an
-     * extra that isn't allowed is reported on its own field.
+     * Works out the layout's items from the customer's choices. An asset that
+     * can't be offered is reported on its own field.
      *
-     * @param  array<string, mixed>  $slotPicks  slot key => asset id
-     * @param  array<int, mixed>  $extraAssetIds
+     * @param  array<int, mixed>  $assetIds  the ticked library assets; none = the theme's default set
      * @param  array<int, array{category: string, name: string, description?: string|null}>  $customItems
      * @return list<array<string, mixed>> preliminary_layout_items rows, without the layout id
      *
      * @throws ValidationException
      */
-    public function resolve(?DesignTheme $theme, array $slotPicks, array $extraAssetIds, array $customItems, int $guests): array
+    public function resolve(?DesignTheme $theme, array $assetIds, array $customItems, int $guests): array
     {
         $offered = $this->offeredAssets()->keyBy('asset_id');
-        $items = [];
-        $used = [];
+        $defaults = $this->defaultAssets($theme, $offered);
         $errors = [];
+        $picked = [];
 
-        foreach ($theme?->slots() ?? [] as $slot) {
-            $key = $slot['key'];
-            $asset = null;
-
-            if (isset($slotPicks[$key]) && $slotPicks[$key] !== '' && $slotPicks[$key] !== null) {
-                $asset = $offered->get((int) $slotPicks[$key]);
-
-                if ($asset === null || $asset->asset_category !== $slot['category'] || isset($used[$asset->asset_id])) {
-                    $errors["slotPicks.{$key}"] = "Choose another {$slot['category']} item for the {$slot['label']}.";
-
-                    continue;
-                }
-            } else {
-                $asset = $this->slotDefault($slot, $offered, $used);
-            }
-
-            if ($asset === null) {
-                continue; // nothing in this category can be offered right now
-            }
-
-            $used[$asset->asset_id] = true;
-            $items[] = $this->assetItem($asset, $guests, $asset->asset_id === $slot['defaultAssetId']);
-        }
-
-        foreach (array_values($extraAssetIds) as $i => $id) {
+        foreach (array_values($assetIds) as $i => $id) {
             $asset = $offered->get((int) $id);
 
             if ($asset === null) {
-                $errors["extraAssetIds.{$i}"] = 'Choose only design assets from the list.';
-
-                continue;
+                $errors["assetIds.{$i}"] = 'Choose only design assets from the list.';
+            } else {
+                $picked[$asset->asset_id] = $asset;
             }
-
-            if (isset($used[$asset->asset_id])) {
-                continue; // already on the layout
-            }
-
-            $used[$asset->asset_id] = true;
-            $items[] = $this->assetItem($asset, $guests, false);
         }
 
         if ($errors !== []) {
             throw ValidationException::withMessages($errors);
+        }
+
+        // Nothing ticked: the theme's default set.
+        $chosen = $picked !== [] ? $picked : $defaults;
+        $items = [];
+
+        foreach ($chosen as $asset) {
+            $items[] = $this->assetItem($asset, $guests, isset($defaults[$asset->asset_id]));
         }
 
         foreach ($customItems as $custom) {
@@ -155,7 +130,7 @@ class PreliminaryLayouts
 
         $guests = (int) $request->guest_count;
         $theme = self::suggestedTheme((int) $request->event_type_id, $guests);
-        $items = $this->resolve($theme, [], [], [], $guests);
+        $items = $this->resolve($theme, [], [], $guests);
 
         return $this->save($request, $theme, $items, (float) $request->services()->sum('subtotal'));
     }
@@ -178,22 +153,31 @@ class PreliminaryLayouts
     }
 
     /**
-     * The slot's default asset, or, when it can't be offered right now, the
-     * first other asset of the slot's category that isn't on the layout yet.
+     * The theme's default set, keyed by asset id: each slot's default asset,
+     * or, when that one can't be offered right now, the first other asset of
+     * the slot's category not used yet. Same rule as defaultAssetIds() in
+     * layout-selection.ts.
      *
-     * @param  array{key: string, label: string, category: string, defaultAssetId: int|null}  $slot
-     * @param  Collection<int, LayoutAsset>  $offered
-     * @param  array<int, true>  $used
+     * @param  Collection<int, LayoutAsset>  $offered  keyed by asset id
+     * @return array<int, LayoutAsset>
      */
-    private function slotDefault(array $slot, Collection $offered, array $used): ?LayoutAsset
+    public function defaultAssets(?DesignTheme $theme, Collection $offered): array
     {
-        $default = $slot['defaultAssetId'] === null ? null : $offered->get($slot['defaultAssetId']);
+        $set = [];
 
-        if ($default !== null && $default->asset_category === $slot['category'] && ! isset($used[$default->asset_id])) {
-            return $default;
+        foreach ($theme?->slots() ?? [] as $slot) {
+            $preferred = $slot['defaultAssetId'] === null ? null : $offered->get($slot['defaultAssetId']);
+
+            $asset = $preferred !== null && $preferred->asset_category === $slot['category'] && ! isset($set[$preferred->asset_id])
+                ? $preferred
+                : $offered->first(fn (LayoutAsset $a) => $a->asset_category === $slot['category'] && ! isset($set[$a->asset_id]));
+
+            if ($asset !== null) {
+                $set[$asset->asset_id] = $asset;
+            }
         }
 
-        return $offered->first(fn (LayoutAsset $a) => $a->asset_category === $slot['category'] && ! isset($used[$a->asset_id]));
+        return $set;
     }
 
     /** @return array<string, mixed> */

@@ -220,6 +220,56 @@ test('a switched-off event type, the styling fee and switched-off services canno
     expect(ServiceRequest::count())->toBe(0);
 });
 
+/* ---------------- Exact budget ---------------- */
+
+test('an exact budget is saved as one amount, in place of a range', function () {
+    $this->actingAs($this->user)
+        ->post(route('customer.new-request.store'), srStandard(['budget' => 'exact', 'budgetExact' => '180000']))
+        ->assertSessionHasNoErrors();
+
+    $request = ServiceRequest::firstOrFail();
+
+    expect($request->budget_min)->toBe('180000.00')
+        ->and($request->budget_max)->toBe('180000.00')
+        ->and($request->hasExactBudget())->toBeTrue();
+});
+
+test('an exact budget must be given, and be at least ₱10,000 (standard) or ₱50,000 (custom)', function (Closure $data, string $error) {
+    $this->actingAs($this->user)
+        ->post(route('customer.new-request.store'), $data())
+        ->assertSessionHasErrors($error);
+
+    expect(ServiceRequest::count())->toBe(0);
+})->with([
+    'no amount' => [fn () => srStandard(['budget' => 'exact', 'budgetExact' => '']), 'budgetExact'],
+    'standard below ₱10,000' => [fn () => srStandard(['budget' => 'exact', 'budgetExact' => '9999']), 'budgetExact'],
+    'custom below ₱50,000' => [fn () => srCustom(['budget' => 'exact', 'budgetExact' => '49999']), 'budgetExact'],
+    'three decimals' => [fn () => srStandard(['budget' => 'exact', 'budgetExact' => '20000.555']), 'budgetExact'],
+]);
+
+test('a custom project\'s reservation fee is 10% of its exact budget', function () {
+    $this->actingAs($this->user)
+        ->post(route('customer.new-request.store'), srCustom(['budget' => 'exact', 'budgetExact' => '120000']))
+        ->assertSessionHasNoErrors();
+
+    $request = ServiceRequest::firstOrFail();
+
+    expect($request->reservationFee())->toBe(12000.0)
+        ->and($request->reservationFeeBasis())->toBe('your budget');
+});
+
+test('a standard request\'s reservation fee is 10% of its initial quotation, whatever the budget', function () {
+    $this->actingAs($this->user)
+        ->post(route('customer.new-request.store'), srStandard(['serviceIds' => [], 'themeId' => srThemeId(), 'budget' => 'Above ₱500,000']))
+        ->assertSessionHasNoErrors();
+
+    $request = ServiceRequest::firstOrFail();
+
+    // Initial quotation: ₱10,000 fee + ₱31,500 of the default set = ₱41,500.
+    expect($request->reservationFee())->toBe(4150.0)
+        ->and($request->reservationFeeBasis())->toBe('your initial quotation');
+});
+
 /* ---------------- Preliminary layout ---------------- */
 
 test('the form gets each theme\'s default set and only priced, switched-on assets with their prices', function () {
@@ -267,12 +317,12 @@ test('nothing picked: the Event Styling fee alone and the theme\'s full default 
         ->and($request->preliminaryLayout->total_initial_cost)->toBe('41500.00');
 });
 
-test('a swapped slot, extra assets and "Other" items are saved, and the total adds services and priced assets', function () {
+test('the ticked assets and "Other" items are saved, and the total adds services and priced assets', function () {
     $this->actingAs($this->user)
         ->post(route('customer.new-request.store'), srStandard([
             'themeId' => srThemeId(),
-            'slotPicks' => ['backdrop' => srAssetId('Entrance Arch'), 'lighting' => srAssetId('Uplighting')],
-            'extraAssetIds' => [srAssetId('Balloon Clusters'), srAssetId('Backdrop Panel')],
+            // Two defaults kept, the rest unticked, two others ticked.
+            'assetIds' => [srAssetId('Chiavari Chairs'), srAssetId('Backdrop Panel'), srAssetId('Entrance Arch'), srAssetId('Uplighting')],
             'customItems' => [['category' => 'Decors', 'name' => 'Neon name sign', 'description' => 'Warm white, "Ana & Ben", 1 m wide']],
         ]))
         ->assertSessionHasNoErrors();
@@ -280,42 +330,54 @@ test('a swapped slot, extra assets and "Other" items are saved, and the total ad
     $request = ServiceRequest::with('preliminaryLayout.items')->firstOrFail();
     $lines = srLayoutLines($request);
 
-    expect($lines['Entrance Arch'])->toBe([1, '6500.00', '6500.00', false])          // swapped in
+    expect(array_keys($lines))->toBe(['Chiavari Chairs', 'Backdrop Panel', 'Entrance Arch', 'Uplighting', 'Neon name sign'])
+        ->and($lines['Chiavari Chairs'])->toBe([150, '45.00', '6750.00', true])      // a default the customer kept
+        ->and($lines['Backdrop Panel'][3])->toBeTrue()
+        ->and($lines['Entrance Arch'])->toBe([1, '6500.00', '6500.00', false])        // not in the theme's set
         ->and($lines['Uplighting'])->toBe([1, '4000.00', '4000.00', false])
-        ->and($lines['Chiavari Chairs'][3])->toBeTrue()                               // untouched default
-        ->and($lines['Balloon Clusters'])->toBe([1, '3500.00', '3500.00', false])    // extra
-        ->and($lines['Backdrop Panel'])->toBe([1, '8000.00', '8000.00', false])      // the swapped-out default, added back as an extra
-        ->and($lines['Neon name sign'])->toBe([1, null, null, false])                // to be priced
+        ->and($lines['Neon name sign'])->toBe([1, null, null, false])                 // to be priced
         ->and($request->preliminaryLayout->items->firstWhere('custom_item_name', 'Neon name sign')->custom_item_category)->toBe('Decors')
-        // services ₱10,000 + ₱15,000 + ₱97,500; assets 6,500 + 6,750 + 5,250 + 4,000 + 9,000 + 3,500 + 8,000
-        ->and($request->preliminaryLayout->total_initial_cost)->toBe((string) number_format(122500 + 43000, 2, '.', ''));
+        // services ₱10,000 + ₱15,000 + ₱97,500; assets 6,750 + 8,000 + 6,500 + 4,000
+        ->and($request->preliminaryLayout->total_initial_cost)->toBe((string) number_format(122500 + 25250, 2, '.', ''));
 });
 
-test('a slot can only be swapped for another switched-on asset of its category', function (Closure $picks, string $error) {
+test('only switched-on, priced assets can be ticked, each once', function (Closure $picks, string $error) {
     $this->actingAs($this->user)
         ->post(route('customer.new-request.store'), srStandard($picks() + ['themeId' => srThemeId()])) // a dataset's own themeId wins
         ->assertSessionHasErrors($error);
 
     expect(ServiceRequest::count())->toBe(0);
 })->with([
-    'another category' => [fn () => ['slotPicks' => ['backdrop' => srAssetId('Fairy Lights')]], 'slotPicks.backdrop'],
+    'unknown asset' => [fn () => ['assetIds' => [99999]], 'assetIds.0'],
     'switched off' => [function () {
         LayoutAsset::where('asset_name', 'Entrance Arch')->update(['status' => 'inactive']);
 
-        return ['slotPicks' => ['backdrop' => srAssetId('Entrance Arch')]];
-    }, 'slotPicks.backdrop'],
-    'already in another slot' => [fn () => ['slotPicks' => ['tables' => srAssetId('Chiavari Chairs')]], 'slotPicks.tables'],
-    'unknown extra' => [fn () => ['extraAssetIds' => [99999]], 'extraAssetIds.0'],
-    'unpriced extra' => [function () {
+        return ['assetIds' => [srAssetId('Entrance Arch')]];
+    }, 'assetIds.0'],
+    'unpriced' => [function () {
         LayoutAsset::where('asset_name', 'Uplighting')->update(['price' => null]);
 
-        return ['extraAssetIds' => [srAssetId('Uplighting')]];
-    }, 'extraAssetIds.0'],
+        return ['assetIds' => [srAssetId('Backdrop Panel'), srAssetId('Uplighting')]];
+    }, 'assetIds.1'],
+    'twice' => [fn () => ['assetIds' => [srAssetId('Entrance Arch'), srAssetId('Entrance Arch')]], 'assetIds.1'],
     'theme of another event type' => [fn () => ['themeId' => srThemeId('Debut Glam')], 'themeId'],
     '"Other" item without a name' => [fn () => ['customItems' => [['category' => 'Decors', 'name' => '', 'description' => 'Big']]], 'customItems.0.name'],
     '"Other" item without a description' => [fn () => ['customItems' => [['category' => 'Decors', 'name' => 'Sign', 'description' => '']]], 'customItems.0.description'],
     '"Other" item in an unknown category' => [fn () => ['customItems' => [['category' => 'Fireworks', 'name' => 'Sign', 'description' => 'Big']]], 'customItems.0.category'],
 ]);
+
+test('a default asset that is switched off is replaced by another of its category', function () {
+    LayoutAsset::where('asset_name', 'Backdrop Panel')->update(['status' => 'inactive']);
+
+    $this->actingAs($this->user)
+        ->post(route('customer.new-request.store'), srStandard(['themeId' => srThemeId()]))
+        ->assertSessionHasNoErrors();
+
+    $lines = srLayoutLines(ServiceRequest::firstOrFail());
+
+    expect($lines)->not->toHaveKey('Backdrop Panel')
+        ->and($lines['Entrance Arch'][3])->toBeTrue(); // stands in for the backdrop slot
+});
 
 test('a request keeps the asset prices of the day it was sent', function () {
     $this->actingAs($this->user)
@@ -327,9 +389,9 @@ test('a request keeps the asset prices of the day it was sent', function () {
     expect(srLayoutLines(ServiceRequest::firstOrFail())['Backdrop Panel'])->toBe([1, '8000.00', '8000.00', true]);
 });
 
-test('without a theme, the layout has only the customer\'s extras', function () {
+test('without a theme, the layout has only the ticked assets', function () {
     $this->actingAs($this->user)
-        ->post(route('customer.new-request.store'), srStandard(['extraAssetIds' => [srAssetId('Entrance Arch')]]))
+        ->post(route('customer.new-request.store'), srStandard(['assetIds' => [srAssetId('Entrance Arch')]]))
         ->assertSessionHasNoErrors();
 
     $request = ServiceRequest::firstOrFail();
@@ -477,4 +539,11 @@ test('ten files are accepted', function () {
         ->assertSessionHasNoErrors();
 
     expect(ServiceRequest::firstOrFail()->files)->toHaveCount(10);
+});
+
+test('the full-screen layout view opens for customers', function () {
+    $this->actingAs($this->user)
+        ->get(route('customer.layout-view'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->component('customer/layout-view'));
 });

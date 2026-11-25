@@ -275,7 +275,8 @@ export type BillCard = {
 };
 
 /** The reservation fee on the step after the consultation, until it is verified. */
-export type ReservationFeeCard = { bill: BillCard | null; expectedAmount: number } | null;
+/** basis: what the fee is 10% of, "your initial quotation" (standard) or "your budget" (custom). */
+export type ReservationFeeCard = { bill: BillCard | null; expectedAmount: number; basis: string } | null;
 
 /** A bill's payment form and history (the bill's own page). */
 export type ReservationFeeInfo = {
@@ -290,7 +291,7 @@ export type ReservationFeeInfo = {
     payments: ReservationPayment[]; // newest first
     canPay: boolean;
     payBlockedReason: string | null;
-    expectedAmount: number; // 10% of the budget, shown before the bill is issued
+    expectedAmount: number; // 10% of the initial quotation or budget, shown before the bill is issued
     dueDays: number;
     gcash: { account_name: string; account_number: string; qr_image: string; is_sample: boolean };
     receipt: { maxMb: number; types: string[] };
@@ -360,6 +361,10 @@ export type RequestDetail = {
     budgetMin: number;
     budgetMax: number | null;
     reservationFee: number;
+    /** What the fee is 10% of: "your initial quotation" (standard) or "your budget" (custom). */
+    reservationFeeBasis: string;
+    /** The customer typed one amount instead of picking a range. */
+    exactBudget: boolean;
     description: string | null;
     services: { name: string; category: string | null; quantity: number; unit: string | null; unitPrice: number; subtotal: number }[];
     servicesTotal: number;
@@ -443,8 +448,9 @@ export function formatDay(p: { startDate: string; endDate: string }) {
 
 export const peso = (n: number) => `₱${n.toLocaleString('en-PH')}`;
 
+/** A range ("₱100,000 – ₱250,000", "Below …", "Above …"), or an exact budget saved as one amount ("₱180,000"). */
 export const budgetLabel = (min: number, max: number | null) =>
-    max === null ? `Above ${peso(min)}` : min === 0 ? `Below ${peso(max)}` : `${peso(min)} – ${peso(max)}`;
+    max === null ? `Above ${peso(min)}` : min === max ? peso(min) : min === 0 ? `Below ${peso(max)}` : `${peso(min)} – ${peso(max)}`;
 
 /** The pill colour for a project's phase or a request's review status. */
 export function statusTone(item: { requestStatus?: string; status: ProjectStatusInfo | null }): PillTone {
