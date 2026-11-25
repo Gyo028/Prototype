@@ -182,7 +182,7 @@ class ServiceRequestController extends Controller
         return [
             'id' => $r->service_request_id,
             'code' => (string) $r->request_code,
-            'title' => CustomerProjectController::titleOf($r),
+            'title' => $r->isCustom() ? (string) $r->project_title : ($r->eventType?->event_type_name ?? 'Event'), // leader: the event type only
             'requestType' => $r->request_type,
             'customer' => [
                 'name' => $customer?->full_name ?? 'Customer',

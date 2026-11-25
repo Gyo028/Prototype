@@ -64,10 +64,26 @@ const PART_TITLES: Record<PartKey, string> = {
 };
 
 /**
- * Steps whose actions are connected to the backend so far. With real data, the other
- * steps show a notice instead of forms that would have nowhere to save yet.
+ * Parts whose actions are connected to the backend so far (add each one as its backlog is connected).
+ * With real data, the other parts show a notice instead of forms that would have nowhere to save yet.
  */
-const CONNECTED_STEPS: StepKey[] = ['consultation'];
+const CONNECTED_PARTS: PartKey[] = ['consultation', 'reservationFee'];
+
+/** A step is connected when at least one of its parts is. */
+const stepConnected = (key: StepKey) =>
+    (STEPS.find((s) => s.key === key)?.parts as readonly PartKey[] | undefined)?.some((p) => CONNECTED_PARTS.includes(p)) ?? false;
+
+/** Shown in place of a step or part that is not connected to the database yet. */
+function NotConnected({ title }: { title: string }) {
+    return (
+        <div className="flex items-start gap-3 rounded-xl border border-dashed border-black/15 bg-neutral-50 p-4 text-sm text-ink-soft">
+            <Lock className="mt-0.5 size-4 shrink-0" />
+            <p>
+                <b className="text-ink">{title}</b> is not connected to the database yet. It will be connected with its backlog.
+            </p>
+        </div>
+    );
+}
 
 // A cancelled project's Completed step stays open so its status history can be seen.
 const canOpen = (state: StepState, key?: StepKey) => state !== 'locked' && (state !== 'closed' || key === 'completed');
@@ -138,7 +154,7 @@ export default function ProjectWizard({ project: serverProject, specialists, set
     /** A part of the selected step: shown only once the part before it is complete. */
     const part = (key: PartKey, before: PartKey | null, content: ReactNode) => (
         <div key={key} className="border-b border-black/10 pb-6 last:border-0 last:pb-0">
-            {before && !isStepComplete(project, before) ? <LockedPart title={PART_TITLES[key]} after={PART_TITLES[before]} /> : content}
+            {before && !isStepComplete(project, before) ? <LockedPart title={PART_TITLES[key]} after={PART_TITLES[before]} /> : !usingSample && !CONNECTED_PARTS.includes(key) ? <NotConnected title={PART_TITLES[key]} /> : content}
         </div>
     );
 
@@ -264,14 +280,8 @@ export default function ProjectWizard({ project: serverProject, specialists, set
 
             {/* Selected step */}
             <Panel>
-                {!usingSample && !CONNECTED_STEPS.includes(selected) ? (
-                    <div className="flex items-start gap-3 rounded-xl border border-dashed border-black/15 bg-neutral-50 p-4 text-sm text-ink-soft">
-                        <Lock className="mt-0.5 size-4 shrink-0" />
-                        <p>
-                            <b className="text-ink">{STEPS[selectedIndex].title}</b> is not connected to the database yet. It will be connected with
-                            its backlog.
-                        </p>
-                    </div>
+                {!usingSample && !stepConnected(selected) ? (
+                    <NotConnected title={STEPS[selectedIndex].title} />
                 ) : (
                     <div className="grid gap-6">
                         {selected === 'consultation' && <ConsultationStep key={project.id} {...stepProps} />}

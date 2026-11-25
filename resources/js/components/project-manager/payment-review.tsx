@@ -294,7 +294,7 @@ export function PaymentHistory({ payments }: { payments: Payment[] }) {
                                 {p.chequeNo && <span className="block text-xs text-ink-soft">No. {p.chequeNo}</span>}
                             </td>
                             <td className="py-2 text-ink-soft">
-                                {p.review ? `${p.review.reviewedBy}, ${formatDateTime(p.review.reviewedAt)}` : '—'}
+                                {p.review ? [p.review.reviewedBy, p.review.reviewedAt && formatDateTime(p.review.reviewedAt)].filter(Boolean).join(', ') : '—'}
                                 {p.review?.remarks && <span className="block text-xs">Remarks: {p.review.remarks}</span>}
                             </td>
                             <td className="py-2">

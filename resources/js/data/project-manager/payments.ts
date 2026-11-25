@@ -58,7 +58,7 @@ export type Payment = {
     review: {
         remarks: string | null; // required when rejected
         reviewedBy: string;
-        reviewedAt: string; // ISO date-time
+        reviewedAt: string | null; // ISO date-time; null when not recorded (the database keeps no date for a rejection)
     } | null;
 };
 

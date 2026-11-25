@@ -5,6 +5,7 @@ namespace App\Http\Controllers\ProjectManager;
 use App\Http\Controllers\Controller;
 use App\Models\AppointmentOutcome;
 use App\Models\Billing;
+use App\Models\Payment;
 use App\Models\Project;
 use App\Models\ProjectSchedule;
 use App\Models\ProjectStatus;
@@ -30,7 +31,7 @@ class ProjectController extends Controller
         'serviceRequest.project.projectManager',
         'status',
         'schedules.outcome.recordedBy',
-        'billings',
+        'billings.payments',
     ];
 
     /** The database status → the status shown on the pages (revision, Nov 19). */
@@ -119,10 +120,11 @@ class ProjectController extends Controller
             'consultationNote' => ! $booked && ! $held ? $closed?->remarks : null,
             'consultation' => self::consultation($p, $held),
 
-            // Step 2 · Ocular Visit (reservation fee and site assessment: connected with their backlogs)
+            // Step 2 · Ocular Visit: the reservation fee (backlog #27); the site assessment comes with #20
             'reservationFee' => [
                 'amount' => $fee ? (float) $fee->amount : $p->serviceRequest->reservationFee(),
-                'paid' => $fee?->status === Billing::STATUS_PAID,
+                'paid' => $fee !== null && ($fee->status === Billing::STATUS_PAID
+                    || $fee->payments->contains('status', Payment::STATUS_VERIFIED)),
             ],
             'ocularVisitAt' => $ocular?->start_datetime->format('Y-m-d\TH:i'),
             'siteAssessment' => null,
@@ -130,13 +132,58 @@ class ProjectController extends Controller
             'designProposal' => null,
             'contract' => null,
             'billings' => [],
-            'payments' => [],
+            'payments' => $fee ? $fee->payments->sortBy('payment_id')->map(fn (Payment $pay) => self::payment($pay, 'Reservation Fee'))->values()->all() : [], // only the reservation fee's for now
             'disputes' => [],
             'execution' => null,
             'statusUpdates' => [],
         ]);
     }
 
+    /** The page's payment statuses ↔ payments.status. */
+    private const PAYMENT_STATUSES = [
+        Payment::STATUS_SUBMITTED => 'For Verification',
+        Payment::STATUS_VERIFIED => 'Verified',
+        Payment::STATUS_REJECTED => 'Rejected',
+    ];
+
+    private const PAYMENT_METHODS = [
+        Payment::METHOD_GCASH => 'GCash',
+        Payment::METHOD_CASH => 'Cash',
+        Payment::METHOD_CHEQUE => 'Cheque',
+    ];
+
+    /**
+     * One payment in the page's shape (resources/js/data/project-manager/payments.ts, type Payment).
+     * The database does not store who reviewed a payment, or when a rejection was made.
+     *
+     * @return array<string, mixed>
+     */
+    public static function payment(Payment $pay, string $type): array
+    {
+        $decided = $pay->status !== Payment::STATUS_SUBMITTED;
+
+        return [
+            'id' => $pay->payment_id,
+            'code' => 'PAY-'.str_pad((string) $pay->payment_id, 4, '0', STR_PAD_LEFT),
+            'billingId' => $type === 'Reservation Fee' ? null : $pay->billing_id,
+            'type' => $type,
+            'amount' => (float) $pay->amount_paid,
+            'method' => self::PAYMENT_METHODS[$pay->payment_method] ?? $pay->payment_method,
+            'referenceNo' => $pay->payment_reference,
+            'paidOn' => $pay->payment_date->toDateString(),
+            'receipt' => $pay->receipt_file_path
+                ? ['name' => $pay->receipt_file_name ?: basename($pay->receipt_file_path), 'url' => "/project-manager/payments/{$pay->payment_id}/receipt"]
+                : null,
+            'chequeNo' => null,
+            'submittedAt' => $pay->submitted_at->toIso8601String(),
+            'status' => self::PAYMENT_STATUSES[$pay->status] ?? $pay->status,
+            'review' => $decided ? [
+                'remarks' => $pay->remarks,
+                'reviewedBy' => 'Project Manager',
+                'reviewedAt' => $pay->verified_at?->toIso8601String(),
+            ] : null,
+        ];
+    }
     /** The consultation the Project Manager recorded, or null. */
     private static function consultation(Project $p, ?ProjectSchedule $held): ?array
     {

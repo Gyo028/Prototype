@@ -11,6 +11,7 @@ import { waitingReason } from '@/data/project-manager/projects';
  * After the consultation, the customer pays the reservation fee and uploads the receipt.
  * The Project Manager verifies it. Once verified, the customer is notified to book the
  * ocular visit and the Site Assessment step opens ("Manage Payments" use case).
+ * Connected to the database (Nov 25): verify / reject. Cash and cheque (backlog #28) are sample data only for now.
  */
 
 export default function ReservationFeeStep(props: StepProps) {
@@ -44,16 +45,19 @@ export default function ReservationFeeStep(props: StepProps) {
                         {pending.map((payment) => (
                             <PaymentReview key={payment.id} {...props} payment={payment} />
                         ))}
-                                                <RecordPaymentForm
-                            {...props}
-                            targets={[
-                                {
-                                    billingId: null,
-                                    type: 'Reservation Fee',
-                                    balance: project.reservationFee.amount - verifiedTotal(null, project.payments),
-                                },
-                            ]}
-                        />
+                        {/* Cash / cheque payments (backlog #28): sample data only until that backlog is connected */}
+                        {props.usingSample && (
+                            <RecordPaymentForm
+                                {...props}
+                                targets={[
+                                    {
+                                        billingId: null,
+                                        type: 'Reservation Fee',
+                                        balance: project.reservationFee.amount - verifiedTotal(null, project.payments),
+                                    },
+                                ]}
+                            />
+                        )}
                     </>
                 )}
 

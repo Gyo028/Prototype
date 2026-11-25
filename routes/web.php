@@ -31,6 +31,7 @@ use App\Http\Controllers\ProjectExpenseRecordController;
 use App\Http\Controllers\ProjectManager\ServiceRequestController as PmServiceRequestController;
 use App\Http\Controllers\ProjectManager\ProjectController as PmProjectController;
 use App\Http\Controllers\ProjectManager\ConsultationController as PmConsultationController;
+use App\Http\Controllers\ProjectManager\PaymentController as PmPaymentController;
 
 
 
@@ -149,6 +150,10 @@ Route::middleware(['auth', 'verified', 'role:project_manager'])
         Route::get('projects', [PmProjectController::class, 'index'])->name('projects');
         Route::get('projects/{project}', [PmProjectController::class, 'show'])->name('projects.show');
         Route::patch('projects/{project}/consultation', [PmConsultationController::class, 'update'])->name('projects.consultation');
+                // Backlog #27: Verify online payments
+        Route::patch('projects/{project}/payments/{payment}/verify', [PmPaymentController::class, 'verify'])->name('projects.payments.verify');
+        Route::patch('projects/{project}/payments/{payment}/reject', [PmPaymentController::class, 'reject'])->name('projects.payments.reject');
+        Route::get('payments/{payment}/receipt', [PmPaymentController::class, 'receipt'])->name('payments.receipt');
         Route::inertia('billing-payments', 'project-manager/billing-payments')->name('billing-payments');
     });
 
