@@ -32,6 +32,8 @@ use App\Http\Controllers\ProjectManager\ServiceRequestController as PmServiceReq
 use App\Http\Controllers\ProjectManager\ProjectController as PmProjectController;
 use App\Http\Controllers\ProjectManager\ConsultationController as PmConsultationController;
 use App\Http\Controllers\ProjectManager\PaymentController as PmPaymentController;
+use App\Http\Controllers\ProjectManager\SiteAssessmentController as PmSiteAssessmentController;
+use App\Http\Controllers\ProjectManager\SiteAccessDocumentController as PmSiteAccessDocumentController;
 
 
 
@@ -156,6 +158,11 @@ Route::middleware(['auth', 'verified', 'role:project_manager'])
         Route::patch('projects/{project}/payments/{payment}/verify', [PmPaymentController::class, 'verify'])->name('projects.payments.verify');
         Route::patch('projects/{project}/payments/{payment}/reject', [PmPaymentController::class, 'reject'])->name('projects.payments.reject');
         Route::get('payments/{payment}/receipt', [PmPaymentController::class, 'receipt'])->name('payments.receipt');
+                // Backlog #20: Site assessment (and the site access documents)
+        Route::post('projects/{project}/site-assessment', [PmSiteAssessmentController::class, 'store'])->name('projects.site-assessment');
+        Route::get('projects/{project}/site-assessment/files/{file}', [PmSiteAssessmentController::class, 'file'])->name('projects.site-assessment.file');
+        Route::patch('projects/{project}/site-access-documents/{document}', [PmSiteAccessDocumentController::class, 'review'])->name('projects.site-access-documents.review');
+        Route::get('projects/{project}/site-access-documents/{document}', [PmSiteAccessDocumentController::class, 'show'])->name('projects.site-access-documents.show');
         Route::inertia('billing-payments', 'project-manager/billing-payments')->name('billing-payments');
     });
 

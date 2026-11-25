@@ -4,11 +4,13 @@ namespace App\Http\Controllers\ProjectManager;
 
 use App\Http\Controllers\Controller;
 use App\Models\AppointmentOutcome;
+use App\Models\AppointmentOutcomeFile;
 use App\Models\Billing;
 use App\Models\Payment;
 use App\Models\Project;
 use App\Models\ProjectSchedule;
 use App\Models\ProjectStatus;
+use App\Models\SiteAccessDocument;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -31,6 +33,8 @@ class ProjectController extends Controller
         'serviceRequest.project.projectManager',
         'status',
         'schedules.outcome.recordedBy',
+        'schedules.outcome.files',
+        'siteAccessDocuments',
         'billings.payments',
     ];
 
@@ -126,8 +130,12 @@ class ProjectController extends Controller
                 'paid' => $fee !== null && ($fee->status === Billing::STATUS_PAID
                     || $fee->payments->contains('status', Payment::STATUS_VERIFIED)),
             ],
-            'ocularVisitAt' => $ocular?->start_datetime->format('Y-m-d\TH:i'),
-            'siteAssessment' => null,
+            // Site assessment (backlog #20)
+            'ocularVisitAt' => $ocular ? self::slot($ocular) : null,
+            'ocularVisitStatus' => $ocular?->schedule_status, // pending | tentative | confirmed | completed
+            'siteAccessDocuments' => $p->siteAccessDocuments->whereNull('replaced_at')->sortBy('document_type')
+                ->map(fn (SiteAccessDocument $d) => self::document($p, $d))->values()->all(),
+            'siteAssessment' => self::siteAssessment($p, $ocular),
             'assignment' => null,
             'designProposal' => null,
             'contract' => null,
@@ -139,6 +147,47 @@ class ProjectController extends Controller
         ]);
     }
 
+        /** The site assessment recorded on the held ocular visit, or null. */
+    private static function siteAssessment(Project $p, ?ProjectSchedule $visit): ?array
+    {
+        $outcome = $visit?->schedule_status === ProjectSchedule::STATUS_COMPLETED ? $visit->outcome : null;
+        $report = $outcome?->files->firstWhere('file_type', AppointmentOutcomeFile::TYPE_REPORT);
+
+        if ($outcome === null || $report === null) {
+            return null;
+        }
+
+        $url = fn (AppointmentOutcomeFile $f) => "/project-manager/projects/{$p->project_id}/site-assessment/files/{$f->outcome_file_id}";
+
+        return [
+            'assessedOn' => $visit->start_datetime->toDateString(), // the visit's date (no separate column)
+            'findings' => $outcome->notes,
+            'report' => [
+                'name' => $report->file_name,
+                'url' => $url($report),
+                'type' => $report->extension() === 'docx' ? 'docx' : 'pdf',
+            ],
+            'photos' => $outcome->files->where('file_type', AppointmentOutcomeFile::TYPE_PHOTO)
+                ->map(fn (AppointmentOutcomeFile $f) => ['id' => $f->outcome_file_id, 'name' => $f->file_name, 'url' => $url($f)])
+                ->values()->all(),
+            'recordedBy' => $outcome->recordedBy?->name ?? 'Project Manager',
+            'recordedAt' => $outcome->recorded_at->toIso8601String(),
+        ];
+    }
+
+    /** One current site access document in the page's shape. */
+    private static function document(Project $p, SiteAccessDocument $d): array
+    {
+        return [
+            'id' => $d->document_id,
+            'type' => SiteAccessDocument::TYPES[$d->document_type] ?? $d->document_type,
+            'name' => $d->file_name,
+            'url' => "/project-manager/projects/{$p->project_id}/site-access-documents/{$d->document_id}",
+            'status' => ucfirst($d->status), // Submitted | Approved | Rejected
+            'remarks' => $d->remarks,
+            'uploadedAt' => $d->uploaded_at?->toIso8601String(),
+        ];
+    }
     /** The page's payment statuses ↔ payments.status. */
     private const PAYMENT_STATUSES = [
         Payment::STATUS_SUBMITTED => 'For Verification',

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { GoldButton, cx } from '@/components/dashboard/ui';
 import { Detail, Section, formatDate, formatDateTime } from '@/components/project-manager/request-details';
+import SiteAccessDocuments from '@/components/project-manager/site-access-documents';
 import SiteAssessmentForm from '@/components/project-manager/site-assessment-form';
 import type { SiteAssessmentErrors, SiteAssessmentValues } from '@/components/project-manager/site-assessment-form';
 import { CompletedNotice, PROJECTS_URL, StepIntro, WaitingNotice } from '@/components/project-manager/steps/step-ui';
@@ -16,6 +17,8 @@ import type { SiteAssessment } from '@/data/project-manager/projects';
  * After the customer pays the reservation fee and books the ocular visit, the Project Manager
  * conducts it and uploads the site assessment report (PDF or DOCX) and venue photos.
  * Skipped when the consultation said no ocular visit is needed.
+ * Connected to the database (Nov 25): the assessment date is the visit's date; a third-party venue's
+ * site access documents are reviewed here first (approving both confirms the visit).
  */
 export default function SiteAssessmentStep({ project, usingSample, managerName, onSaved }: StepProps) {
     const [editing, setEditing] = useState(false);
@@ -24,6 +27,8 @@ export default function SiteAssessmentStep({ project, usingSample, managerName, 
 
     const ocularRequired = project.consultation?.ocularVisit.required ?? true;
     const waiting = waitingReason(project, 'siteAssessment');
+    // A visit waiting for its site access documents cannot be recorded yet (the documents box explains).
+    const canRecord = !(waiting && !project.siteAssessment) && project.ocularVisitStatus !== 'pending';
 
     const save = (v: SiteAssessmentValues) => {
         const finish = () => {
@@ -77,7 +82,7 @@ export default function SiteAssessmentStep({ project, usingSample, managerName, 
                 },
                 onError: (errors) => {
                     const photoError = Object.entries(errors).find(([key]) => key.startsWith('photos'))?.[1];
-                    setServerErrors({ report: errors.report, assessedOn: errors.assessedOn, photos: photoError });
+                    setServerErrors({ report: errors.report, assessedOn: errors.assessedOn ?? errors.visit, photos: photoError });
                 },
             },
         );
@@ -93,7 +98,7 @@ export default function SiteAssessmentStep({ project, usingSample, managerName, 
                 <CompletedNotice>
                     <b>Skipped.</b> The consultation recorded that no ocular visit is needed for this project.
                 </CompletedNotice>
-            ) : waiting && !project.siteAssessment ? (
+            ) : !project.ocularVisitAt ? (
                 <WaitingNotice>
                     <b>{waiting}</b>
                     <span className="mt-1 block text-ink-soft">This step opens once the ocular visit is booked.</span>
@@ -101,13 +106,20 @@ export default function SiteAssessmentStep({ project, usingSample, managerName, 
             ) : (
                 <div className="grid gap-4">
                     <Section title="Ocular Visit">
-                        <Detail label="Booked by the customer for">
-                            {project.ocularVisitAt ? formatDateTime(project.ocularVisitAt) : '—'}
-                        </Detail>
+                        <Detail label="Booked by the customer for">{formatDateTime(project.ocularVisitAt)}</Detail>
                     </Section>
 
-                    {editing ? (
+                    {project.siteAccessDocuments && project.siteAccessDocuments.length > 0 && <SiteAccessDocuments project={project} />}
+
+                    {waiting && !project.siteAssessment && (
+                        <WaitingNotice>
+                            <b>{waiting}</b>
+                        </WaitingNotice>
+                    )}
+
+                    {!canRecord ? null : editing ? (
                         <SiteAssessmentForm
+                            dateLocked={!usingSample}
                             project={project}
                             saving={saving}
                             serverErrors={serverErrors}
@@ -135,6 +147,7 @@ export default function SiteAssessmentStep({ project, usingSample, managerName, 
         </>
     );
 }
+
 
 /** Read-only view of a saved site assessment. */
 function AssessmentSummary({ assessment: a }: { assessment: SiteAssessment }) {
