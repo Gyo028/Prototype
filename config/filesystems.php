@@ -26,6 +26,16 @@ return [
     */
 
     /*
+    | Website Content photos the Technical Admin uploads (hero, About Us,
+    | service pages, Our Works). Public photos, so a public disk: "public"
+    | keeps them in storage/app/public (run `php artisan storage:link` once).
+    | Where they live in production is decided once the host is chosen.
+    | The photos shipped with the app stay in public/images.
+    */
+
+    'website_disk' => env('WEBSITE_CONTENT_DISK', 'public'),
+
+    /*
     |--------------------------------------------------------------------------
     | Filesystem Disks
     |--------------------------------------------------------------------------

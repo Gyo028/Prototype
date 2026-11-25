@@ -3,6 +3,7 @@
 use App\Enums\Role;
 use App\Models\User;
 use App\Models\WebsiteContent;
+use App\Support\WebsiteDefaults;
 use Database\Seeders\WebsiteContentSeeder;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -15,12 +16,10 @@ beforeEach(function () {
 function validServices(array $overrides = []): array
 {
     return array_merge([
-        'title' => 'What We Do',
-        'intro' => 'Everything for your event.',
         'cards' => [
-            ['title' => 'Corporate', 'description' => 'For companies.'],
-            ['title' => 'Occasions', 'description' => 'For celebrations.'],
-            ['title' => 'Fabrication', 'description' => 'Custom builds.'],
+            ['description' => 'Styling and management for brand activations and corporate functions.'],
+            ['description' => 'Creative setups for weddings, birthdays, debuts and milestones.'],
+            ['description' => 'Design and production of backdrops, props and themed structures.'],
         ],
     ], $overrides);
 }
@@ -46,7 +45,7 @@ test('only the Technical Admin can open or change the website content', function
     $user = User::factory()->create(['role' => $role]);
 
     $this->actingAs($user)->get(route('technical-admin.website-content'))->assertForbidden();
-    $this->actingAs($user)->put(route('technical-admin.website-content.about'), ['title' => 'x', 'content' => 'y'])->assertForbidden();
+    $this->actingAs($user)->put(route('technical-admin.website-content.about'), ['first' => 'x', 'second' => 'y'])->assertForbidden();
     $this->actingAs($user)->post(route('technical-admin.website-content.faqs.store'), ['question' => 'q', 'answer' => 'a'])->assertForbidden();
 })->with([Role::Customer, Role::ProjectManager, Role::Owner]);
 
@@ -56,85 +55,88 @@ test('the screen shows the saved content of each section', function () {
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('technical-admin/website-content')
-            ->where('about.title', 'About Us')
-            ->where('services.title', 'Our Services')
+            ->where('hero.photos.hero.url', '/images/hero-bg.webp')
+            ->where('about.first', WebsiteDefaults::ABOUT[0])
+            ->where('about.second', WebsiteDefaults::ABOUT[1])
+            ->has('about.photos', 3)
             ->has('services.cards', 3)
+            ->where('services.cards.2.title', 'Custom Projects')
+            ->has('servicePages', 3)
+            ->has('servicePages.0.showcase', 4)
+            ->has('works', 20)
             ->where('contact.email', 'gr3ataseventsstyling@gmail.com')
             ->has('faqs', 6)
             ->where('faqs.0.id', fn ($id) => is_int($id))
             ->has('updated.about')
+            ->has('updated.pages')
             ->has('updated.faq')
         );
 });
 
-test('About Us is saved right away and remembers who changed it', function () {
+test('About Us saves the two paragraphs as single lines and remembers who changed it', function () {
     $this->actingAs($this->admin)
-        ->put(route('technical-admin.website-content.about'), ['title' => 'Who We Are', 'content' => "First.\n\nSecond."])
+        ->put(route('technical-admin.website-content.about'), ['first' => "  First   paragraph\n here. ", 'second' => 'Second paragraph.'])
         ->assertRedirect(route('technical-admin.website-content'))
         ->assertSessionHasNoErrors();
 
     $about = WebsiteContent::where('block_key', 'about')->firstOrFail();
 
-    expect($about->title)->toBe('Who We Are')
-        ->and($about->content)->toBe("First.\n\nSecond.")
+    expect($about->title)->toBe('About Us') // fixed
+        ->and($about->content)->toBe("First paragraph here.\n\nSecond paragraph.")
         ->and($about->updated_by)->toBe($this->admin->id)
         ->and(WebsiteContent::where('block_key', 'about')->count())->toBe(1);
 });
 
-test('About Us needs a title and content within the limits', function (array $input, array $errors) {
+test('About Us needs both paragraphs within the limits', function (array $input, array $errors) {
     $this->actingAs($this->admin)
         ->put(route('technical-admin.website-content.about'), $input)
         ->assertSessionHasErrors($errors);
 })->with([
-    'empty' => [['title' => '', 'content' => ''], ['title', 'content']],
-    'title too long' => [['title' => str_repeat('a', 41), 'content' => 'ok'], ['title']],
-    'content too long' => [['title' => 'ok', 'content' => str_repeat('a', 1501)], ['content']],
+    'empty' => [['first' => '', 'second' => '   '], ['first', 'second']],
+    'first too long' => [['first' => str_repeat('a', 181), 'second' => 'ok'], ['first']],
+    'second too long' => [['first' => 'ok', 'second' => str_repeat('a', 421)], ['second']],
 ]);
 
-test('a missing block is created when it is first saved', function () {
+test('a missing About Us block is created when it is first saved', function () {
     WebsiteContent::query()->delete();
 
     $this->actingAs($this->admin)
-        ->put(route('technical-admin.website-content.about'), ['title' => 'About Us', 'content' => 'Hello.'])
+        ->put(route('technical-admin.website-content.about'), ['first' => 'Hello.', 'second' => 'World.'])
         ->assertSessionHasNoErrors();
 
     expect(WebsiteContent::where('block_key', 'about')->value('section'))->toBe('homepage');
 });
 
-test('Our Services saves the heading and the three cards', function () {
+test('Our Services saves the three card descriptions and keeps the fixed titles', function () {
     $this->actingAs($this->admin)
         ->put(route('technical-admin.website-content.services'), validServices())
         ->assertRedirect(route('technical-admin.website-content'))
         ->assertSessionHasNoErrors();
 
-    $heading = WebsiteContent::where('block_key', 'services')->firstOrFail();
     $cards = WebsiteContent::where('section', 'services')->whereNull('block_key')->orderBy('sort_order')->get();
 
-    expect($heading->title)->toBe('What We Do')
-        ->and($heading->content)->toBe('Everything for your event.')
-        ->and($cards)->toHaveCount(3)
-        ->and($cards->pluck('title')->all())->toBe(['Corporate', 'Occasions', 'Fabrication'])
-        ->and($cards->last()->content)->toBe('Custom builds.');
+    expect($cards)->toHaveCount(3)
+        ->and($cards->pluck('title')->all())->toBe(WebsiteDefaults::CARD_TITLES)
+        ->and($cards->last()->content)->toBe('Design and production of backdrops, props and themed structures.')
+        ->and(WebsiteContent::where('block_key', 'services')->value('title'))->toBe('Our Services');
 });
 
-test('Our Services rejects incomplete or oversized cards and the wrong number of cards', function () {
+test('Our Services rejects descriptions that are too short or too long, and the wrong number of cards', function () {
     $this->actingAs($this->admin)
         ->put(route('technical-admin.website-content.services'), validServices([
             'cards' => [
-                ['title' => 'Corporate', 'description' => 'For companies.'],
-                ['title' => '', 'description' => 'No title.'],
-                ['title' => 'Fabrication', 'description' => str_repeat('a', 151)],
+                ['description' => 'Styling and management for brand activations and corporate functions.'],
+                ['description' => 'Too short.'],
+                ['description' => str_repeat('a', 111)],
             ],
         ]))
-        ->assertSessionHasErrors(['cards.1.title', 'cards.2.description']);
+        ->assertSessionHasErrors(['cards.1.description', 'cards.2.description']);
 
     $this->actingAs($this->admin)
         ->put(route('technical-admin.website-content.services'), validServices([
-            'cards' => [['title' => 'Only', 'description' => 'One.']],
+            'cards' => [['description' => 'Styling and management for brand activations and corporate functions.']],
         ]))
         ->assertSessionHasErrors('cards');
-
-    expect(WebsiteContent::where('block_key', 'services')->value('title'))->toBe('Our Services');
 });
 
 test('Contact & Footer is saved, and an empty social link is allowed', function () {
