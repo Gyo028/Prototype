@@ -6,6 +6,7 @@ import { formatDate } from '@/components/project-manager/request-details';
 import { PROJECTS_URL } from '@/components/project-manager/steps/step-ui';
 import { PROJECT_STATUSES, getSampleProjects, projectStatus } from '@/data/project-manager/projects';
 import type { Project, ProjectStatus } from '@/data/project-manager/projects';
+import { requestTitle } from '@/data/project-manager/project-requests';
 
 /*
  * The Projects page: every approved service request is a project.
@@ -36,7 +37,7 @@ export default function ProjectList({ projects }: Props) {
     const q = query.trim().toLowerCase();
     const visibleProjects = allProjects
         .filter((p) => filter === 'All' || projectStatus(p) === filter)
-        .filter((p) => !q || p.code.toLowerCase().includes(q) || p.eventType.toLowerCase().includes(q))
+        .filter((p) => !q || p.code.toLowerCase().includes(q) || requestTitle(p).toLowerCase().includes(q))
         // Queue: first come, first served. The oldest is at the top.
         .sort((a, b) => a.submittedAt.localeCompare(b.submittedAt));
 
@@ -110,7 +111,7 @@ export default function ProjectList({ projects }: Props) {
                                         className="cursor-pointer transition hover:bg-gold/10 focus-visible:bg-gold/10 focus-visible:outline-none"
                                     >
                                         <td className="px-4 py-3 font-semibold whitespace-nowrap text-ink">{p.code}</td>
-                                        <td className="px-2 py-3 text-ink">{p.eventType}</td>
+                                        <td className="px-2 py-3 text-ink">{requestTitle(p)}</td>
                                         <td className="px-2 py-3 whitespace-nowrap text-ink">{formatDate(p.submittedAt.slice(0, 10))}</td>
                                         <td className="px-2 py-3 pr-4 whitespace-nowrap">
                                             <Pill tone={projectStatusTone[status]}>{status}</Pill>

@@ -30,6 +30,7 @@ import {
     stepStates,
 } from '@/data/project-manager/projects';
 import type { DesignSpecialist, PartKey, Project, StepKey, StepState } from '@/data/project-manager/projects';
+import { requestTitle } from '@/data/project-manager/project-requests';
 
 /*
  * The project wizard: one page per project, with the planning steps across the top.
@@ -61,6 +62,28 @@ const PART_TITLES: Record<PartKey, string> = {
     installation: 'Installation',
     completed: 'Completed',
 };
+
+/**
+ * Parts whose actions are connected to the backend so far (add each one as its backlog is connected).
+ * With real data, the other parts show a notice instead of forms that would have nowhere to save yet.
+ */
+const CONNECTED_PARTS: PartKey[] = ['consultation', 'reservationFee'];
+
+/** A step is connected when at least one of its parts is. */
+const stepConnected = (key: StepKey) =>
+    (STEPS.find((s) => s.key === key)?.parts as readonly PartKey[] | undefined)?.some((p) => CONNECTED_PARTS.includes(p)) ?? false;
+
+/** Shown in place of a step or part that is not connected to the database yet. */
+function NotConnected({ title }: { title: string }) {
+    return (
+        <div className="flex items-start gap-3 rounded-xl border border-dashed border-black/15 bg-neutral-50 p-4 text-sm text-ink-soft">
+            <Lock className="mt-0.5 size-4 shrink-0" />
+            <p>
+                <b className="text-ink">{title}</b> is not connected to the database yet. It will be connected with its backlog.
+            </p>
+        </div>
+    );
+}
 
 // A cancelled project's Completed step stays open so its status history can be seen.
 const canOpen = (state: StepState, key?: StepKey) => state !== 'locked' && (state !== 'closed' || key === 'completed');
@@ -113,7 +136,8 @@ export default function ProjectWizard({ project: serverProject, specialists, set
     const status = projectStatus(project);
     const notProceeding = isNotProceeding(project);
     const heads = setUpHeads ?? SAMPLE_SET_UP_HEADS;
-    const canCancel = !notProceeding && executionStatus(project) === null;
+    // Cancelling is connected to the backend with backlog #35; until then, sample data only.
+    const canCancel = usingSample && !notProceeding && executionStatus(project) === null;
 
     const selectedIndex = STEPS.findIndex((s) => s.key === selected);
     const nextStep = STEPS[selectedIndex + 1];
@@ -130,13 +154,13 @@ export default function ProjectWizard({ project: serverProject, specialists, set
     /** A part of the selected step: shown only once the part before it is complete. */
     const part = (key: PartKey, before: PartKey | null, content: ReactNode) => (
         <div key={key} className="border-b border-black/10 pb-6 last:border-0 last:pb-0">
-            {before && !isStepComplete(project, before) ? <LockedPart title={PART_TITLES[key]} after={PART_TITLES[before]} /> : content}
+            {before && !isStepComplete(project, before) ? <LockedPart title={PART_TITLES[key]} after={PART_TITLES[before]} /> : !usingSample && !CONNECTED_PARTS.includes(key) ? <NotConnected title={PART_TITLES[key]} /> : content}
         </div>
     );
 
     const ocularNotRequired = project.consultation?.ocularVisit.required === false;
 
-        return (
+    return (
         <>
             <Head title={`${project.code} · Projects`} />
 
@@ -149,12 +173,14 @@ export default function ProjectWizard({ project: serverProject, specialists, set
                 <div>
                     <div className="flex flex-wrap items-center gap-3">
                         <h1 className="text-2xl font-bold text-ink">
-                            {project.code} · {project.eventType}
+                            {project.code} · {requestTitle(project)}
                         </h1>
                         <Pill tone={projectStatusTone[status]}>{status}</Pill>
+                        {project.onHold && <Pill tone="yellow">On hold</Pill>}
                     </div>
                     <p className="text-sm text-ink-soft">
                         {project.customer.name} · {formatDate(project.eventDate)} · {project.venue}
+                        {project.requestCode && ` · Request ${project.requestCode}`}
                     </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -189,12 +215,13 @@ export default function ProjectWizard({ project: serverProject, specialists, set
                 </div>
             )}
 
-                        {notProceeding && (
+            {notProceeding && (
                 <div role="status" className="mb-5 rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-ink">
                     <b>This project will not proceed.</b> {project.consultation?.decisionReason ?? ''} The remaining steps are closed.
                 </div>
             )}
 
+            
             {/* Stepper */}
             <Panel className="mb-5 overflow-x-auto p-4">
                 <ol className="flex min-w-[880px] items-start">
@@ -243,10 +270,7 @@ export default function ProjectWizard({ project: serverProject, specialists, set
                                     <span className="text-xs text-ink-soft">{stateLabel[state]}</span>
                                 </button>
                                 {index < STEPS.length - 1 && (
-                                    <span
-                                        aria-hidden
-                                        className={cx('mt-6 h-0.5 w-6 shrink-0', finished ? 'bg-green-600' : 'bg-black/15')}
-                                    />
+                                    <span aria-hidden className={cx('mt-6 h-0.5 w-6 shrink-0', finished ? 'bg-green-600' : 'bg-black/15')} />
                                 )}
                             </li>
                         );
@@ -254,55 +278,59 @@ export default function ProjectWizard({ project: serverProject, specialists, set
                 </ol>
             </Panel>
 
-                        {/* Selected step */}
+            {/* Selected step */}
             <Panel>
-                <div className="grid gap-6">
-                    {selected === 'consultation' && <ConsultationStep key={project.id} {...stepProps} />}
+                {!usingSample && !stepConnected(selected) ? (
+                    <NotConnected title={STEPS[selectedIndex].title} />
+                ) : (
+                    <div className="grid gap-6">
+                        {selected === 'consultation' && <ConsultationStep key={project.id} {...stepProps} />}
 
-                    {selected === 'ocularVisit' && (
-                        <>
-                            {part('reservationFee', null, <ReservationFeeStep key={project.id} {...stepProps} />)}
-                            {part(
-                                'siteAssessment',
-                                'reservationFee',
-                                ocularNotRequired ? (
-                                    <p className="rounded-xl border border-black/10 p-4 text-sm text-ink-soft">
-                                        <b className="text-ink">Site Assessment:</b> not required. No ocular visit was needed for this project.
-                                    </p>
-                                ) : (
-                                    <SiteAssessmentStep key={project.id} {...stepProps} />
-                                ),
-                            )}
-                        </>
-                    )}
+                        {selected === 'ocularVisit' && (
+                            <>
+                                {part('reservationFee', null, <ReservationFeeStep key={project.id} {...stepProps} />)}
+                                {part(
+                                    'siteAssessment',
+                                    'reservationFee',
+                                    ocularNotRequired ? (
+                                        <p className="rounded-xl border border-black/10 p-4 text-sm text-ink-soft">
+                                            <b className="text-ink">Site Assessment:</b> not required. No ocular visit was needed for this project.
+                                        </p>
+                                    ) : (
+                                        <SiteAssessmentStep key={project.id} {...stepProps} />
+                                    ),
+                                )}
+                            </>
+                        )}
 
-                    {selected === 'design' && (
-                        <>
-                            {part(
-                                'designAssignment',
-                                null,
-                                <DesignAssignmentStep key={project.id} {...stepProps} specialists={specialists ?? SAMPLE_SPECIALISTS} />,
-                            )}
-                            {part('designProposal', 'designAssignment', <DesignProposalStep key={project.id} {...stepProps} />)}
-                        </>
-                    )}
+                        {selected === 'design' && (
+                            <>
+                                {part(
+                                    'designAssignment',
+                                    null,
+                                    <DesignAssignmentStep key={project.id} {...stepProps} specialists={specialists ?? SAMPLE_SPECIALISTS} />,
+                                )}
+                                {part('designProposal', 'designAssignment', <DesignProposalStep key={project.id} {...stepProps} />)}
+                            </>
+                        )}
 
-                    {selected === 'contract' && (
-                        <>
-                            {part('contract', null, <ContractStep key={project.id} {...stepProps} />)}
-                            {part('payments', 'contract', <PaymentsStep key={project.id} {...stepProps} />)}
-                        </>
-                    )}
+                        {selected === 'contract' && (
+                            <>
+                                {part('contract', null, <ContractStep key={project.id} {...stepProps} />)}
+                                {part('payments', 'contract', <PaymentsStep key={project.id} {...stepProps} />)}
+                            </>
+                        )}
 
-                    {selected === 'fabrication' && (
-                        <ExecutionStep key={`${project.id}-fabrication`} {...stepProps} setUpHeads={heads} phaseKey="fabrication" />
-                    )}
-                    {selected === 'installation' && (
-                        <ExecutionStep key={`${project.id}-installation`} {...stepProps} setUpHeads={heads} phaseKey="installation" />
-                    )}
+                        {selected === 'fabrication' && (
+                            <ExecutionStep key={`${project.id}-fabrication`} {...stepProps} setUpHeads={heads} phaseKey="fabrication" />
+                        )}
+                        {selected === 'installation' && (
+                            <ExecutionStep key={`${project.id}-installation`} {...stepProps} setUpHeads={heads} phaseKey="installation" />
+                        )}
 
-                    {selected === 'completed' && <ProjectStatusPanel key={project.id} {...stepProps} setUpHeads={heads} />}
-                </div>
+                        {selected === 'completed' && <ProjectStatusPanel key={project.id} {...stepProps} setUpHeads={heads} />}
+                    </div>
+                )}
 
                 {/* Move on once the next step is unlocked */}
                 {canGoNext && (
