@@ -21,7 +21,7 @@ beforeEach(function () {
         'user_id' => $this->user->id,
         'first_name' => 'Andrea',
         'last_name' => 'Santos',
-        'contact_number' => '09171234567',
+        'contact_number' => uniqueMobile(),
     ]);
 });
 
@@ -106,16 +106,17 @@ test('only customers can open or submit the form', function () {
     expect(ServiceRequest::count())->toBe(0);
 });
 
-test('a customer without a profile is told so and cannot submit', function () {
+test('a customer without a contact number is sent to My Profile and cannot submit', function () {
+    // No profile row at all (an account from before profiles were made at registration)…
     $noProfile = User::factory()->create(['role' => Role::Customer]);
+    // …and a profile from registration, without a contact number yet.
+    $newCustomer = User::factory()->create(['role' => Role::Customer]);
+    Customer::create(['user_id' => $newCustomer->id, 'first_name' => 'Jo', 'last_name' => 'Cruz']);
 
-    $this->actingAs($noProfile)
-        ->get(route('customer.new-request'))
-        ->assertInertia(fn (Assert $page) => $page->where('profileMissing', true));
-
-    $this->actingAs($noProfile)
-        ->post(route('customer.new-request.store'), srStandard())
-        ->assertSessionHasErrors('profile');
+    foreach ([$noProfile, $newCustomer] as $user) {
+        $this->actingAs($user)->get(route('customer.new-request'))->assertRedirect(route('customer.profile'));
+        $this->actingAs($user)->post(route('customer.new-request.store'), srStandard())->assertRedirect(route('customer.profile'));
+    }
 
     expect(ServiceRequest::count())->toBe(0);
 });

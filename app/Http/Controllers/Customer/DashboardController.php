@@ -22,7 +22,8 @@ class DashboardController extends Controller
         $customer = Customer::query()->where('user_id', $request->user()->id)->first();
 
         return Inertia::render('customer/dashboard', [
-            'profileMissing' => $customer === null,
+            // No contact number yet: the dashboard points to My Profile before the first request.
+            'profileMissing' => ! $customer?->isComplete(),
             ...$this->dashboard->for($customer),
         ]);
     }

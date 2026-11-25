@@ -48,3 +48,14 @@ function something()
 {
     // ..
 }
+
+/*
+| A different 09XXXXXXXXX number on every call: customer.contact_number is unique,
+| and the sample data already uses some numbers (09171234567, 0917111…).
+*/
+function uniqueMobile(): string
+{
+    static $next = 0;
+
+    return '0999'.str_pad((string) ++$next, 7, '0', STR_PAD_LEFT);
+}

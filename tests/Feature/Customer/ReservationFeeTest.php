@@ -49,7 +49,7 @@ function rfCustomer(): array
         'user_id' => $user->id,
         'first_name' => 'Andrea',
         'last_name' => 'Santos',
-        'contact_number' => '09171234567',
+        'contact_number' => uniqueMobile(),
     ])];
 }
 

@@ -23,19 +23,26 @@ use Throwable;
 /**
  * Customer > Request New Project.
  *
+ * Both need a complete profile (a contact number on My Profile); without one
+ * the customer is sent there first.
+ *
  * create() sends the form what the Technical Admin has switched on; store()
  * saves a submitted request. Prices are read here, on the server, and copied
  * onto the request, so a later price change never alters a saved request.
  */
 class ServiceRequestController extends Controller
 {
-    public function create(Request $request): Response
+    public function create(Request $request): Response|RedirectResponse
     {
+        if (! $this->customerFor($request)?->isComplete()) {
+            return $this->toProfile();
+        }
+
         $baseFee = Service::query()->where('service_name', Service::BASE_FEE_NAME)->first();
 
         return Inertia::render('customer/project-request', [
-            // The customer profile is created at registration. Without it a request cannot be saved.
-            'profileMissing' => $this->customerFor($request) === null,
+            // Always false here: create() sends an incomplete profile to My Profile first.
+            'profileMissing' => false,
 
             // The flat fee added to every standard request.
             'baseFee' => $baseFee === null ? null : [
@@ -118,8 +125,8 @@ class ServiceRequestController extends Controller
     {
         $customer = $this->customerFor($request);
 
-        if ($customer === null) {
-            return back()->withErrors(['profile' => 'Complete your customer profile before submitting a request.']);
+        if (! $customer?->isComplete()) {
+            return $this->toProfile();
         }
 
         $data = $request->validated();
@@ -195,6 +202,14 @@ class ServiceRequestController extends Controller
                 'subtotal' => round((float) $service->price * $quantity, 2),
             ]);
         }
+    }
+
+    /** A request needs the customer's contact number: My Profile first. */
+    private function toProfile(): RedirectResponse
+    {
+        Inertia::flash('toast', ['type' => 'info', 'message' => 'Add your contact number first, so we can reach you about your request.']);
+
+        return to_route('customer.profile');
     }
 
     private function customerFor(Request $request): ?Customer

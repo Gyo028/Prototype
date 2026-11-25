@@ -1,5 +1,5 @@
 import { Link, router, usePage } from '@inertiajs/react';
-import { Bell, CreditCard, FilePlus, FolderOpen, House, LogOut, Star } from 'lucide-react';
+import { Bell, CreditCard, FilePlus, FolderOpen, House, LogOut, Star, UserRound } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cx } from '@/components/dashboard/ui';
 
@@ -14,14 +14,19 @@ export const customerNav: CustomerNavItem[] = [
     { title: 'Billing & Payments', href: '/customer/billing', icon: CreditCard },
     { title: 'Notifications', href: '/customer/notifications', icon: Bell },
     { title: 'Ratings & Reviews', href: '/customer/reviews', icon: Star },
+    { title: 'My Profile', href: '/customer/profile', icon: UserRound },
 ];
 
 type Props = {
     onNavigate?: () => void;
+    /** Unread notifications, shown on "Notifications" (the top bar no longer has a bell). */
+    unreadCount?: number;
 };
 
-export default function CustomerSidebar({ onNavigate }: Props) {
-    const { url } = usePage();
+export default function CustomerSidebar({ onNavigate, unreadCount = 0 }: Props) {
+    const { url, props } = usePage<{ customerProfileComplete?: boolean | null }>();
+    // A red dot on "My Profile" until it has a contact number (needed before the first request).
+    const profileIncomplete = props.customerProfileComplete === false;
     const path = url.split('?')[0];
 
 
@@ -45,7 +50,18 @@ export default function CustomerSidebar({ onNavigate }: Props) {
                                     )}
                                 >
                                     <item.icon className="size-5 shrink-0" strokeWidth={active ? 2.25 : 1.75} />
-                                    {item.title}
+                                    <span className="flex-1">{item.title}</span>
+                                    {item.href === '/customer/notifications' && unreadCount > 0 && (
+                                        <span
+                                            className="flex h-5 min-w-5 items-center justify-center rounded-full bg-gold px-1.5 text-[11px] font-bold text-ink"
+                                            aria-label={`${unreadCount} unread`}
+                                        >
+                                            {unreadCount}
+                                        </span>
+                                    )}
+                                    {item.href === '/customer/profile' && profileIncomplete && (
+                                        <span className="size-2 rounded-full bg-red-500" role="img" aria-label="Profile incomplete" />
+                                    )}
                                 </Link>
                             </li>
                         );
