@@ -24,7 +24,9 @@ test('registering sends the verification email', function () {
     Notification::fake();
 
     $this->post(route('register.store'), [
-        'name' => 'Test User',
+        'first_name' => 'Test',
+        'last_name' => 'User',
+        'contact_number' => uniqueMobile(),
         'email' => 'new.customer@example.com',
         'password' => 'password',
         'password_confirmation' => 'password',
@@ -40,9 +42,11 @@ test('the verification email is branded and has the verify link', function () {
     $html = (string) $mail->render();
 
     expect($mail->subject)->toContain('Verify your email')
-        ->and($html)->toContain(config('app.name'))
+        // e(): an app name like "Gr3at A's …" is written as "Gr3at A&#039;s …" in the HTML.
+        ->and($html)->toContain(e(config('app.name')))
         ->toContain('Hi Andrea Santos')
-        ->toContain('images/contract-logo.jpg')
+        // The logo: attached to the email (a data: image when rendered here) or its URL.
+        ->toMatch('/<img src="(data:image\/jpeg;base64,|[^"]*images\/contract-logo\.jpg)/')
         ->toContain('/email/verify-link/'.$user->id.'/'); // works without logging in
 });
 

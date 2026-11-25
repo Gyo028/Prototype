@@ -47,7 +47,7 @@ function blCustomer(): array
         'user_id' => $user->id,
         'first_name' => 'Andrea',
         'last_name' => 'Santos',
-        'contact_number' => '09171234567',
+        'contact_number' => uniqueMobile(),
     ])];
 }
 
@@ -156,7 +156,7 @@ test('a project billing page shows its totals and bills, for its customer only',
     $this->actingAs($this->user)->get($url)
         ->assertInertia(fn (Assert $page) => $page
             ->component('customer/billing-project')
-            ->where('project.title', 'Wedding')
+            ->where('project.title', "Andrea's Wedding")
             ->where('project.remaining', fn ($v) => (float) $v === 25000.0)
             ->has('project.bills', 1)
             ->where('project.bills.0.title', 'Reservation fee'));

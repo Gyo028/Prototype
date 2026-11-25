@@ -20,6 +20,9 @@ export type CatalogService = {
 
 export type CatalogEventType = { id: number; name: string };
 
+/** One place in a theme's default set: the asset there can be swapped for another of the same category. */
+export type ThemeSlot = { key: string; label: string; category: string; defaultAssetId: number | null };
+
 export type CatalogTheme = {
     id: number;
     name: string;
@@ -28,13 +31,20 @@ export type CatalogTheme = {
     style: string;
     minGuests: number | null;
     maxGuests: number;
+    /** The theme's default set. Empty for a theme that has none yet. */
+    slots: ThemeSlot[];
 };
 
+/** Only assets that are switched on and priced are sent. */
 export type CatalogAsset = {
     id: number;
     name: string;
     category: string;
     placementZone: 'floor' | 'wall' | 'ceiling' | null;
+    price: number;
+    pricingType: 'fixed' | 'per_guest';
+    /** per_guest only: 1 = one per guest, 10 = one per 10 guests. */
+    guestsPerUnit: number | null;
 };
 
 export type RequestLimits = {

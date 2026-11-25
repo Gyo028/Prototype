@@ -2,8 +2,10 @@
 
 use App\Enums\Role;
 use App\Models\Customer;
+use App\Models\DesignTheme;
 use App\Models\EventType;
 use App\Models\LayoutAsset;
+use App\Models\PreliminaryLayoutItem;
 use App\Models\Service;
 use App\Models\ServiceRequest;
 use App\Models\User;
@@ -21,7 +23,7 @@ beforeEach(function () {
         'user_id' => $this->user->id,
         'first_name' => 'Andrea',
         'last_name' => 'Santos',
-        'contact_number' => '09171234567',
+        'contact_number' => uniqueMobile(),
     ]);
 });
 
@@ -44,6 +46,25 @@ function srStandard(array $overrides = []): array
         'description' => 'Rustic garden wedding with warm lighting.',
         'serviceIds' => [srServiceId('DJ Services'), srServiceId('Buffet Catering')],
     ], $overrides);
+}
+
+function srThemeId(string $name = 'Garden Romance'): int
+{
+    return DesignTheme::where('theme_name', $name)->value('theme_id');
+}
+
+function srAssetId(string $name): int
+{
+    return LayoutAsset::where('asset_name', $name)->value('asset_id');
+}
+
+/** The saved layout items by name: [quantity, unit price, subtotal, is default]. */
+function srLayoutLines(ServiceRequest $request): array
+{
+    return $request->preliminaryLayout->items()->with('asset')->orderBy('layout_item_id')->get()
+        ->mapWithKeys(fn (PreliminaryLayoutItem $i) => [
+            $i->asset?->asset_name ?? $i->custom_item_name => [$i->quantity, $i->unit_price, $i->subtotal, $i->is_default],
+        ])->all();
 }
 
 function srCustom(array $overrides = []): array
@@ -83,7 +104,7 @@ test('the customer gets what is switched on, and the budget ranges', function ()
                 ->and($props['eventTypes'])->toHaveCount(3)
                 ->and($props['assets'])->toHaveCount(7)
                 ->and($props['baseFee']['name'])->toBe('Event Styling')
-                ->and((float) $props['baseFee']['price'])->toBe(45000.0)
+                ->and((float) $props['baseFee']['price'])->toBe(10000.0)
                 ->and($props['budgetRanges']['standard'])->toHaveCount(5)
                 ->and($props['budgetRanges']['custom'])->toHaveCount(4)
                 ->and($props['budgetRanges']['custom'][0])->toBe('₱50,000 – ₱100,000')
@@ -106,16 +127,17 @@ test('only customers can open or submit the form', function () {
     expect(ServiceRequest::count())->toBe(0);
 });
 
-test('a customer without a profile is told so and cannot submit', function () {
+test('a customer without a contact number is sent to My Profile and cannot submit', function () {
+    // No profile row at all (an account from before profiles were made at registration)…
     $noProfile = User::factory()->create(['role' => Role::Customer]);
+    // …and a profile from registration, without a contact number yet.
+    $newCustomer = User::factory()->create(['role' => Role::Customer]);
+    Customer::create(['user_id' => $newCustomer->id, 'first_name' => 'Jo', 'last_name' => 'Cruz']);
 
-    $this->actingAs($noProfile)
-        ->get(route('customer.new-request'))
-        ->assertInertia(fn (Assert $page) => $page->where('profileMissing', true));
-
-    $this->actingAs($noProfile)
-        ->post(route('customer.new-request.store'), srStandard())
-        ->assertSessionHasErrors('profile');
+    foreach ([$noProfile, $newCustomer] as $user) {
+        $this->actingAs($user)->get(route('customer.new-request'))->assertRedirect(route('customer.profile'));
+        $this->actingAs($user)->post(route('customer.new-request.store'), srStandard())->assertRedirect(route('customer.profile'));
+    }
 
     expect(ServiceRequest::count())->toBe(0);
 });
@@ -148,7 +170,7 @@ test('a standard request is saved with the styling fee, the services and their p
 
     $lines = $request->services->mapWithKeys(fn ($line) => [$line->service->service_name => $line]);
 
-    expect($lines['Event Styling']->subtotal)->toBe('45000.00')
+    expect($lines['Event Styling']->subtotal)->toBe('10000.00')
         ->and($lines['DJ Services']->subtotal)->toBe('15000.00')
         ->and($lines['Buffet Catering']->quantity)->toBe(150)        // per guest
         ->and($lines['Buffet Catering']->unit_price)->toBe('650.00')
@@ -177,7 +199,6 @@ test('incomplete or invalid standard requests are not saved', function (array $o
     'unknown budget' => [['budget' => 'Free'], 'budget'],
     'missing guests' => [['guests' => ''], 'guests'],
     'zero guests' => [['guests' => 0], 'guests'],
-    'no services' => [['serviceIds' => []], 'serviceIds'],
 ]);
 
 test('a switched-off event type, the styling fee and switched-off services cannot be chosen', function () {
@@ -197,6 +218,124 @@ test('a switched-off event type, the styling fee and switched-off services canno
         ->assertSessionHasErrors('serviceIds.0');
 
     expect(ServiceRequest::count())->toBe(0);
+});
+
+/* ---------------- Preliminary layout ---------------- */
+
+test('the form gets each theme\'s default set and only priced, switched-on assets with their prices', function () {
+    LayoutAsset::where('asset_name', 'Uplighting')->update(['price' => null]);
+
+    $this->actingAs($this->user)
+        ->get(route('customer.new-request'))
+        ->assertInertia(function (Assert $page) {
+            $all = $page->toArray();
+            $props = $all['props'] ?? $all;
+            $garden = collect($props['themes'])->firstWhere('name', 'Garden Romance');
+            $chairs = collect($props['assets'])->firstWhere('name', 'Chiavari Chairs');
+
+            expect(collect($props['assets'])->pluck('name')->all())->not->toContain('Uplighting')
+                ->and(array_column($garden['slots'], 'key'))->toBe(['backdrop', 'seating', 'tables', 'lighting', 'centerpieces'])
+                ->and($garden['slots'][1]['defaultAssetId'])->toBe(srAssetId('Chiavari Chairs'))
+                ->and((float) $chairs['price'])->toBe(45.0)
+                ->and($chairs['pricingType'])->toBe('per_guest')
+                ->and($chairs['guestsPerUnit'])->toBe(1);
+        });
+});
+
+test('nothing picked: the Event Styling fee alone and the theme\'s full default set', function () {
+    $this->actingAs($this->user)
+        ->post(route('customer.new-request.store'), srStandard(['serviceIds' => [], 'themeId' => srThemeId()]))
+        ->assertSessionHasNoErrors();
+
+    $request = ServiceRequest::with('services.service', 'preliminaryLayout')->firstOrFail();
+    $lines = srLayoutLines($request);
+
+    // 150 guests: chairs one each, tables and centerpieces one per 10.
+    expect($request->services)->toHaveCount(1)
+        ->and($request->services[0]->service->service_name)->toBe('Event Styling')
+        ->and($request->preliminaryLayout->theme_id)->toBe(srThemeId())
+        ->and($request->preliminaryLayout->layout_status)->toBe('submitted')
+        ->and($request->preliminaryLayout->generated_at)->not->toBeNull()
+        ->and($lines)->toBe([
+            'Backdrop Panel' => [1, '8000.00', '8000.00', true],
+            'Chiavari Chairs' => [150, '45.00', '6750.00', true],
+            'Cocktail Tables' => [15, '350.00', '5250.00', true],
+            'Fairy Lights' => [1, '2500.00', '2500.00', true],
+            'Floral Centerpieces' => [15, '600.00', '9000.00', true],
+        ])
+        // ₱10,000 fee + ₱31,500 of assets
+        ->and($request->preliminaryLayout->total_initial_cost)->toBe('41500.00');
+});
+
+test('a swapped slot, extra assets and "Other" items are saved, and the total adds services and priced assets', function () {
+    $this->actingAs($this->user)
+        ->post(route('customer.new-request.store'), srStandard([
+            'themeId' => srThemeId(),
+            'slotPicks' => ['backdrop' => srAssetId('Entrance Arch'), 'lighting' => srAssetId('Uplighting')],
+            'extraAssetIds' => [srAssetId('Balloon Clusters'), srAssetId('Backdrop Panel')],
+            'customItems' => [['category' => 'Decors', 'name' => 'Neon name sign', 'description' => 'Warm white, "Ana & Ben", 1 m wide']],
+        ]))
+        ->assertSessionHasNoErrors();
+
+    $request = ServiceRequest::with('preliminaryLayout.items')->firstOrFail();
+    $lines = srLayoutLines($request);
+
+    expect($lines['Entrance Arch'])->toBe([1, '6500.00', '6500.00', false])          // swapped in
+        ->and($lines['Uplighting'])->toBe([1, '4000.00', '4000.00', false])
+        ->and($lines['Chiavari Chairs'][3])->toBeTrue()                               // untouched default
+        ->and($lines['Balloon Clusters'])->toBe([1, '3500.00', '3500.00', false])    // extra
+        ->and($lines['Backdrop Panel'])->toBe([1, '8000.00', '8000.00', false])      // the swapped-out default, added back as an extra
+        ->and($lines['Neon name sign'])->toBe([1, null, null, false])                // to be priced
+        ->and($request->preliminaryLayout->items->firstWhere('custom_item_name', 'Neon name sign')->custom_item_category)->toBe('Decors')
+        // services ₱10,000 + ₱15,000 + ₱97,500; assets 6,500 + 6,750 + 5,250 + 4,000 + 9,000 + 3,500 + 8,000
+        ->and($request->preliminaryLayout->total_initial_cost)->toBe((string) number_format(122500 + 43000, 2, '.', ''));
+});
+
+test('a slot can only be swapped for another switched-on asset of its category', function (Closure $picks, string $error) {
+    $this->actingAs($this->user)
+        ->post(route('customer.new-request.store'), srStandard($picks() + ['themeId' => srThemeId()])) // a dataset's own themeId wins
+        ->assertSessionHasErrors($error);
+
+    expect(ServiceRequest::count())->toBe(0);
+})->with([
+    'another category' => [fn () => ['slotPicks' => ['backdrop' => srAssetId('Fairy Lights')]], 'slotPicks.backdrop'],
+    'switched off' => [function () {
+        LayoutAsset::where('asset_name', 'Entrance Arch')->update(['status' => 'inactive']);
+
+        return ['slotPicks' => ['backdrop' => srAssetId('Entrance Arch')]];
+    }, 'slotPicks.backdrop'],
+    'already in another slot' => [fn () => ['slotPicks' => ['tables' => srAssetId('Chiavari Chairs')]], 'slotPicks.tables'],
+    'unknown extra' => [fn () => ['extraAssetIds' => [99999]], 'extraAssetIds.0'],
+    'unpriced extra' => [function () {
+        LayoutAsset::where('asset_name', 'Uplighting')->update(['price' => null]);
+
+        return ['extraAssetIds' => [srAssetId('Uplighting')]];
+    }, 'extraAssetIds.0'],
+    'theme of another event type' => [fn () => ['themeId' => srThemeId('Debut Glam')], 'themeId'],
+    '"Other" item without a name' => [fn () => ['customItems' => [['category' => 'Decors', 'name' => '', 'description' => 'Big']]], 'customItems.0.name'],
+    '"Other" item without a description' => [fn () => ['customItems' => [['category' => 'Decors', 'name' => 'Sign', 'description' => '']]], 'customItems.0.description'],
+    '"Other" item in an unknown category' => [fn () => ['customItems' => [['category' => 'Fireworks', 'name' => 'Sign', 'description' => 'Big']]], 'customItems.0.category'],
+]);
+
+test('a request keeps the asset prices of the day it was sent', function () {
+    $this->actingAs($this->user)
+        ->post(route('customer.new-request.store'), srStandard(['themeId' => srThemeId()]))
+        ->assertSessionHasNoErrors();
+
+    LayoutAsset::where('asset_name', 'Backdrop Panel')->update(['price' => 12000]);
+
+    expect(srLayoutLines(ServiceRequest::firstOrFail())['Backdrop Panel'])->toBe([1, '8000.00', '8000.00', true]);
+});
+
+test('without a theme, the layout has only the customer\'s extras', function () {
+    $this->actingAs($this->user)
+        ->post(route('customer.new-request.store'), srStandard(['extraAssetIds' => [srAssetId('Entrance Arch')]]))
+        ->assertSessionHasNoErrors();
+
+    $request = ServiceRequest::firstOrFail();
+
+    expect($request->preliminaryLayout->theme_id)->toBeNull()
+        ->and(array_keys(srLayoutLines($request)))->toBe(['Entrance Arch']);
 });
 
 /* ---------------- Custom Projects ---------------- */
@@ -229,7 +368,8 @@ test('a custom project is saved with its title and dates, and no services, times
         ->and($request->guest_count)->toBeNull()
         ->and($request->budget_min)->toBe('500000.00')
         ->and($request->budget_max)->toBeNull()
-        ->and($request->services)->toHaveCount(0);
+        ->and($request->services)->toHaveCount(0)
+        ->and($request->preliminaryLayout)->toBeNull(); // no layout: quoted after the design proposal
 });
 
 test('a custom project can start and end on the same day', function () {

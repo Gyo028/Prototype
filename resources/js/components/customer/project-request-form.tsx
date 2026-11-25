@@ -5,6 +5,8 @@ import { useRef, useState } from 'react';
 import DatePicker, { formatRange } from '@/components/customer/date-picker';
 import type { RequestCatalog, RequestType } from '@/components/customer/request-catalog';
 import { defaultThemeFor, themeFits, toISODate } from '@/components/customer/request-catalog';
+import type { LayoutChoice } from '@/components/customer/layout-selection';
+import { EMPTY_LAYOUT_CHOICE } from '@/components/customer/layout-selection';
 import ServicesAssetsSelector from '@/components/customer/services-assets-selector';
 import { Field, GoldButton, OutlineButton, Panel, cx, inputClass, selectClass, textareaClass } from '@/components/dashboard/ui';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -182,8 +184,21 @@ export default function ProjectRequestForm({ catalog }: { catalog: RequestCatalo
     const [errors, setErrors] = useState<Record<string, string>>({});
 
     const [serviceIds, setServiceIds] = useState<number[]>([]);
-    const [themeId, setThemeId] = useState<number | null>(null);
-    const [assetIds, setAssetIds] = useState<number[]>([]);
+    const [themeId, setThemeIdState] = useState<number | null>(null);
+    const [layoutChoice, setLayoutChoice] = useState<LayoutChoice>(EMPTY_LAYOUT_CHOICE);
+
+    /** Another theme starts with its own default set: swaps are cleared, extras and "Other" items stay. */
+    const setThemeId = (id: number | null) => {
+        if (id === themeId) return;
+        setThemeIdState(id);
+        setLayoutChoice((c) => ({ ...c, slotPicks: {} }));
+        clearErrors('layout');
+    };
+
+    const changeLayout = (choice: LayoutChoice) => {
+        setLayoutChoice(choice);
+        clearErrors('layout');
+    };
 
     const fileRef = useRef<HTMLInputElement>(null);
     const [files, setFiles] = useState<RefFile[]>([]);
@@ -318,10 +333,9 @@ export default function ProjectRequestForm({ catalog }: { catalog: RequestCatalo
 
     /* ---------------- Step 3 (standard): services & assets ---------------- */
 
+    // Nothing is required here: the Event Styling fee always counts, and an untouched layout is the theme's default set.
     const continueFromSelection = () => {
-        const e: Record<string, string> = {};
-        if (serviceIds.length === 0) e.services = 'Select at least one service.';
-        if (check(e)) goTo('extras');
+        if (check({})) goTo('extras');
     };
 
     /* ---------------- Last step: description & files ---------------- */
@@ -375,6 +389,9 @@ export default function ProjectRequestForm({ catalog }: { catalog: RequestCatalo
             } else if (key === 'serviceIds' || key.startsWith('serviceIds.')) {
                 e.services = message;
                 if (target === 'extras') target = 'selection';
+            } else if (['themeId', 'slotPicks', 'extraAssetIds', 'customItems'].some((k) => key === k || key.startsWith(`${k}.`))) {
+                e.layout = e.layout ?? message;
+                if (target === 'extras') target = 'selection';
             } else if (key === 'eventStartTime' || key === 'eventEndTime') {
                 e.eventTime = message;
                 target = 'details';
@@ -411,7 +428,10 @@ export default function ProjectRequestForm({ catalog }: { catalog: RequestCatalo
                   eventEndTime: form.eventEndTime,
                   guests: form.guests,
                   serviceIds,
-                  // Theme and assets are not saved yet (story 14), so they are not sent.
+                  themeId: themeId ?? '',
+                  slotPicks: layoutChoice.slotPicks,
+                  extraAssetIds: layoutChoice.extraAssetIds,
+                  customItems: layoutChoice.customItems.map(({ category, name, description }) => ({ category, name, description })),
               };
 
         router.post(SUBMIT_URL, payload, {
@@ -433,8 +453,8 @@ export default function ProjectRequestForm({ catalog }: { catalog: RequestCatalo
         setForm(EMPTY_FORM);
         setRequestType(null);
         setServiceIds([]);
-        setThemeId(null);
-        setAssetIds([]);
+        setThemeIdState(null);
+        setLayoutChoice(EMPTY_LAYOUT_CHOICE);
         setFiles([]);
         setErrors({});
         setFileError('');
@@ -677,11 +697,11 @@ export default function ProjectRequestForm({ catalog }: { catalog: RequestCatalo
                             budget={form.budget}
                             serviceIds={serviceIds}
                             onServiceIdsChange={setServiceIds}
-                            serviceError={errors.services}
                             themeId={themeId}
                             onThemeIdChange={setThemeId}
-                            assetIds={assetIds}
-                            onAssetIdsChange={setAssetIds}
+                            layoutChoice={layoutChoice}
+                            onLayoutChoiceChange={changeLayout}
+                            layoutError={errors.layout ?? errors.services}
                         />
                     </Panel>
 

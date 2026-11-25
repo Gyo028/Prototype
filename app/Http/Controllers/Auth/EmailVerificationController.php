@@ -7,7 +7,9 @@ use App\Models\User;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
+use Inertia\Inertia;
 
 /**
  * Email verification for people who are not logged in.
@@ -19,8 +21,8 @@ use Illuminate\Support\Facades\RateLimiter;
  *
  *  - resend()  sends the email again, to that account only, once a minute
  *  - verify()  is the link in the email: signed, expires after 60 minutes,
- *              works without logging in, then back to the login page with
- *              "Email verified. You can log in now."
+ *              works once. It verifies the account, logs it in and opens
+ *              its home page (a customer's dashboard).
  */
 class EmailVerificationController extends Controller
 {
@@ -83,22 +85,48 @@ class EmailVerificationController extends Controller
         return to_route('login');
     }
 
+    /**
+     * The link in the email. Valid and not used yet: verifies the account, logs
+     * it in and opens its home page (a customer's dashboard). The link works once:
+     * after that, or when it has expired, it goes to the login page with a message.
+     */
     public function verify(Request $request, int $id, string $hash): RedirectResponse
     {
+        if (! $request->hasValidSignature()) {
+            return to_route('login')->with('status', 'This verification link has expired. Log in to get a new one.');
+        }
+
         $user = User::find($id);
 
         if ($user === null || ! hash_equals(sha1($user->getEmailForVerification()), $hash)) {
             return to_route('login')->with('status', 'This verification link is not valid. Log in to get a new one.');
         }
 
-        if (! $user->hasVerifiedEmail()) {
-            $user->markEmailAsVerified();
-            event(new Verified($user));
+        if ($user->hasVerifiedEmail()) {
+            return to_route('login')->with('status', 'Your email is already verified. Log in to continue.');
+        }
+
+        $user->markEmailAsVerified();
+        event(new Verified($user));
+
+        // Someone else logged in on this browser: log them out first.
+        if (Auth::check() && Auth::id() !== $user->id) {
+            Auth::guard('web')->logout();
+            $request->session()->invalidate();
         }
 
         $request->session()->forget(self::SESSION_KEY);
 
-        return to_route('login')->with('status', 'Email verified. You can log in now.');
+        if (! $user->isActive()) {
+            return to_route('login')->with('status', 'Email verified. You can log in now.');
+        }
+
+        Auth::guard('web')->login($user);
+        $request->session()->regenerate();
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Email verified. Welcome to GR3AT A\'s!']);
+
+        return to_route($user->role?->homeRoute() ?? 'dashboard');
     }
 
     /** "an****@gmail.com": enough to recognise it, not to read it over a shoulder. */

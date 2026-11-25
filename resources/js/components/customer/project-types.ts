@@ -366,6 +366,29 @@ export type RequestDetail = {
     files: { id: number; name: string; isImage: boolean; url: string }[];
 };
 
+/** The preliminary layout saved with a standard request (null for custom projects and older requests). */
+export type RequestLayout = {
+    theme: { name: string; venue: string; style: string; minGuests: number | null; maxGuests: number } | null;
+    items: {
+        id: number;
+        name: string;
+        category: string;
+        description: string | null;
+        isCustom: boolean;
+        isDefault: boolean;
+        quantity: number;
+        perGuest: boolean;
+        guestsPerUnit: number | null;
+        /** null = to be priced */
+        unitPrice: number | null;
+        subtotal: number | null;
+    }[];
+    assetsTotal: number;
+    toBePriced: number;
+    /** Services (with the Event Styling fee) + priced assets. */
+    total: number;
+};
+
 export const MEETING_MODES: { value: MeetingMode; label: string; hint: string }[] = [
     { value: 'online', label: 'Online', hint: 'Video call; the link is sent before the meeting' },
     { value: 'face_to_face', label: 'Face to face', hint: "At GR3AT A's office" },

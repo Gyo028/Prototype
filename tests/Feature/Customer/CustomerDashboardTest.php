@@ -90,7 +90,7 @@ test('the countdown is the next event of a project still in progress', function 
 
 test('a new customer with no requests gets the getting-started dashboard', function () {
     $user = User::factory()->create(['role' => Role::Customer]);
-    Customer::create(['user_id' => $user->id, 'first_name' => 'Andrea', 'last_name' => 'Santos', 'contact_number' => '09171234567']);
+    Customer::create(['user_id' => $user->id, 'first_name' => 'Andrea', 'last_name' => 'Santos', 'contact_number' => uniqueMobile()]);
 
     $this->actingAs($user)->get('/customer')
         ->assertInertia(fn (Assert $page) => $page
@@ -104,11 +104,12 @@ test('a new customer with no requests gets the getting-started dashboard', funct
 });
 
 test('only customers can open it', function () {
+    // Guest first: once actingAs runs, later requests in this test stay signed in.
+    $this->get('/customer')->assertRedirect('/login');
+
     $staff = User::where('email', Role::ProjectManager->value.'@example.com')->first();
 
     if ($staff !== null) {
         $this->actingAs($staff)->get('/customer')->assertForbidden();
     }
-
-    $this->get('/customer')->assertRedirect('/login');
 });

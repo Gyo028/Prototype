@@ -18,7 +18,7 @@ function newCustomerProfile(array $overrides = []): Customer
         'user_id' => User::factory()->create()->id,
         'first_name' => 'Andrea',
         'last_name' => 'Santos',
-        'contact_number' => '09171234567',
+        'contact_number' => uniqueMobile(),
     ], $overrides));
 }
 
@@ -44,7 +44,7 @@ function newStandardRequest(Customer $customer, array $overrides = []): ServiceR
 
 test('the tables follow the ERD column names', function () {
     expect(Schema::getColumnListing('customer'))->toEqualCanonicalizing([
-        'customer_id', 'user_id', 'first_name', 'last_name', 'contact_number', 'address', 'created_at', 'updated_at',
+        'customer_id', 'user_id', 'first_name', 'last_name', 'company_name', 'contact_number', 'address', 'created_at', 'updated_at',
     ]);
     expect(Schema::getColumnListing('service_requests'))->toEqualCanonicalizing([
         'service_request_id', 'customer_id', 'request_type', 'event_type_id', 'project_title', 'request_date',
@@ -70,6 +70,18 @@ test('a customer profile belongs to one user account, once', function () {
         ->and($customer->address)->toBeNull();
 
     expect(fn () => newCustomerProfile(['user_id' => $user->id]))->toThrow(QueryException::class);
+});
+
+test('a contact number is optional until My Profile, and used by one customer only', function () {
+    $fromRegistration = newCustomerProfile(['contact_number' => null]);
+    newCustomerProfile(['contact_number' => null]); // many profiles may still be without one
+
+    expect($fromRegistration->contact_number)->toBeNull()
+        ->and($fromRegistration->isComplete())->toBeFalse();
+
+    newCustomerProfile(['contact_number' => '09170000123']);
+
+    expect(fn () => newCustomerProfile(['contact_number' => '09170000123']))->toThrow(QueryException::class);
 });
 
 test('a standard request is saved as pending with its date, times, guests and budget', function () {

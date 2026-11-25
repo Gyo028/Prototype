@@ -52,7 +52,7 @@ function ctCustomer(string $first = 'Andrea', string $last = 'Santos'): array
         'user_id' => $user->id,
         'first_name' => $first,
         'last_name' => $last,
-        'contact_number' => '09171234567',
+        'contact_number' => uniqueMobile(),
     ])];
 }
 

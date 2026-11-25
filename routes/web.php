@@ -22,6 +22,7 @@ use App\Http\Controllers\Customer\DashboardController as CustomerDashboardContro
 use App\Http\Controllers\Customer\DesignProposalController;
 use App\Http\Controllers\Customer\OcularVisitController;
 use App\Http\Controllers\Customer\PaymentController as CustomerPaymentController;
+use App\Http\Controllers\Customer\ProfileController as CustomerProfileController;
 use App\Http\Controllers\Customer\RequestController as CustomerRequestController;
 use App\Http\Controllers\DesignSpecialist;
 use App\Http\Controllers\Bookkeeper\ExpenseController;
@@ -38,9 +39,10 @@ Route::inertia('/', 'public/landing')->name('home');
 // Email verification without logging in (the login page's "Verify your email" modal).
 Route::post('/email/verification/resend', [EmailVerificationController::class, 'resend'])
     ->middleware(['guest', 'throttle:6,1'])->name('verification.resend');
-// The link in the verification email: signed, expires after 60 minutes.
+// The link in the verification email: signed, expires after 60 minutes. The controller
+// checks the signature itself, so an expired link lands on the login page, not a 403.
 Route::get('/email/verify-link/{id}/{hash}', [EmailVerificationController::class, 'verify'])
-    ->middleware(['signed', 'throttle:6,1'])->whereNumber('id')->name('verification.verify.guest');
+    ->middleware(['throttle:6,1'])->whereNumber('id')->name('verification.verify.guest');
 Route::inertia('/faq', 'public/faq')->name('faq');
 Route::inertia('/our-works', 'public/our-works')->name('our-works');
 Route::inertia('/services/corporate-events', 'public/corporate-events')->name('services.corporate-events');
@@ -128,6 +130,8 @@ Route::middleware(['auth', 'verified', 'role:customer'])
         Route::post('billing/{billing}/dispute', [CustomerBillingController::class, 'dispute'])->name('billing.dispute');
         Route::get('billing/{billing}/dispute-proof', [CustomerBillingController::class, 'disputeProof'])->name('billing.dispute-proof');
         Route::get('payments/{payment}/receipt', [CustomerPaymentController::class, 'receipt'])->name('payments.receipt');
+        Route::get('profile', [CustomerProfileController::class, 'edit'])->name('profile');
+        Route::patch('profile', [CustomerProfileController::class, 'update'])->name('profile.update');
     });
 
 Route::middleware(['auth', 'verified', 'role:project_manager'])

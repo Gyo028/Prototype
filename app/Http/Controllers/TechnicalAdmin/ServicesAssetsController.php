@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\TechnicalAdmin;
 
 use App\Http\Controllers\Controller;
-use App\Models\AssetVariant;
 use App\Models\DesignTheme;
 use App\Models\EventType;
 use App\Models\LayoutAsset;
@@ -14,7 +13,7 @@ use Inertia\Response;
 /**
  * Technical Admin > Services & Assets,
  * Services, and Assets (design themes and
- * layout assets with their priced variants).
+ * layout assets with their price).
  */
 class ServicesAssetsController extends Controller
 {
@@ -50,21 +49,16 @@ class ServicesAssetsController extends Controller
             ]);
 
         $assets = LayoutAsset::query()
-            ->with(['variants' => fn ($q) => $q->orderBy('asset_variant_id')])
             ->orderBy('asset_id')
             ->get()
             ->map(fn (LayoutAsset $asset) => [
                 'id' => $asset->asset_id,
                 'name' => $asset->asset_name,
                 'category' => $asset->asset_category,
+                'price' => $asset->price === null ? null : (float) $asset->price,
+                'pricingType' => $asset->pricing_type,
+                'guestsPerUnit' => $asset->guests_per_unit,
                 'active' => $asset->status === 'active',
-                'variants' => $asset->variants->map(fn (AssetVariant $variant) => [
-                    'id' => $variant->asset_variant_id,
-                    'name' => $variant->variant_name,
-                    'description' => (string) $variant->description,
-                    'price' => (float) $variant->price,
-                    'active' => $variant->status === 'active',
-                ])->values(),
             ]);
 
         return Inertia::render('technical-admin/services-assets', [

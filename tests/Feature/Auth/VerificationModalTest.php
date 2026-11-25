@@ -29,7 +29,9 @@ test('after registering: not logged in, the login page shows "Check your email"'
     $this->skipUnlessFortifyHas(Features::registration());
 
     $this->post(route('register.store'), [
-        'name' => 'Andrea Santos',
+        'first_name' => 'Andrea',
+        'last_name' => 'Santos',
+        'contact_number' => uniqueMobile(),
         'email' => 'andrea.santos@gmail.com',
         'password' => 'password',
         'password_confirmation' => 'password',
@@ -97,16 +99,49 @@ test('resend does nothing without an account waiting for verification', function
     Notification::assertNothingSent();
 });
 
-test('the email link verifies the account without logging in', function () {
+test('the email link verifies the account, logs in and opens the customer dashboard', function () {
     $user = vmUser();
     $url = (new VerifyEmail)->toMail($user)->viewData['url'];
 
-    $this->get($url)
-        ->assertRedirect(route('login'))
-        ->assertSessionHas('status', 'Email verified. You can log in now.');
+    $this->get($url)->assertRedirect(route('customer.dashboard'));
 
     expect($user->fresh()->hasVerifiedEmail())->toBeTrue();
+    $this->assertAuthenticatedAs($user);
+});
+
+test('the link works once: used again, it goes to the login page', function () {
+    $user = vmUser();
+    $url = (new VerifyEmail)->toMail($user)->viewData['url'];
+
+    $this->get($url);
+    auth()->logout();
+
+    $this->get($url)
+        ->assertRedirect(route('login'))
+        ->assertSessionHas('status', 'Your email is already verified. Log in to continue.');
     $this->assertGuest();
+});
+
+test('an expired link goes to the login page, where a new one can be sent', function () {
+    $user = vmUser();
+    $expired = URL::temporarySignedRoute('verification.verify.guest', now()->subMinute(), ['id' => $user->id, 'hash' => sha1($user->email)]);
+
+    $this->get($expired)
+        ->assertRedirect(route('login'))
+        ->assertSessionHas('status', 'This verification link has expired. Log in to get a new one.');
+
+    expect($user->fresh()->hasVerifiedEmail())->toBeFalse();
+    $this->assertGuest();
+});
+
+test('someone else logged in on the browser is logged out first', function () {
+    $other = User::factory()->create();
+    $user = vmUser();
+    $url = (new VerifyEmail)->toMail($user)->viewData['url'];
+
+    $this->actingAs($other)->get($url)->assertRedirect(route('customer.dashboard'));
+
+    $this->assertAuthenticatedAs($user);
 });
 
 test('a link with the wrong email, or not signed, does not verify', function () {
@@ -115,9 +150,10 @@ test('a link with the wrong email, or not signed, does not verify', function () 
     $wrong = URL::temporarySignedRoute('verification.verify.guest', now()->addHour(), ['id' => $user->id, 'hash' => sha1('someone@else.com')]);
     $this->get($wrong)->assertRedirect(route('login'));
 
-    $this->get('/email/verify-link/'.$user->id.'/'.sha1($user->email))->assertForbidden();
+    $this->get('/email/verify-link/'.$user->id.'/'.sha1($user->email))->assertRedirect(route('login'));
 
     expect($user->fresh()->hasVerifiedEmail())->toBeFalse();
+    $this->assertGuest();
 });
 
 test('emails are masked in the modal', function () {

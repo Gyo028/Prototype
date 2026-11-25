@@ -14,6 +14,7 @@ use App\Models\ProjectStatus;
 use App\Models\Service;
 use App\Models\ServiceRequest;
 use App\Models\User;
+use App\Services\PreliminaryLayouts;
 use App\Services\ReservationFees;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
@@ -160,6 +161,8 @@ class ReservationFeeSeeder extends Seeder
                 'subtotal' => $baseFee->price,
             ]);
         }
+
+        app(PreliminaryLayouts::class)->saveDefault($request);
 
         $project = Project::create([
             'service_request_id' => $request->service_request_id,

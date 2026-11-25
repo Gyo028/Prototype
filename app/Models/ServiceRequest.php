@@ -144,6 +144,12 @@ class ServiceRequest extends Model
         return $this->hasMany(ServiceRequestService::class, 'service_request_id');
     }
 
+    /** The preliminary 2D layout (standard requests). @return HasOne<PreliminaryLayout, $this> */
+    public function preliminaryLayout(): HasOne
+    {
+        return $this->hasOne(PreliminaryLayout::class, 'service_request_id');
+    }
+
     /** The project created when this request was approved. @return HasOne<Project, $this> */
     public function project(): HasOne
     {

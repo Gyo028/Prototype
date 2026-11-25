@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { CalendarDays, ChevronLeft, ChevronRight, ClipboardCheck, FilePlus, Info, Sparkles } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, ClipboardCheck, FilePlus, Info, Sparkles, UserRound } from 'lucide-react';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { formatDate, formatTime, fromISO } from '@/components/customer/project-types';
@@ -119,7 +119,13 @@ function NewCustomer({ name, profileMissing }: { name: string; profileMissing: b
             {profileMissing && (
                 <p className="flex items-start gap-2 rounded-xl border border-gold/40 bg-cream px-4 py-3 text-sm text-ink">
                     <Info className="mt-0.5 size-4 shrink-0 text-gold-dark" />
-                    Your customer profile isn&apos;t set up yet, so you can&apos;t send a request. Please contact us.
+                    <span>
+                        Your email is verified. Add your contact number in{' '}
+                        <Link href="/customer/profile" className="font-bold text-gold-dark underline">
+                            My Profile
+                        </Link>{' '}
+                        to start sending service requests.
+                    </span>
                 </p>
             )}
 
@@ -134,7 +140,11 @@ function NewCustomer({ name, profileMissing }: { name: string; profileMissing: b
                         estimate. Our Project Manager reviews your request and contacts you to set up a consultation.
                     </p>
                 </div>
-                {!profileMissing && (
+                {profileMissing ? (
+                    <Link href="/customer/profile" className={cx(goldLink, 'min-h-11 shrink-0 px-5 md:min-h-0 md:py-3')}>
+                        <UserRound className="size-4" /> Complete My Profile
+                    </Link>
+                ) : (
                     <Link href="/customer/new-request" className={cx(goldLink, 'min-h-11 shrink-0 px-5 md:min-h-0 md:py-3')}>
                         <FilePlus className="size-4" /> New Service Request
                     </Link>

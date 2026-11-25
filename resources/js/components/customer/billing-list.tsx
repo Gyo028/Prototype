@@ -79,7 +79,8 @@ export default function BillingList({ projects }: { projects: BillingProject[] }
         <div className="mx-auto w-full max-w-[1150px]">
             <PageHeader title="Billing & Payments" description="Every bill for your projects. Open a bill to pay it, see its payments or dispute it." />
 
-            <Panel className="p-0">
+            {/* p-0! wins over the card's own p-6, so the table reaches the card's edges. */}
+            <Panel className="overflow-hidden p-0!">
                 <ListToolbar
                     filters={FILTERS}
                     value={filter}
@@ -94,6 +95,7 @@ export default function BillingList({ projects }: { projects: BillingProject[] }
                         setQuery(q);
                         setPage(1);
                     }}
+                    allLabel="All projects"
                     placeholder="Search project or code"
                 />
 
