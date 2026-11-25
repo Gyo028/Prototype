@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\AssetVariant;
 use App\Models\DesignTheme;
 use App\Models\EventType;
 use App\Models\LayoutAsset;
@@ -32,12 +31,12 @@ test('the tables follow the ERD column names, plus services.price', function () 
         'theme_id', 'theme_name', 'description', 'event_type_id', 'min_guests', 'max_guests', 'venue', 'style',
         'background_image_path', 'grid_config', 'status', 'created_at', 'updated_at',
     ]);
+    // asset_variants was dropped: an asset has one price (GR3AT A has no size or price tiers).
     expect(Schema::getColumnListing('layout_assets'))->toEqualCanonicalizing([
-        'asset_id', 'asset_name', 'asset_category', 'description', 'isometric_icon_path', 'placement_zone', 'status',
+        'asset_id', 'asset_name', 'asset_category', 'description', 'isometric_icon_path', 'placement_zone',
+        'price', 'pricing_type', 'guests_per_unit', 'status',
     ]);
-    expect(Schema::getColumnListing('asset_variants'))->toEqualCanonicalizing([
-        'asset_variant_id', 'asset_id', 'variant_name', 'description', 'price', 'status',
-    ]);
+    expect(Schema::hasTable('asset_variants'))->toBeFalse();
 });
 
 test('a service is saved with its price and defaults to fixed and active', function () {
@@ -92,23 +91,35 @@ test('only the venues and placement zones in the ERD are accepted', function (Cl
     'pricing type' => fn () => Service::create(['service_name' => 'X', 'service_category' => 'Host', 'price' => 1, 'pricing_type' => 'hourly']),
 ]);
 
-test('assets have priced variants, with variant names unique per asset only', function () {
-    $chairs = LayoutAsset::create(['asset_name' => 'Chiavari Chairs', 'asset_category' => 'Furniture', 'placement_zone' => 'floor']);
-    $tables = LayoutAsset::create(['asset_name' => 'Cocktail Tables', 'asset_category' => 'Furniture']);
+test('an asset has one price, fixed by default; per-guest assets count from the guest count', function () {
+    $arch = LayoutAsset::create(['asset_name' => 'Entrance Arch', 'asset_category' => 'Structures', 'price' => 6500]);
+    $chairs = LayoutAsset::create(['asset_name' => 'Chiavari Chairs', 'asset_category' => 'Furniture', 'price' => 45, 'pricing_type' => 'per_guest', 'guests_per_unit' => 1]);
+    $tables = LayoutAsset::create(['asset_name' => 'Cocktail Tables', 'asset_category' => 'Furniture', 'price' => 350, 'pricing_type' => 'per_guest', 'guests_per_unit' => 10]);
+    $unpriced = LayoutAsset::create(['asset_name' => 'Uplighting', 'asset_category' => 'Lighting']);
 
-    $chairs->variants()->create(['variant_name' => 'Gold', 'price' => 150]);
-    $tables->variants()->create(['variant_name' => 'Gold', 'price' => 300]); // same name, different asset: fine
+    expect($arch->fresh()->pricing_type)->toBe('fixed')
+        ->and($arch->fresh()->price)->toBe('6500.00')
+        ->and($arch->quantityFor(150))->toBe(1)
+        ->and($chairs->quantityFor(150))->toBe(150)
+        ->and($tables->quantityFor(150))->toBe(15)
+        ->and($tables->quantityFor(151))->toBe(16) // rounded up
+        ->and($unpriced->fresh()->price)->toBeNull()
+        // Customers are offered switched-on, priced assets only.
+        ->and(LayoutAsset::query()->offered()->pluck('asset_name')->all())->toEqualCanonicalizing(['Entrance Arch', 'Chiavari Chairs', 'Cocktail Tables']);
+});
 
-    expect($chairs->variants()->first()->price)->toBe('150.00')
-        ->and($tables->fresh()->placement_zone)->toBeNull()
-        ->and(AssetVariant::count())->toBe(2);
-
-    $chairs->variants()->create(['variant_name' => 'Gold', 'price' => 175]);
+test('only fixed and per-guest asset pricing is accepted', function () {
+    LayoutAsset::create(['asset_name' => 'Arch', 'asset_category' => 'Structures', 'price' => 1, 'pricing_type' => 'hourly']);
 })->throws(QueryException::class);
 
-test('an asset with variants cannot be deleted', function () {
-    $chairs = LayoutAsset::create(['asset_name' => 'Chiavari Chairs', 'asset_category' => 'Furniture']);
-    $chairs->variants()->create(['variant_name' => 'Gold', 'price' => 150]);
+test('a theme reads its default set from grid_config', function () {
+    $theme = makeTheme(['grid_config' => ['slots' => [
+        ['key' => 'backdrop', 'label' => 'Backdrop', 'category' => 'Structures', 'defaultAssetId' => 3],
+        ['key' => 'broken'], // no category: ignored
+    ]]]);
 
-    $chairs->delete();
-})->throws(QueryException::class);
+    expect($theme->fresh()->slots())->toBe([
+        ['key' => 'backdrop', 'label' => 'Backdrop', 'category' => 'Structures', 'defaultAssetId' => 3],
+    ])
+        ->and(makeTheme(['theme_name' => 'Plain'])->slots())->toBe([]);
+});

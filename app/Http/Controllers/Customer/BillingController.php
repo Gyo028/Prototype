@@ -44,7 +44,7 @@ class BillingController extends Controller
         }
 
         $projects = $customer === null ? collect() : Project::query()
-            ->with(['serviceRequest.eventType', 'status', 'billings.payments', 'contracts'])
+            ->with(['serviceRequest.eventType', 'serviceRequest.customer', 'status', 'billings.payments', 'contracts'])
             ->whereHas('serviceRequest', fn ($q) => $q->where('customer_id', $customer->customer_id))
             ->whereHas('billings')
             ->latest('project_id')
@@ -61,7 +61,7 @@ class BillingController extends Controller
         ProjectController::ensureOwned($request, $project);
         $this->fees->cancelOverdue($project->serviceRequest->customer_id);
 
-        $project->load(['serviceRequest.eventType', 'status', 'billings.payments', 'contracts']);
+        $project->load(['serviceRequest.eventType', 'serviceRequest.customer', 'status', 'billings.payments', 'contracts']);
 
         return Inertia::render('customer/billing-project', [
             'project' => $this->projectSummary($project),
@@ -129,7 +129,7 @@ class BillingController extends Controller
         $this->ensureOwned($request, $billing);
         $this->fees->cancelOverdue($billing->project->serviceRequest->customer_id);
 
-        $billing->refresh()->load(['payments', 'project.serviceRequest.eventType', 'project.status', 'project.billings']);
+        $billing->refresh()->load(['payments', 'project.serviceRequest.eventType', 'project.serviceRequest.customer', 'project.status', 'project.billings']);
         $project = $billing->project;
         $kind = $this->billings->kind($billing);
         $payBlocked = $this->billings->payBlockedReason($billing);

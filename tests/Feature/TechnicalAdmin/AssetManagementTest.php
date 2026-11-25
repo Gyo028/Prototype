@@ -1,7 +1,6 @@
 <?php
 
 use App\Enums\Role;
-use App\Models\AssetVariant;
 use App\Models\DesignTheme;
 use App\Models\EventType;
 use App\Models\LayoutAsset;
@@ -37,11 +36,10 @@ function validAsset(array $overrides = []): array
     return array_merge([
         'name' => 'Ghost Chairs',
         'category' => 'Furniture',
+        'price' => '180.50',
+        'pricingType' => 'per_guest',
+        'guestsPerUnit' => 1,
         'active' => true,
-        'variants' => [
-            ['id' => null, 'name' => 'Clear', 'description' => 'Acrylic', 'price' => '180', 'active' => true],
-            ['id' => null, 'name' => 'Smoke', 'description' => '', 'price' => '200.50', 'active' => true],
-        ],
     ], $overrides);
 }
 
@@ -57,8 +55,8 @@ test('only the Technical Admin can change themes and assets', function (Role $ro
     $this->actingAs($user)->post(route('technical-admin.services-assets.assets.store'), validAsset())->assertForbidden();
 })->with([Role::Customer, Role::DesignSpecialist]);
 
-test('the screen sends themes, event types, styles, assets and their variants', function () {
-    chairs()->variants()->create(['variant_name' => 'Gold', 'price' => 150]);
+test('the screen sends themes, event types, styles, and assets with their price', function () {
+    LayoutAsset::where('asset_name', 'Uplighting')->update(['price' => null]);
 
     $this->actingAs($this->admin)
         ->get(route('technical-admin.services-assets'))
@@ -70,9 +68,12 @@ test('the screen sends themes, event types, styles, assets and their variants', 
             ->has('assets', 8)
             ->where('assetCategories', LayoutAsset::CATEGORIES)
             ->where('assets.0.name', 'Chiavari Chairs')
-            ->has('assets.0.variants', 1)
-            ->where('assets.0.variants.0.name', 'Gold')
-            ->has('assets.1.variants', 0)
+            ->where('assets.0.price', fn ($price) => (float) $price === 45.0)
+            ->where('assets.0.pricingType', 'per_guest')
+            ->where('assets.0.guestsPerUnit', 1)
+            ->where('assets.2.pricingType', 'fixed')
+            ->where('assets.7.name', 'Uplighting')
+            ->where('assets.7.price', null)
         );
 });
 
@@ -142,54 +143,50 @@ test('a theme can be switched off and on', function () {
         ->and(DesignTheme::count())->toBe(8);
 });
 
-/* ---------------- Layout assets and variants ---------------- */
+/* ---------------- Layout assets: one price each ---------------- */
 
-test('an asset is added together with its priced variants', function () {
+test('an asset is added with its price and how it is counted', function () {
     $this->actingAs($this->admin)
         ->post(route('technical-admin.services-assets.assets.store'), validAsset())
         ->assertRedirect(route('technical-admin.services-assets'))
         ->assertSessionHasNoErrors();
 
     $asset = LayoutAsset::where('asset_name', 'Ghost Chairs')->firstOrFail();
-    $variants = $asset->variants()->orderBy('asset_variant_id')->get();
 
     expect($asset->asset_category)->toBe('Furniture')
-        ->and($variants)->toHaveCount(2)
-        ->and($variants[0]->variant_name)->toBe('Clear')
-        ->and($variants[0]->description)->toBe('Acrylic')
-        ->and($variants[0]->price)->toBe('180.00')
-        ->and($variants[1]->description)->toBeNull()
-        ->and($variants[1]->price)->toBe('200.50');
+        ->and($asset->price)->toBe('180.50')
+        ->and($asset->pricing_type)->toBe('per_guest')
+        ->and($asset->guests_per_unit)->toBe(1)
+        ->and($asset->status)->toBe('active');
 });
 
-test('an asset can be saved without variants', function () {
+test('a fixed-price asset keeps no guests-per-unit', function () {
     $this->actingAs($this->admin)
-        ->post(route('technical-admin.services-assets.assets.store'), validAsset(['variants' => []]))
+        ->post(route('technical-admin.services-assets.assets.store'), validAsset([
+            'name' => 'Neon Sign', 'category' => 'Lighting', 'price' => '3000', 'pricingType' => 'fixed', 'guestsPerUnit' => 5,
+        ]))
         ->assertSessionHasNoErrors();
 
-    expect(LayoutAsset::where('asset_name', 'Ghost Chairs')->first()->variants)->toHaveCount(0);
+    $asset = LayoutAsset::where('asset_name', 'Neon Sign')->firstOrFail();
+
+    expect($asset->pricing_type)->toBe('fixed')
+        ->and($asset->guests_per_unit)->toBeNull();
 });
 
-test('editing an asset updates existing variants, adds new ones and never deletes', function () {
-    $gold = chairs()->variants()->create(['variant_name' => 'Gold', 'price' => 150]);
-    $silver = chairs()->variants()->create(['variant_name' => 'Silver', 'price' => 140]);
-
+test('editing an asset changes its price and counting', function () {
     $this->actingAs($this->admin)
         ->patch(route('technical-admin.services-assets.assets.update', chairs()), [
             'name' => 'Chiavari Chairs',
             'category' => 'Furniture',
+            'price' => '55',
+            'pricingType' => 'per_guest',
+            'guestsPerUnit' => 1,
             'active' => true,
-            'variants' => [
-                ['id' => $gold->asset_variant_id, 'name' => 'Gold', 'description' => '', 'price' => '165', 'active' => true],
-                ['id' => $silver->asset_variant_id, 'name' => 'Silver', 'description' => '', 'price' => '140', 'active' => false],
-                ['id' => null, 'name' => 'White', 'description' => '', 'price' => '150', 'active' => true],
-            ],
         ])
         ->assertSessionHasNoErrors();
 
-    expect($gold->fresh()->price)->toBe('165.00')
-        ->and($silver->fresh()->status)->toBe('inactive')
-        ->and(chairs()->variants()->count())->toBe(3);
+    expect(chairs()->price)->toBe('55.00')
+        ->and(LayoutAsset::count())->toBe(8);
 });
 
 test('incomplete or invalid assets are not saved', function (array $override, string $error) {
@@ -197,49 +194,18 @@ test('incomplete or invalid assets are not saved', function (array $override, st
         ->post(route('technical-admin.services-assets.assets.store'), validAsset($override))
         ->assertSessionHasErrors($error);
 
-    expect(LayoutAsset::count())->toBe(8)
-        ->and(AssetVariant::count())->toBe(0);
+    expect(LayoutAsset::count())->toBe(8);
 })->with([
     'missing name' => [['name' => ''], 'name'],
     'duplicate name, other case' => [['name' => 'chiavari chairs'], 'name'],
     'unknown category' => [['category' => 'Fireworks'], 'category'],
-    'variant without name' => [['variants' => [['id' => null, 'name' => '', 'price' => '100']]], 'variants.0.name'],
-    'variant without price' => [['variants' => [['id' => null, 'name' => 'Gold', 'price' => '']]], 'variants.0.price'],
-    'variant with zero price' => [['variants' => [['id' => null, 'name' => 'Gold', 'price' => '0']]], 'variants.0.price'],
-    'two variants, same name' => [['variants' => [
-        ['id' => null, 'name' => 'Gold', 'price' => '100'],
-        ['id' => null, 'name' => 'gold', 'price' => '120'],
-    ]], 'variants.1.name'],
+    'missing price' => [['price' => ''], 'price'],
+    'zero price' => [['price' => '0'], 'price'],
+    'three decimals' => [['price' => '10.505'], 'price'],
+    'unknown counting' => [['pricingType' => 'hourly'], 'pricingType'],
+    'per guest without guests per unit' => [['guestsPerUnit' => ''], 'guestsPerUnit'],
+    'per guest with zero guests per unit' => [['guestsPerUnit' => 0], 'guestsPerUnit'],
 ]);
-
-test('a variant of another asset cannot be changed through this asset', function () {
-    $tables = LayoutAsset::where('asset_name', 'Cocktail Tables')->firstOrFail();
-    $tableVariant = $tables->variants()->create(['variant_name' => 'Round', 'price' => 300]);
-
-    $this->actingAs($this->admin)
-        ->patch(route('technical-admin.services-assets.assets.update', chairs()), [
-            'name' => 'Chiavari Chairs',
-            'category' => 'Furniture',
-            'variants' => [['id' => $tableVariant->asset_variant_id, 'name' => 'Hacked', 'price' => '1']],
-        ])
-        ->assertSessionHasErrors('variants.0.id');
-
-    expect($tableVariant->fresh()->variant_name)->toBe('Round');
-});
-
-test('a new variant cannot reuse the name of a saved one left out of the form', function () {
-    chairs()->variants()->create(['variant_name' => 'Gold', 'price' => 150]);
-
-    $this->actingAs($this->admin)
-        ->patch(route('technical-admin.services-assets.assets.update', chairs()), [
-            'name' => 'Chiavari Chairs',
-            'category' => 'Furniture',
-            'variants' => [['id' => null, 'name' => 'GOLD', 'price' => '160']],
-        ])
-        ->assertSessionHasErrors('variants');
-
-    expect(chairs()->variants()->count())->toBe(1);
-});
 
 test('an asset can be switched off and on', function () {
     $this->actingAs($this->admin)->patch(route('technical-admin.services-assets.assets.status', chairs()), ['active' => false]);

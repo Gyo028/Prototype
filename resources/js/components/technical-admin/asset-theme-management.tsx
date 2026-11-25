@@ -1,5 +1,5 @@
 import { router } from '@inertiajs/react';
-import { Check, Pencil, Plus, X } from 'lucide-react';
+import { Check, Pencil, Plus } from 'lucide-react';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { Field, GoldButton, OutlineButton, Panel, Pill, Switch, cx, inputClass, selectClass } from '@/components/dashboard/ui';
@@ -16,11 +16,12 @@ import {
  * Design Themes and Design Assets
  *  - A theme carries the fields customers filter by (event type, venue,
  *    style) plus a guest cap. Event types come from `event_types`.
- *  - An asset holds its priced variants (e.g. Chiavari Chairs - Gold, ₱150).
- *    The asset and its variants are saved together with one Save.
+ *  - An asset has one price, counted once (fixed) or from the guest count
+ *    (per guest, e.g. one table per 10 guests). An asset without a price is
+ *    not offered to customers.
  *
- * Nothing is deleted: themes, assets and variants are switched off instead,
- * since layouts refer to them.
+ * Nothing is deleted: themes and assets are switched off instead, since
+ * layouts refer to them.
  */
 
 const BASE_URL = '/technical-admin/services-assets';
@@ -55,20 +56,27 @@ export type Theme = {
     active: boolean;
 };
 
-export type Variant = { id: number; name: string; description: string; price: number; active: boolean };
+export type PricingType = 'fixed' | 'per_guest';
 
-export type Asset = { id: number; name: string; category: string; active: boolean; variants: Variant[] };
+export type Asset = {
+    id: number;
+    name: string;
+    category: string;
+    price: number | null;
+    pricingType: PricingType;
+    guestsPerUnit: number | null;
+    active: boolean;
+};
 
 const peso = (n: number) => `₱${n.toLocaleString('en-PH')}`;
 const venueLabel = (v: string) => VENUES.find((x) => x.value === v)?.label ?? v;
 
-/** "₱150", "₱150 – ₱200", or "No price yet" from the active variants */
-function priceRange(variants: Variant[]) {
-    const prices = variants.filter((v) => v.active).map((v) => v.price);
-    if (!prices.length) return 'No price yet';
-    const min = Math.min(...prices);
-    const max = Math.max(...prices);
-    return min === max ? peso(min) : `${peso(min)} – ${peso(max)}`;
+/** "₱8,000 each", "₱45 per guest", "₱350 each · 1 per 10 guests", or "No price yet" */
+function priceLabel(a: Pick<Asset, 'price' | 'pricingType' | 'guestsPerUnit'>) {
+    if (a.price === null) return 'No price yet';
+    if (a.pricingType !== 'per_guest') return `${peso(a.price)} each`;
+    const per = a.guestsPerUnit ?? 1;
+    return per === 1 ? `${peso(a.price)} per guest` : `${peso(a.price)} each · 1 per ${per} guests`;
 }
 
 function IconButton({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
@@ -250,18 +258,13 @@ function ThemesTab({ themes, eventTypes, styles }: { themes: Theme[]; eventTypes
 }
 
 /* ---------------------------------------------------------------- */
-/* Design Assets (with variants and prices)                         */
+/* Design Assets (one price each)                                   */
 /* ---------------------------------------------------------------- */
 
-/** A variant row in the form. `id` is null for a new row that isn't saved yet. */
-type VariantForm = { key: string; id: number | null; name: string; description: string; price: string; active: boolean };
-type AssetForm = { name: string; category: string; active: boolean; variants: VariantForm[] };
-
-let rowCounter = 0;
-const newRow = (): VariantForm => ({ key: `new-${++rowCounter}`, id: null, name: '', description: '', price: '', active: true });
+type AssetForm = { name: string; category: string; price: string; pricingType: PricingType; guestsPerUnit: string; active: boolean };
 
 function AssetsTab({ assets, categories }: { assets: Asset[]; categories: string[] }) {
-    const emptyForm: AssetForm = { name: '', category: categories[0] ?? '', active: true, variants: [] };
+    const emptyForm: AssetForm = { name: '', category: categories[0] ?? '', price: '', pricingType: 'fixed', guestsPerUnit: '1', active: true };
 
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editing, setEditing] = useState<Asset | null>(null);
@@ -270,10 +273,11 @@ function AssetsTab({ assets, categories }: { assets: Asset[]; categories: string
     const [saving, setSaving] = useState(false);
 
     const activeCount = assets.filter((a) => a.active).length;
+    const perGuest = form.pricingType === 'per_guest';
 
     const openAdd = () => {
         setEditing(null);
-        setForm({ ...emptyForm, variants: [newRow()] });
+        setForm(emptyForm);
         setErrors({});
         setDialogOpen(true);
     };
@@ -283,41 +287,31 @@ function AssetsTab({ assets, categories }: { assets: Asset[]; categories: string
         setForm({
             name: a.name,
             category: a.category,
+            price: a.price === null ? '' : String(a.price),
+            pricingType: a.pricingType,
+            guestsPerUnit: String(a.guestsPerUnit ?? 1),
             active: a.active,
-            variants: a.variants.map((v) => ({
-                key: `saved-${v.id}`,
-                id: v.id,
-                name: v.name,
-                description: v.description,
-                price: String(v.price),
-                active: v.active,
-            })),
         });
         setErrors({});
         setDialogOpen(true);
     };
 
-    const setVariant = (index: number, changes: Partial<VariantForm>) =>
-        setForm({ ...form, variants: form.variants.map((v, i) => (i === index ? { ...v, ...changes } : v)) });
-
-    // Only rows that were never saved can be removed; saved variants are switched off instead.
-    const removeRow = (index: number) => setForm({ ...form, variants: form.variants.filter((_, i) => i !== index) });
-
     const save = () => {
         const e: Record<string, string> = {};
         if (!form.name.trim()) e.name = 'Asset name is required.';
-        form.variants.forEach((v, i) => {
-            if (!v.name.trim()) e[`variants.${i}.name`] = 'Variant name is required.';
-            if (!v.price || Number(v.price) <= 0) e[`variants.${i}.price`] = 'Enter a valid price.';
-        });
+        if (!form.price || Number(form.price) <= 0) e.price = 'Enter a valid price.';
+        if (perGuest && (!Number.isInteger(Number(form.guestsPerUnit)) || Number(form.guestsPerUnit) < 1))
+            e.guestsPerUnit = 'Enter how many guests one unit serves.';
         setErrors(e);
         if (Object.keys(e).length) return;
 
         const data = {
             name: form.name,
             category: form.category,
+            price: form.price,
+            pricingType: form.pricingType,
+            guestsPerUnit: perGuest ? Number(form.guestsPerUnit) : null,
             active: form.active,
-            variants: form.variants.map((v) => ({ id: v.id, name: v.name, description: v.description, price: v.price, active: v.active })),
         };
         const options = visitOptions(setSaving, () => setDialogOpen(false), setErrors);
 
@@ -350,10 +344,7 @@ function AssetsTab({ assets, categories }: { assets: Asset[]; categories: string
                                 <Panel key={a.id} className={cx('flex items-center justify-between gap-3 p-3', !a.active && 'opacity-70')}>
                                     <div className="min-w-0">
                                         <p className="text-sm font-bold text-ink">{a.name}</p>
-                                        <p className="text-xs text-ink-soft">
-                                            {priceRange(a.variants)}
-                                            {a.variants.length > 0 && ` · ${a.variants.length} ${a.variants.length === 1 ? 'variant' : 'variants'}`}
-                                        </p>
+                                        <p className={cx('text-xs', a.price === null ? 'text-red-700' : 'text-ink-soft')}>{priceLabel(a)}</p>
                                         <Pill tone={a.active ? 'green' : 'gray'} className="mt-1">
                                             {a.active ? 'Active' : 'Inactive'}
                                         </Pill>
@@ -376,79 +367,69 @@ function AssetsTab({ assets, categories }: { assets: Asset[]; categories: string
             )}
 
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                <DialogContent className="sm:max-w-2xl">
+                <DialogContent className="sm:max-w-xl">
                     <DialogHeader>
                         <DialogTitle>{editing === null ? 'Add Design Asset' : 'Edit Design Asset'}</DialogTitle>
-                        <DialogDescription>The asset and its priced variants are saved together.</DialogDescription>
+                        <DialogDescription>A new price applies to requests sent after it. Requests already sent keep their price.</DialogDescription>
                     </DialogHeader>
 
-                    <div className="max-h-[65vh] space-y-4 overflow-y-auto pr-1">
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            <Field label="Asset name" htmlFor="asset-name" required error={errors.name}>
-                                <input id="asset-name" className={inputClass} maxLength={100} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-                            </Field>
-                            <Field label="Category" htmlFor="asset-category" required error={errors.category}>
-                                <select id="asset-category" className={selectClass} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-                                    {categories.map((c) => (
-                                        <option key={c}>{c}</option>
-                                    ))}
-                                </select>
-                            </Field>
-                        </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <Field label="Asset name" htmlFor="asset-name" required error={errors.name}>
+                            <input id="asset-name" className={inputClass} maxLength={100} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                        </Field>
+                        <Field label="Category" htmlFor="asset-category" required error={errors.category}>
+                            <select id="asset-category" className={selectClass} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+                                {categories.map((c) => (
+                                    <option key={c}>{c}</option>
+                                ))}
+                            </select>
+                        </Field>
 
-                        <div className="flex items-center gap-3">
+                        <Field label="Counted" htmlFor="asset-pricing" required error={errors.pricingType}>
+                            <select
+                                id="asset-pricing"
+                                className={selectClass}
+                                value={form.pricingType}
+                                onChange={(e) => setForm({ ...form, pricingType: e.target.value as PricingType })}
+                            >
+                                <option value="fixed">Once per event (e.g. backdrop, arch)</option>
+                                <option value="per_guest">By guest count (e.g. chairs, tables)</option>
+                            </select>
+                        </Field>
+                        <Field label={perGuest ? 'Price per unit (₱)' : 'Price (₱)'} htmlFor="asset-price" required error={errors.price}>
+                            <input
+                                id="asset-price"
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                className={inputClass}
+                                value={form.price}
+                                onChange={(e) => setForm({ ...form, price: e.target.value })}
+                            />
+                        </Field>
+
+                        {perGuest && (
+                            <Field label="Guests per unit" htmlFor="asset-per-unit" required error={errors.guestsPerUnit} className="sm:col-span-2">
+                                <input
+                                    id="asset-per-unit"
+                                    type="number"
+                                    min="1"
+                                    step="1"
+                                    className={inputClass}
+                                    value={form.guestsPerUnit}
+                                    onChange={(e) => setForm({ ...form, guestsPerUnit: e.target.value })}
+                                />
+                                <span className="text-[11px] text-ink-soft">
+                                    1 = one per guest (chairs). 10 = one per 10 guests (tables). 150 guests ÷ {Number(form.guestsPerUnit) || 1} ={' '}
+                                    {Math.ceil(150 / Math.max(1, Number(form.guestsPerUnit) || 1))} units, rounded up.
+                                </span>
+                            </Field>
+                        )}
+
+                        <div className="flex items-center gap-3 sm:col-span-2">
                             <span className="text-sm text-ink">Availability</span>
                             <Switch checked={form.active} label="Availability" onChange={(v) => setForm({ ...form, active: v })} />
                             <span className={cx('text-xs font-semibold', form.active ? 'text-green-700' : 'text-ink-soft')}>{form.active ? 'Active' : 'Inactive'}</span>
-                        </div>
-
-                        {/* Variants & prices */}
-                        <div className="border-t border-black/10 pt-4">
-                            <div className="mb-2 flex items-center justify-between gap-3">
-                                <div>
-                                    <p className="text-sm font-bold text-ink">Variants &amp; prices</p>
-                                    <p className="text-[11px] text-ink-soft">e.g. Gold, Silver, Large. Saved variants are switched off instead of removed.</p>
-                                </div>
-                                <OutlineButton onClick={() => setForm({ ...form, variants: [...form.variants, newRow()] })}>
-                                    <Plus className="size-4" /> Add variant
-                                </OutlineButton>
-                            </div>
-                            {errors.variants && <p className="mb-2 text-xs text-red-600">{errors.variants}</p>}
-
-                            {form.variants.length === 0 && (
-                                <p className="rounded-lg bg-neutral-100 p-3 text-xs text-ink-soft">No variants yet. Customers can't be quoted for this asset until it has a price.</p>
-                            )}
-
-                            <div className="space-y-3">
-                                {form.variants.map((v, i) => (
-                                    <div key={v.key} className={cx('rounded-lg border border-black/10 p-3', !v.active && 'opacity-60')}>
-                                        <div className="grid gap-3 sm:grid-cols-[1fr_9rem]">
-                                            <Field label="Variant name" htmlFor={`var-name-${v.key}`} required error={errors[`variants.${i}.name`]}>
-                                                <input id={`var-name-${v.key}`} className={inputClass} maxLength={100} value={v.name} onChange={(e) => setVariant(i, { name: e.target.value })} />
-                                            </Field>
-                                            <Field label="Price (₱)" htmlFor={`var-price-${v.key}`} required error={errors[`variants.${i}.price`]}>
-                                                <input id={`var-price-${v.key}`} type="number" min="0" step="0.01" className={inputClass} value={v.price} onChange={(e) => setVariant(i, { price: e.target.value })} />
-                                            </Field>
-                                            <Field label="Description (optional)" htmlFor={`var-desc-${v.key}`} error={errors[`variants.${i}.description`]} className="sm:col-span-2">
-                                                <input id={`var-desc-${v.key}`} className={inputClass} maxLength={255} value={v.description} onChange={(e) => setVariant(i, { description: e.target.value })} />
-                                            </Field>
-                                        </div>
-                                        <div className="mt-2 flex items-center justify-between">
-                                            {v.id === null ? (
-                                                <button type="button" onClick={() => removeRow(i)} className="inline-flex items-center gap-1 text-xs font-semibold text-red-700 hover:underline">
-                                                    <X className="size-3.5" /> Remove
-                                                </button>
-                                            ) : (
-                                                <span />
-                                            )}
-                                            <div className="flex items-center gap-2">
-                                                <Switch checked={v.active} label={`${v.active ? 'Switch off' : 'Switch on'} variant`} onChange={(on) => setVariant(i, { active: on })} />
-                                                <span className={cx('text-xs font-semibold', v.active ? 'text-green-700' : 'text-ink-soft')}>{v.active ? 'Active' : 'Inactive'}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
                         </div>
                     </div>
 

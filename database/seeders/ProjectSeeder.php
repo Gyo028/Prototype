@@ -12,6 +12,7 @@ use App\Models\ProjectStatus;
 use App\Models\Service;
 use App\Models\ServiceRequest;
 use App\Models\User;
+use App\Services\PreliminaryLayouts;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -222,6 +223,9 @@ class ProjectSeeder extends Seeder
                 'subtotal' => $baseFee->price,
             ]);
         }
+
+        // Its preliminary layout: the suggested theme's default set, unchanged.
+        app(PreliminaryLayouts::class)->saveDefault($request);
 
         return $request;
     }

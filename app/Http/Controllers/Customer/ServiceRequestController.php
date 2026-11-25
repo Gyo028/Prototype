@@ -10,6 +10,7 @@ use App\Models\EventType;
 use App\Models\LayoutAsset;
 use App\Models\Service;
 use App\Models\ServiceRequest;
+use App\Services\PreliminaryLayouts;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -27,12 +28,13 @@ use Throwable;
  * the customer is sent there first.
  *
  * create() sends the form what the Technical Admin has switched on; store()
- * saves a submitted request. Prices are read here, on the server, and copied
- * onto the request, so a later price change never alters a saved request.
+ * saves a submitted request with its preliminary layout. Prices are read here,
+ * on the server, and copied onto the request, so a later price change never
+ * alters a saved request.
  */
 class ServiceRequestController extends Controller
 {
-    public function create(Request $request): Response|RedirectResponse
+    public function create(Request $request, PreliminaryLayouts $layouts): Response|RedirectResponse
     {
         if (! $this->customerFor($request)?->isComplete()) {
             return $this->toProfile();
@@ -90,19 +92,21 @@ class ServiceRequestController extends Controller
                     'style' => $theme->style,
                     'minGuests' => $theme->min_guests,
                     'maxGuests' => $theme->max_guests,
+                    'slots' => $theme->slots(),
                 ]),
 
-            // Assets are a checklist for the customer: no prices.
-            'assets' => LayoutAsset::query()
-                ->where('status', 'active')
-                ->orderBy('asset_id')
-                ->get()
+            // Switched on and priced only, in the order PreliminaryLayouts uses.
+            'assets' => $layouts->offeredAssets()
                 ->map(fn (LayoutAsset $asset) => [
                     'id' => $asset->asset_id,
                     'name' => $asset->asset_name,
                     'category' => $asset->asset_category,
                     'placementZone' => $asset->placement_zone,
-                ]),
+                    'price' => (float) $asset->price,
+                    'pricingType' => $asset->pricing_type,
+                    'guestsPerUnit' => $asset->guests_per_unit,
+                ])
+                ->values(),
             'assetCategories' => LayoutAsset::CATEGORIES,
 
             'budgetRanges' => [
@@ -121,7 +125,7 @@ class ServiceRequestController extends Controller
         ]);
     }
 
-    public function store(ServiceRequestRequest $request): RedirectResponse
+    public function store(ServiceRequestRequest $request, PreliminaryLayouts $layouts): RedirectResponse
     {
         $customer = $this->customerFor($request);
 
@@ -136,7 +140,7 @@ class ServiceRequestController extends Controller
         $storedPaths = [];
 
         try {
-            DB::transaction(function () use ($request, $data, $custom, $customer, $budgetMin, $budgetMax, &$storedPaths) {
+            DB::transaction(function () use ($request, $layouts, $data, $custom, $customer, $budgetMin, $budgetMax, &$storedPaths) {
                 $serviceRequest = ServiceRequest::create([
                     'customer_id' => $customer->customer_id,
                     'request_type' => $custom ? ServiceRequest::TYPE_CUSTOM : ServiceRequest::TYPE_STANDARD,
@@ -156,7 +160,13 @@ class ServiceRequestController extends Controller
                 ]);
 
                 if (! $custom) {
-                    $this->saveServices($serviceRequest, $data['serviceIds'], (int) $data['guests']);
+                    $guests = (int) $data['guests'];
+                    $servicesTotal = $this->saveServices($serviceRequest, $data['serviceIds'] ?? [], $guests);
+
+                    // The preliminary layout: the theme's default set with the customer's swaps, extras and "Other" items.
+                    $theme = empty($data['themeId']) ? null : DesignTheme::find($data['themeId']);
+                    $items = $layouts->resolve($theme, $data['slotPicks'] ?? [], $data['extraAssetIds'] ?? [], $data['customItems'] ?? [], $guests);
+                    $layouts->save($serviceRequest, $theme, $items, $servicesTotal);
                 }
 
                 foreach ($request->file('files', []) as $file) {
@@ -183,11 +193,14 @@ class ServiceRequestController extends Controller
     /**
      * The Event Styling fee plus the chosen add-ons, each with the price it has
      * today. Per-guest services (catering) are multiplied by the guest count.
+     * Returns their total.
      *
      * @param  list<int>  $serviceIds
      */
-    private function saveServices(ServiceRequest $serviceRequest, array $serviceIds, int $guests): void
+    private function saveServices(ServiceRequest $serviceRequest, array $serviceIds, int $guests): float
     {
+        $total = 0.0;
+
         $baseFee = Service::query()->where('service_name', Service::BASE_FEE_NAME)->firstOrFail();
         $addOns = Service::query()->whereIn('service_id', $serviceIds)->orderBy('service_id')->get();
 
@@ -195,13 +208,18 @@ class ServiceRequestController extends Controller
             $perGuest = $service->pricing_type === Service::PRICING_PER_UNIT && $service->unit_type === 'pax';
             $quantity = $perGuest ? $guests : 1;
 
+            $subtotal = round((float) $service->price * $quantity, 2);
+            $total += $subtotal;
+
             $serviceRequest->services()->create([
                 'service_id' => $service->service_id,
                 'quantity' => $quantity,
                 'unit_price' => $service->price,
-                'subtotal' => round((float) $service->price * $quantity, 2),
+                'subtotal' => $subtotal,
             ]);
         }
+
+        return $total;
     }
 
     /** A request needs the customer's contact number: My Profile first. */

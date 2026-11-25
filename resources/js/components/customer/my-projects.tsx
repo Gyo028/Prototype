@@ -1,9 +1,9 @@
 import { Link } from '@inertiajs/react';
-import { FilePlus, FolderOpen, Info } from 'lucide-react';
+import { FolderOpen, Info } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { ListCard, ListEmpty, ListPager, ListTable, ListToolbar, pageSlice } from '@/components/customer/list-parts';
 import { formatDay, statusText, statusTone } from '@/components/customer/project-types';
-import { GoldButton, PageHeader, Panel, Pill } from '@/components/dashboard/ui';
+import { PageHeader, Panel, Pill } from '@/components/dashboard/ui';
 import type { ProjectListItem } from '@/components/customer/project-types';
 
 /*
@@ -76,13 +76,6 @@ export default function MyProjects({ items, profileMissing }: { items: ProjectLi
             <PageHeader
                 title="My Projects"
                 description="Your service requests and the projects they became. Open one to see its progress or what you submitted."
-                actions={
-                    <Link href="/customer/new-request" className="w-full sm:w-auto">
-                        <GoldButton className="w-full sm:w-auto">
-                            <FilePlus className="size-4" /> New Service Request
-                        </GoldButton>
-                    </Link>
-                }
             />
 
             {profileMissing && (
@@ -92,7 +85,8 @@ export default function MyProjects({ items, profileMissing }: { items: ProjectLi
                 </div>
             )}
 
-            <Panel className="p-0">
+            {/* p-0! wins over the card's own p-6, so the table reaches the card's edges. */}
+            <Panel className="overflow-hidden p-0!">
                 <ListToolbar
                     filters={FILTERS}
                     value={filter}
@@ -101,12 +95,23 @@ export default function MyProjects({ items, profileMissing }: { items: ProjectLi
                     label="Filter projects"
                     query={query}
                     onQuery={changeQuery}
+                    allLabel="All projects"
                     placeholder="Search title, venue or code"
                 />
 
                 {shown.length === 0 ? (
                     <ListEmpty icon={<FolderOpen className="size-8" />}>
-                        {items.length === 0 ? 'No projects yet. Submit a service request to get started.' : 'No projects match this filter.'}
+                        {items.length === 0 ? (
+                            <>
+                                No projects yet.{' '}
+                                <Link href="/customer/new-request" className="font-bold text-gold-dark hover:underline">
+                                    Submit a service request
+                                </Link>{' '}
+                                to get started.
+                            </>
+                        ) : (
+                            'No projects match this filter or search.'
+                        )}
                     </ListEmpty>
                 ) : (
                     <ListTable

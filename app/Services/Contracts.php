@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Http\Controllers\Customer\ProjectController;
 use App\Models\Billing;
 use App\Models\Contract;
 use App\Models\DesignProposal;
@@ -202,7 +203,7 @@ class Contracts
             ],
             'project' => [
                 'code' => (string) $project->project_code,
-                'title' => $request->isCustom() ? (string) $request->project_title : ($request->eventType?->event_type_name ?? 'Event'),
+                'title' => ProjectController::titleOf($request),
                 'type' => $request->isCustom() ? 'Custom Project' : 'Standard Event Styling',
                 'dates' => $start->isSameDay($end)
                     ? $start->format('F j, Y')

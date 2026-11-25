@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Customer;
 
+use App\Models\LayoutAsset;
 use App\Models\Service;
 use App\Models\ServiceRequest;
 use Closure;
@@ -14,18 +15,25 @@ use Illuminate\Validation\Rule;
  * Field names match the customer form (camelCase).
  *
  * Two request types:
- *  - standard: eventTypeId, eventDate, eventStartTime, eventEndTime, guests, serviceIds
+ *  - standard: eventTypeId, eventDate, eventStartTime, eventEndTime, guests,
+ *              serviceIds (optional add-ons), and the preliminary layout:
+ *              themeId, slotPicks (slot key => asset id), extraAssetIds,
+ *              customItems ("Other" items: category, name, description)
  *  - custom:   projectTitle, startDate, endDate (no event type, times, guests or services)
  * Both:        requestType, venue, budget, description (optional), files (optional)
  *
- * Theme and asset choices are not validated or saved yet; they come with the
- * preliminary layout.
+ * Nothing has to be picked on Services & Assets: the Event Styling fee always
+ * counts as a service, and an untouched layout is the theme's default set.
+ * Whether a swap or an extra is allowed is checked by PreliminaryLayouts.
  */
 class ServiceRequestRequest extends FormRequest
 {
     public const MAX_FILES = 10;
 
     public const MAX_FILE_MB = 10;
+
+    /** "Other" items a customer can add to the layout. */
+    public const MAX_CUSTOM_ITEMS = 20;
 
     /** A standard event date must be at least this many months from today. */
     public const MIN_LEAD_MONTHS = 1;
@@ -105,7 +113,7 @@ class ServiceRequestRequest extends FormRequest
                 },
             ],
             'guests' => ['required', 'integer', 'min:1', 'max:100000'],
-            'serviceIds' => ['required', 'array', 'min:1'],
+            'serviceIds' => ['nullable', 'array'],
             'serviceIds.*' => [
                 'integer', 'distinct',
                 // Active add-on services only: the Event Styling fee is added automatically.
@@ -113,6 +121,23 @@ class ServiceRequestRequest extends FormRequest
                     fn ($query) => $query->where('status', 'active')->where('service_name', '!=', Service::BASE_FEE_NAME)
                 ),
             ],
+
+            // The preliminary layout.
+            'themeId' => [
+                'nullable', 'integer',
+                Rule::exists('design_themes', 'theme_id')->where(
+                    fn ($query) => $query->where('status', 'active')->where('event_type_id', (int) $this->input('eventTypeId'))
+                ),
+            ],
+            'slotPicks' => ['nullable', 'array', 'max:50'],
+            'slotPicks.*' => ['integer'],
+            'extraAssetIds' => ['nullable', 'array', 'max:100'],
+            'extraAssetIds.*' => ['integer', 'distinct'],
+            'customItems' => ['nullable', 'array', 'max:'.self::MAX_CUSTOM_ITEMS],
+            'customItems.*' => ['array'],
+            'customItems.*.category' => ['required', Rule::in(LayoutAsset::CATEGORIES)],
+            'customItems.*.name' => ['required', 'string', 'max:50'],
+            'customItems.*.description' => ['required', 'string', 'max:200'],
         ];
     }
 
@@ -185,10 +210,20 @@ class ServiceRequestRequest extends FormRequest
             'guests.integer' => 'Enter the expected number of guests.',
             'guests.min' => 'Enter the expected number of guests.',
             'guests.max' => 'Enter a valid number of guests.',
-            'serviceIds.required' => 'Select at least one service.',
-            'serviceIds.array' => 'Select at least one service.',
-            'serviceIds.min' => 'Select at least one service.',
+            'serviceIds.array' => 'Choose only services from the list.',
             'serviceIds.*.exists' => 'Choose only services from the list.',
+            'themeId.exists' => 'Choose one of the design themes for your event type.',
+            'themeId.integer' => 'Choose one of the design themes for your event type.',
+            'slotPicks.*.integer' => 'Choose only design assets from the list.',
+            'extraAssetIds.*.integer' => 'Choose only design assets from the list.',
+            'extraAssetIds.*.distinct' => 'Each design asset can be added once.',
+            'customItems.max' => 'You can add up to '.self::MAX_CUSTOM_ITEMS.' "Other" items.',
+            'customItems.*.category.required' => 'Choose a category for each "Other" item.',
+            'customItems.*.category.in' => 'Choose a category for each "Other" item.',
+            'customItems.*.name.required' => 'Tell us what each "Other" item is.',
+            'customItems.*.name.max' => 'Keep each "Other" item name to 50 characters.',
+            'customItems.*.description.required' => 'Describe each "Other" item.',
+            'customItems.*.description.max' => 'Keep each "Other" item description to 200 characters.',
 
             'projectTitle.required' => 'Enter a project title.',
             'startDate.required' => 'Choose the start date.',
