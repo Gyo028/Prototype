@@ -34,15 +34,14 @@ use App\Http\Controllers\ProjectManager\ServiceRequestController as PmServiceReq
 use App\Http\Controllers\ProjectManager\ProjectController as PmProjectController;
 use App\Http\Controllers\ProjectManager\ConsultationController as PmConsultationController;
 use App\Http\Controllers\ProjectManager\PaymentController as PmPaymentController;
-<<<<<<< HEAD
 use App\Http\Controllers\ProjectManager\SiteAssessmentController as PmSiteAssessmentController;
 use App\Http\Controllers\ProjectManager\SiteAccessDocumentController as PmSiteAccessDocumentController;
 use App\Http\Controllers\ProjectManager\DesignAssignmentController as PmDesignAssignmentController;
 use App\Http\Controllers\ProjectManager\DesignProposalController as PmDesignProposalController;
 use App\Http\Controllers\ProjectManager\ContractController as PmContractController;
-=======
 use App\Http\Controllers\PublicSiteController;
->>>>>>> 2fa1df49f36c4b9016d3641210ef143517a60bf7
+
+
 
 
 
