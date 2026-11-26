@@ -35,10 +35,10 @@ type Props = {
     /** Validation errors sent back by Laravel, if any. */
     serverErrors: SiteAssessmentErrors;
     onCancel: () => void;
-    onSave: (values: SiteAssessmentValues) => void;
+    onSave: (values: SiteAssessmentValues) => void; dateLocked?: boolean; // real data: the visit's date, not editable
 };
 
-export default function SiteAssessmentForm({ project, saving, serverErrors, onCancel, onSave }: Props) {
+export default function SiteAssessmentForm({ project, saving, serverErrors, onCancel, onSave, dateLocked = false }: Props) {
     const saved = project.siteAssessment;
 
     const [assessedOn, setAssessedOn] = useState(saved?.assessedOn ?? project.ocularVisitAt?.slice(0, 10) ?? today());
@@ -234,7 +234,7 @@ export default function SiteAssessmentForm({ project, saving, serverErrors, onCa
                 <Field label="Assessment date" htmlFor="sa-date" required error={errors.assessedOn}>
                     <input
                         id="sa-date"
-                        type="date"
+                        type="date" disabled={dateLocked}
                         value={assessedOn}
                         onChange={(e) => {
                             setAssessedOn(e.target.value);

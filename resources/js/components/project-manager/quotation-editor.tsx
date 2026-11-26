@@ -74,10 +74,12 @@ type Props = {
     quotation: Quotation;
     errors: QuotationErrors;
     onChange: (quotation: Quotation) => void;
+    /** Real data: there is no discount (no column, decided with the user). */
+    noDiscount?: boolean;
 };
 
 /** Editable quotation table. */
-export default function QuotationEditor({ quotation, errors, onChange }: Props) {
+export default function QuotationEditor({ quotation, errors, onChange, noDiscount = false }: Props) {
     const updateItem = (id: string, changes: Partial<QuotationItem>) =>
         onChange({ ...quotation, items: quotation.items.map((item) => (item.id === id ? { ...item, ...changes } : item)) });
 
@@ -173,6 +175,7 @@ export default function QuotationEditor({ quotation, errors, onChange }: Props) 
                     <span>Subtotal</span>
                     <span>{peso(subtotal)}</span>
                 </div>
+                {!noDiscount && (
                 <div className="flex items-center justify-between gap-3 text-ink">
                     <label htmlFor="q-discount">Discount (₱)</label>
                     <input
@@ -186,6 +189,7 @@ export default function QuotationEditor({ quotation, errors, onChange }: Props) 
                         className={cx(inputClass, 'w-36 text-right', errors.discount && 'border-red-500')}
                     />
                 </div>
+                )}
                 {errors.discount && <p className="text-right text-xs text-red-600">{errors.discount}</p>}
                 <div className="flex justify-between border-t border-black/10 pt-2 text-base font-bold text-ink">
                     <span>Total</span>

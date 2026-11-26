@@ -44,6 +44,16 @@ export type SiteAssessment = {
     recordedAt: string; // ISO date-time
 };
 
+/** A file the customer uploaded so the team may visit a third-party venue (backend only). */
+export type SiteAccessDocument = {
+    id: number;
+    type: string; // 'Authorization letter' | 'Venue permit'
+    name: string;
+    url: string;
+    status: 'Submitted' | 'Approved' | 'Rejected';
+    remarks: string | null; // the reason, when rejected
+    uploadedAt: string | null; // ISO date-time
+};
 /* ---------- design assignment (backlog #21) ---------- */
 
 export type DesignSpecialist = {
@@ -84,7 +94,7 @@ export const quotationTotal = (q: Quotation) => Math.max(0, quotationSubtotal(q)
  * Awaiting Customer     = approved by the Project Manager, quotation finalized, waiting for the customer
  * Approved              = approved by the customer too (the contract comes next)
  */
-export type ProposalStatus = 'Submitted' | 'Returned for Revision' | 'Awaiting Customer' | 'Approved';
+export type ProposalStatus = 'Submitted' | 'Returned for Revision' | 'Awaiting Owner' | 'Awaiting Customer' | 'Approved';
 
 export type DesignProposal = {
     version: number; // 2 or more = re-submitted after a revision
@@ -95,6 +105,8 @@ export type DesignProposal = {
     layoutSnapshotUrl: string | null; // image exported from the 2D Layout Designer
     file: StoredFile | null; // the design proposal document
     quotation: Quotation | null; // finalized by the Project Manager when approving
+    files?: (StoredFile & { category: string })[]; // backend only: the designer's files (2D design, 3D visualization, other)
+    externalLink?: string | null; // backend only: e.g. a shared folder with large 3D files
     review: {
         decision: 'approve' | 'return';
         remarks: string | null; // required when returned for revision
@@ -155,6 +167,9 @@ export type Project = ProjectRequest & {
     onHold?: boolean; // the customer is still deciding after the consultation
     consultationAt?: string | null; // 'YYYY-MM-DDTHH:mm', the consultation the customer booked; null when none is booked
     consultationNote?: string | null; // why the last booking was closed (rescheduled / did not attend)
+    ocularVisitStatus?: 'pending' | 'tentative' | 'confirmed' | 'completed' | null; // pending = waiting for the site access documents
+    siteAccessDocuments?: SiteAccessDocument[]; // third-party venues only: authorization letter + venue permit
+    assignmentLocked?: boolean; // the designer already submitted a design proposal, so they can no longer be changed
 };
 /* ---------- wizard steps (revision, Nov 19) ---------- */
 
@@ -239,6 +254,11 @@ export function isStepComplete(p: Project, key: PartKey): boolean {
     }
 }
 
+/** The browser's current date and time as 'YYYY-MM-DDTHH:mm' (to compare with booked times). */
+const localNow = () => {
+    const d = new Date();
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+};
 /** Why an open piece of work cannot be done yet, or null when the Project Manager can act. */
 export function waitingReason(p: Project, key: PartKey): string | null {
     switch (key) {
@@ -254,11 +274,17 @@ export function waitingReason(p: Project, key: PartKey): string | null {
         }
         case 'siteAssessment':
             if (!p.ocularVisitAt) return 'Waiting for the customer to book the ocular visit.';
+            // Backend only: a third-party venue's visit waits for its site access documents.
+            if (p.ocularVisitStatus === 'pending' && !p.siteAccessDocuments?.some((d) => d.status === 'Submitted'))
+                return 'Waiting for the customer to upload the site access documents (authorization letter and venue permit).';
+            if (p.ocularVisitStatus && p.ocularVisitStatus !== 'pending' && p.ocularVisitStatus !== 'completed' && p.ocularVisitAt > localNow())
+                return 'Waiting for the ocular visit. Record the site assessment after the visit.';
             return null;
         case 'designProposal': {
             const designer = p.assignment?.specialistName ?? 'the Design Specialist';
             if (!p.designProposal) return `Waiting for ${designer} to submit the design proposal.`;
             if (p.designProposal.status === 'Returned for Revision') return `Waiting for ${designer} to revise and re-submit the design proposal.`;
+            if (p.designProposal.status === 'Awaiting Owner') return 'Waiting for the Owner to review the design proposal.';
             if (p.designProposal.status === 'Awaiting Customer') return 'Waiting for the customer to approve the design proposal and quotation.';
             return null;
         }
