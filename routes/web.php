@@ -39,6 +39,9 @@ use App\Http\Controllers\ProjectManager\SiteAccessDocumentController as PmSiteAc
 use App\Http\Controllers\ProjectManager\DesignAssignmentController as PmDesignAssignmentController;
 use App\Http\Controllers\ProjectManager\DesignProposalController as PmDesignProposalController;
 use App\Http\Controllers\ProjectManager\ContractController as PmContractController;
+use App\Http\Controllers\ProjectManager\AdditionalChargeController as PmAdditionalChargeController;
+use App\Http\Controllers\ProjectManager\DisputeController as PmDisputeController;
+use App\Http\Controllers\ProjectManager\ExecutionScheduleController as PmExecutionScheduleController;
 use App\Http\Controllers\PublicSiteController;
 
 
@@ -174,6 +177,17 @@ Route::middleware(['auth', 'verified', 'role:project_manager'])
         Route::patch('projects/{project}/payments/{payment}/verify', [PmPaymentController::class, 'verify'])->name('projects.payments.verify');
         Route::patch('projects/{project}/payments/{payment}/reject', [PmPaymentController::class, 'reject'])->name('projects.payments.reject');
         Route::get('payments/{payment}/receipt', [PmPaymentController::class, 'receipt'])->name('payments.receipt');
+                // Backlog #28: Record cash / cheque payments
+        Route::post('projects/{project}/payments', [PmPaymentController::class, 'record'])->name('projects.payments.record');
+                // Backlog #29: Add additional charges
+        Route::post('projects/{project}/additional-charges', [PmAdditionalChargeController::class, 'store'])->name('projects.additional-charges');
+                // Backlog #31: Review and resolve billing disputes
+        Route::patch('projects/{project}/disputes/{billing}/review', [PmDisputeController::class, 'review'])->name('projects.disputes.review');
+        Route::patch('projects/{project}/disputes/{billing}/resolve', [PmDisputeController::class, 'resolve'])->name('projects.disputes.resolve');
+        Route::get('projects/{project}/disputes/{billing}/proof', [PmDisputeController::class, 'proof'])->name('projects.disputes.proof');
+                // Backlog #32: Schedule project execution
+        Route::put('projects/{project}/execution-schedule', [PmExecutionScheduleController::class, 'store'])->name('projects.execution-schedule');
+        Route::put('projects/{project}/execution-schedule/{phase}/reschedule', [PmExecutionScheduleController::class, 'reschedule'])->whereIn('phase', ['fabrication', 'installation'])->name('projects.execution-schedule.reschedule');
                 // Backlog #20: Site assessment (and the site access documents)
         Route::post('projects/{project}/site-assessment', [PmSiteAssessmentController::class, 'store'])->name('projects.site-assessment');
         Route::get('projects/{project}/site-assessment/files/{file}', [PmSiteAssessmentController::class, 'file'])->name('projects.site-assessment.file');

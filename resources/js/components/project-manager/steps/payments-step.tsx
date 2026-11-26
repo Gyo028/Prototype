@@ -102,9 +102,14 @@ export default function PaymentsStep(props: StepProps) {
                         </div>
                     </Section>
                 )}
-                <BillingDisputes {...props} />
+                {/* Billing disputes (backlog #31) */}
+                <BillingDisputes {...props} scope="bills" />
+
+                {/* Additional charges (backlog #29) */}
                 <AddChargeForm {...props} />
-                    <RecordPaymentForm
+
+                {/* Cash / cheque payments (backlog #28) */}
+                <RecordPaymentForm
                     {...props}
                     targets={project.billings
                         .filter((b) => billingStatus(b, project.payments) !== 'Paid')

@@ -120,7 +120,12 @@ export const verified = (reviewedAt: string): Payment['review'] => ({ remarks: n
  */
 export type DisputeStatus = 'Submitted' | 'Reviewed' | 'Resolved';
 
-/** Upheld and Rejected keep the bill as it is; Adjusted changes the billing amount. */
+/**
+ * Upheld   = the customer is right: the bill is corrected (new amount)
+ * Rejected = the bill stays as it is
+ * Adjusted = the bill is partly corrected (new amount)
+ * (decided with the user, Nov 26: follows the group's Billings::resolveDispute)
+ */
 export const DISPUTE_DECISIONS = ['Upheld', 'Rejected', 'Adjusted'] as const;
 export type DisputeDecision = (typeof DISPUTE_DECISIONS)[number];
 
@@ -128,16 +133,20 @@ export type BillingDispute = {
     id: number;
     code: string; // e.g. "DSP-0001"
     billingId: number; // the bill being disputed
+    billingType?: string; // backend only: "Reservation Fee", "Down Payment", "Final Payment" or "Additional Charge"
+    currentAmount?: number; // backend only: the bill's amount now
     reason: string; // the customer's explanation
     submittedAt: string; // ISO date-time
     status: DisputeStatus;
-    reviewedAt: string | null; // when the Project Manager started the review
+    reviewedAt: string | null; // when the Project Manager started the review (not stored in the backend)
+    proof?: { name: string; url: string } | null; // the customer's proof file
     resolution: {
         decision: DisputeDecision;
         remarks: string | null;
-        previousAmount: number; // the bill before the resolution
-        newAmount: number; // equal to previousAmount unless Adjusted
-        resolvedBy: string;
+        previousAmount: number | null; // the bill before the resolution (not stored in the backend)
+        newAmount: number; // the bill after the resolution
+        resolvedBy: string | null; // not stored in the backend
         resolvedAt: string; // ISO date-time = the resolved date
+        dueDate?: string; // the bill's new due date (YYYY-MM-DD)
     } | null;
 };

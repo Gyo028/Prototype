@@ -53,12 +53,12 @@ export type PhaseSchedule = {
 export type ScheduleChange = {
     reason: string;
     changedBy: string;
-    changedAt: string; // ISO date-time
+    changedAt: string | null; // ISO date-time (not stored in the backend)
 };
 
 export type ExecutionSchedule = Record<PhaseKey, PhaseSchedule> & {
     savedBy: string;
-    savedAt: string; // ISO date-time
+    savedAt: string | null; // ISO date-time (not stored in the backend)
 };
 
 /* ---------- validation (acceptance criterion 2) ---------- */

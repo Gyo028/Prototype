@@ -1,3 +1,4 @@
+import BillingDisputes from '@/components/project-manager/billing-disputes';
 import { PaymentHistory, PaymentReview } from '@/components/project-manager/payment-review';
 import RecordPaymentForm from '@/components/project-manager/record-payment-form';
 import { Section, peso } from '@/components/project-manager/request-details';
@@ -45,22 +46,22 @@ export default function ReservationFeeStep(props: StepProps) {
                         {pending.map((payment) => (
                             <PaymentReview key={payment.id} {...props} payment={payment} />
                         ))}
-                        {/* Cash / cheque payments (backlog #28): sample data only until that backlog is connected */}
-                        {props.usingSample && (
+                        {/* Cash / cheque payments (backlog #28) */}
                             <RecordPaymentForm
-                                {...props}
-                                targets={[
-                                    {
-                                        billingId: null,
-                                        type: 'Reservation Fee',
-                                        balance: project.reservationFee.amount - verifiedTotal(null, project.payments),
-                                    },
-                                ]}
-                            />
-                        )}
+                            {...props}
+                            targets={[
+                                {
+                                    billingId: null,
+                                    type: 'Reservation Fee',
+                                    balance: project.reservationFee.amount - verifiedTotal(null, project.payments),
+                                },
+                            ]}
+                        />
                     </>
                 )}
 
+                {/* A dispute of the reservation fee (backlog #31) */}
+                <BillingDisputes {...props} scope="reservation" />
                 <Section title="Payment History">
                     <PaymentHistory payments={feePayments} />
                 </Section>

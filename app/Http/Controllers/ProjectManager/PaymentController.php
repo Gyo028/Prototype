@@ -54,17 +54,7 @@ class PaymentController extends Controller
                 'remarks' => self::clean($data['remarks'] ?? null),
             ]);
 
-            // The bill is paid once its verified payments cover the full amount.
-            $verified = (float) $billing->payments()->where('status', Payment::STATUS_VERIFIED)->sum('amount_paid');
-            if ($verified >= (float) $billing->amount) {
-                $billing->update(['status' => Billing::STATUS_PAID]);
-            }
-
-            // Reservation fee verified: the project is booked (Plan Project step 2).
-            if ($billing->billing_type === Billing::TYPE_RESERVATION_FEE
-                && $project->status->status_name === ProjectStatus::CONSULTATION) {
-                $project->update(['current_status_id' => ProjectStatus::idFor(ProjectStatus::BOOKED)]);
-            }
+        self::settle($billing, $project);
         });
 
         if ($billing->billing_type === Billing::TYPE_FINAL_BILLING) {
@@ -74,6 +64,92 @@ class PaymentController extends Controller
         return back();
     }
 
+        /**
+     * Backlog #28: Record a cash or cheque payment the customer paid in person.
+     *   1. Amount, method, date and (for cheques) the cheque number are saved as verified,
+     *      and the bill is marked paid once it is covered.
+     *   2. Nothing is saved when a required detail is missing.
+     * billingId null = the reservation fee. The cheque number is kept in payment_reference.
+     */
+    public function record(Request $request, Project $project, Contracts $contracts): RedirectResponse
+    {
+        $data = $request->validate([
+            'billingId' => ['nullable', 'integer'],
+            'method' => ['required', 'in:Cash,Cheque'],
+            'amount' => ['required', 'numeric', 'gt:0', 'max:9999999999.99'],
+            'paidOn' => ['required', 'date_format:Y-m-d', 'before_or_equal:'.Carbon::now(ConsultationScheduler::TIMEZONE)->toDateString()],
+            'chequeNo' => ['nullable', 'required_if:method,Cheque', 'string', 'max:100'],
+        ], [
+            'method.required' => 'Select the payment method.',
+            'amount.required' => 'Enter the amount received.',
+            'amount.gt' => 'Enter the amount received.',
+            'paidOn.required' => 'Enter the date the payment was received.',
+            'paidOn.before_or_equal' => 'The payment date cannot be in the future.',
+            'chequeNo.required_if' => 'Enter the cheque number.',
+        ]);
+
+        $project->loadMissing('status');
+        if (in_array($project->status->status_name, [ProjectStatus::CANCELLED, ProjectStatus::COMPLETED], true)) {
+            throw ValidationException::withMessages(['target' => 'This project is '.strtolower($project->status->status_name).'.']);
+        }
+
+        $billing = $data['billingId'] === null
+            ? $project->billings()->where('billing_type', Billing::TYPE_RESERVATION_FEE)->first()
+            : $project->billings()->whereKey($data['billingId'])->first();
+
+        if ($billing === null) {
+            throw ValidationException::withMessages(['target' => 'Select what the payment is for.']);
+        }
+
+        // My addition: no more than what is still owed.
+        $paid = (float) $billing->payments()->where('status', Payment::STATUS_VERIFIED)->sum('amount_paid');
+        $balance = round((float) $billing->amount - $paid, 2);
+        if ($balance <= 0) {
+            throw ValidationException::withMessages(['target' => 'This bill is already paid.']);
+        }
+        if (round((float) $data['amount'], 2) > $balance) {
+            throw ValidationException::withMessages(['amount' => 'The amount is more than the remaining balance (₱'.number_format($balance, 2).').']);
+        }
+
+        DB::transaction(function () use ($request, $project, $billing, $data) {
+            $now = Carbon::now(ConsultationScheduler::TIMEZONE);
+            $cheque = $data['method'] === 'Cheque';
+
+            $billing->payments()->create([
+                'amount_paid' => round((float) $data['amount'], 2),
+                'payment_reference' => $cheque ? trim((string) $data['chequeNo']) : 'Cash',
+                'payment_date' => $data['paidOn'],
+                'submitted_at' => $now,
+                'payment_method' => $cheque ? Payment::METHOD_CHEQUE : Payment::METHOD_CASH,
+                'status' => Payment::STATUS_VERIFIED,
+                'verified_at' => $now,
+                'recorded_by' => $request->user()->id,
+            ]);
+
+            self::settle($billing, $project);
+        });
+
+        if ($billing->billing_type === Billing::TYPE_FINAL_BILLING) {
+            $contracts->startFabricationIfReady($project);
+        }
+
+        return back();
+    }
+
+    /** After a payment is verified: the bill is paid once covered; a paid reservation fee books the project. */
+    public static function settle(Billing $billing, Project $project): void
+    {
+        $verified = (float) $billing->payments()->where('status', Payment::STATUS_VERIFIED)->sum('amount_paid');
+        if ($verified >= (float) $billing->amount) {
+            $billing->update(['status' => Billing::STATUS_PAID]);
+        }
+
+        if ($billing->billing_type === Billing::TYPE_RESERVATION_FEE
+            && $billing->fresh()->status === Billing::STATUS_PAID
+            && $project->status->status_name === ProjectStatus::CONSULTATION) {
+            $project->update(['current_status_id' => ProjectStatus::idFor(ProjectStatus::BOOKED)]);
+        }
+    }
     public function reject(Request $request, Project $project, Payment $payment): RedirectResponse
     {
         // Acceptance criterion 3: no rejection without remarks.

@@ -117,9 +117,10 @@ export default function AddChargeForm({ project, usingSample, managerName, onSav
             <p className="text-sm font-bold text-ink">Add Additional Charge</p>
 
             <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Charge details (optional)" htmlFor="ac-description">
+                <Field label="Charge details (optional)" htmlFor="ac-description" error={errors.description}>
                     <input
                         id="ac-description"
+                        maxLength={100}
                         value={values.description}
                         onChange={(e) => set('description', e.target.value)}
                         placeholder="e.g. 20 extra chiavari chairs"
@@ -143,6 +144,7 @@ export default function AddChargeForm({ project, usingSample, managerName, onSav
                 <Field label="Reason" htmlFor="ac-reason" required error={errors.reason} className="sm:col-span-2">
                     <textarea
                         id="ac-reason"
+                        maxLength={140}
                         value={values.reason}
                         onChange={(e) => set('reason', e.target.value)}
                         placeholder="e.g. The customer added 20 guests after the quotation was approved."

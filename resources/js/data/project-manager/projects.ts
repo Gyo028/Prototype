@@ -269,6 +269,8 @@ export function waitingReason(p: Project, key: PartKey): string | null {
             return null;
         case 'reservationFee': {
             const pending = p.payments.some((x) => x.type === 'Reservation Fee' && x.status === 'For Verification');
+                        // A reservation fee dispute needs the Project Manager (backlog #31).
+            if (p.disputes.some((d) => d.billingType === 'Reservation Fee' && d.status !== 'Resolved')) return null;
             if (!pending) return `Waiting for the customer to pay the reservation fee (${peso(p.reservationFee.amount)}) and upload the receipt.`;
             return null;
         }
@@ -295,7 +297,7 @@ export function waitingReason(p: Project, key: PartKey): string | null {
         case 'payments': {
             if (p.billings.length === 0) return 'Waiting for the billing to be issued to the customer.';
             if (p.payments.some((x) => x.billingId !== null && x.status === 'For Verification')) return null;
-            if (p.disputes.some((d) => d.status !== 'Resolved')) return null; // a billing dispute needs the Project Manager
+            if (p.disputes.some((d) => d.billingType !== 'Reservation Fee' && d.status !== 'Resolved')) return null; // a billing dispute needs the Project Manager
             const unpaid = p.billings.filter((b) => billingStatus(b, p.payments) === 'Unpaid');
             if (unpaid.length === 0) return null;
             return `Waiting for the customer to pay: ${unpaid.map((b) => `${b.type} (${peso(b.amount)})`).join(', ')}.`;

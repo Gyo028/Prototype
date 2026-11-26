@@ -69,6 +69,7 @@ class ProjectSchedule extends Model
         'venue_ownership',
         'remarks',
         'changed_by',
+        'assigned_employee_id',
     ];
 
     protected function casts(): array
@@ -92,6 +93,11 @@ class ProjectSchedule extends Model
         return $this->belongsTo(User::class, 'changed_by');
     }
 
+    /** The Fabrication / Installation Head responsible for it (backlog #32). @return BelongsTo<Employee, $this> */
+    public function assignedEmployee(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class, 'assigned_employee_id');
+    }
     /** What came out of a held consultation or ocular visit. @return HasOne<AppointmentOutcome, $this> */
     public function outcome(): HasOne
     {

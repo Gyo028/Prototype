@@ -16,6 +16,7 @@ use App\Models\Project;
 use App\Models\ProjectSchedule;
 use App\Models\ProjectStatus;
 use App\Models\SiteAccessDocument;
+use App\Services\ExecutionSchedules;
 use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -46,7 +47,9 @@ class ProjectController extends Controller
         'designProposals.files',
         'designProposals.designSpecialist',
         'contracts.reviewer',
-        'billings.payments',
+        'billings.payments.recordedBy',
+        'schedules.changedBy',
+        'schedules.assignedEmployee',
     ];
 
     /** The database status → the status shown on the pages (revision, Nov 19). */
@@ -106,6 +109,8 @@ class ProjectController extends Controller
             'project' => self::toArray($project),
             // Backlog #21: the Design Specialists the project can be assigned to
             'specialists' => self::specialists(),
+            // Backlog #32: the Fabrication and Installation Heads
+            'setUpHeads' => ExecutionScheduleController::heads(),
         ]);
     }
 
@@ -164,10 +169,13 @@ class ProjectController extends Controller
             'designProposal' => self::designProposal($p, $request['customer']['name']),
                  // Step 4 · Contract (backlog #18)
             'contract' => self::contract($p),
-            'billings' => [],
-            'payments' => $fee ? $fee->payments->sortBy('payment_id')->map(fn (Payment $pay) => self::payment($pay, 'Reservation Fee'))->values()->all() : [], // only the reservation fee's for now
-            'disputes' => [],
-            'execution' => null,
+                        // Step 4 · Contract: the bills issued after the contract and every payment (backlog #27)
+            'billings' => array_values(array_map(fn (array $b) => $b['page'], self::bills($p))),
+            'payments' => self::payments($p),
+                        // Billing disputes (backlog #31)
+            'disputes' => self::disputes($p),
+                        // Step 5 · Fabrication and Step 6 · Installation (backlog #32)
+            'execution' => ExecutionScheduleController::page($p, app(ExecutionSchedules::class)),
             'statusUpdates' => [],
         ]);
     }
@@ -332,6 +340,80 @@ class ProjectController extends Controller
             'uploadedAt' => $d->uploaded_at?->toIso8601String(),
         ];
     }
+        /**
+     * The customer's billing disputes, newest first (backlog #31). A reservation fee dispute
+     * shows on the Reservation Fee part; the others on Payments.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function disputes(Project $p): array
+    {
+        $types = collect(self::bills($p))->mapWithKeys(fn (array $b) => [$b['model']->billing_id => $b['type']]);
+
+        return $p->billings
+            ->whereNotNull('dispute_status')
+            ->sortByDesc('billing_id')
+            ->map(fn (Billing $b) => DisputeController::page($p, $b, $types[$b->billing_id] ?? 'Reservation Fee'))
+            ->values()
+            ->all();
+    }
+    /**
+     * The bills after the contract, oldest first, with the page's type: the first final
+     * billing is the down payment, the second the remaining balance ("Final Payment").
+     *
+     * @return list<array{model: Billing, type: string, page: array<string, mixed>}>
+     */
+    private static function bills(Project $p): array
+    {
+        $finals = 0;
+
+        return $p->billings
+            ->whereIn('billing_type', [Billing::TYPE_FINAL_BILLING, Billing::TYPE_ADDITIONAL_CHARGE])
+            ->sortBy('billing_id')
+            ->map(function (Billing $b) use (&$finals) {
+                $type = $b->billing_type === Billing::TYPE_ADDITIONAL_CHARGE
+                    ? 'Additional Charge'
+                    : (++$finals === 1 ? 'Down Payment' : 'Final Payment');
+
+            // Additional charges keep the details and the reason together in description (backlog #29).
+                [$details, $reason] = $type === 'Additional Charge'
+                    ? AdditionalChargeController::split($b->description)
+                    : [$b->description, null];
+
+                return ['model' => $b, 'type' => $type, 'page' => [
+                                        'id' => $b->billing_id,
+                    'type' => $type,
+                    'amount' => (float) $b->amount,
+                    'issuedAt' => $b->issued_at->toIso8601String(),
+                    'description' => $details,
+                    'reason' => $reason,
+                    'recordedBy' => null, // not stored
+                ]];
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Every payment the customer made: the reservation fee's and the bills', oldest first.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function payments(Project $p): array
+    {
+        $fee = $p->billings->firstWhere('billing_type', Billing::TYPE_RESERVATION_FEE);
+        $list = $fee ? $fee->payments->map(fn (Payment $pay) => self::payment($pay, 'Reservation Fee'))->all() : [];
+
+        foreach (self::bills($p) as $bill) {
+            foreach ($bill['model']->payments as $pay) {
+                $list[] = self::payment($pay, $bill['type']);
+            }
+        }
+
+        usort($list, fn (array $a, array $b) => $a['id'] <=> $b['id']);
+
+        return $list;
+    }
     /** The page's payment statuses ↔ payments.status. */
     private const PAYMENT_STATUSES = [
         Payment::STATUS_SUBMITTED => 'For Verification',
@@ -362,17 +444,17 @@ class ProjectController extends Controller
             'type' => $type,
             'amount' => (float) $pay->amount_paid,
             'method' => self::PAYMENT_METHODS[$pay->payment_method] ?? $pay->payment_method,
-            'referenceNo' => $pay->payment_reference,
+            'referenceNo' => $pay->payment_method === Payment::METHOD_CHEQUE ? 'Cheque '.$pay->payment_reference : $pay->payment_reference,
             'paidOn' => $pay->payment_date->toDateString(),
             'receipt' => $pay->receipt_file_path
                 ? ['name' => $pay->receipt_file_name ?: basename($pay->receipt_file_path), 'url' => "/project-manager/payments/{$pay->payment_id}/receipt"]
                 : null,
-            'chequeNo' => null,
+            'chequeNo' => $pay->payment_method === Payment::METHOD_CHEQUE ? $pay->payment_reference : null, // kept in payment_reference (backlog #28)
             'submittedAt' => $pay->submitted_at->toIso8601String(),
             'status' => self::PAYMENT_STATUSES[$pay->status] ?? $pay->status,
             'review' => $decided ? [
                 'remarks' => $pay->remarks,
-                'reviewedBy' => 'Project Manager',
+                'reviewedBy' => $pay->payment_method !== Payment::METHOD_GCASH ? ($pay->recordedBy?->name ?? 'Project Manager') : 'Project Manager', // cash / cheque: who recorded it
                 'reviewedAt' => $pay->verified_at?->toIso8601String(),
             ] : null,
         ];

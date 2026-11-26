@@ -1,9 +1,9 @@
 import { router } from '@inertiajs/react';
-import { CalendarDays, CalendarClock, Plus, Send, Trash2 } from 'lucide-react';
+import { CalendarDays, CalendarClock, Send } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Field, GoldButton, OutlineButton, cx, inputClass, selectClass, textareaClass } from '@/components/dashboard/ui';
-import { Section, formatDate, formatDateTime } from '@/components/project-manager/request-details';
+import { Detail, Section, formatDate, formatDateTime } from '@/components/project-manager/request-details';
 import { CompletedNotice, PROJECTS_URL, StepIntro, WaitingNotice } from '@/components/project-manager/steps/step-ui';
 import WorkOrderPanel from '@/components/project-manager/work-order';
 import { PhaseCompletion } from '@/components/project-manager/project-status';
@@ -21,14 +21,42 @@ import { executionStatus } from '@/data/project-manager/projects';
  *   - Each step shows its own schedule, work order (#33) and completion (#35).
  *   - Rescheduling a phase after it was saved needs a reason, and its work order must be re-sent.
  * #32 acceptance criteria: the schedule is saved with every required detail (1);
- * a missing Head, activity or date blocks saving (2).
+ * a missing Head or date blocks saving (2).
+ * Decided with the user (Nov 26): one start date and one target completion date per phase
+ * (the group's project_schedules); the phase's single activity is named after the phase.
  */
 
 type Draft = Pick<ExecutionSchedule, PhaseKey>;
 
 const newId = () => `act-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-const emptyPhase = (): PhaseSchedule => ({ headId: null, headName: null, activities: [{ id: newId(), activity: '', scheduledDate: '', targetDate: '' }] });
+const emptyPhase = (title: string): PhaseSchedule => ({
+    headId: null,
+    headName: null,
+    activities: [{ id: newId(), activity: title, scheduledDate: '', targetDate: '' }],
+});
 const noErrors = (): ScheduleErrors => ({ fabrication: { activities: {} }, installation: { activities: {} } });
+
+/** One phase as the backend expects it: the Head and one start / target completion date. */
+const toForm = (phase: PhaseSchedule) => ({
+    headId: phase.headId,
+    startDate: phase.activities[0]?.scheduledDate ?? '',
+    targetDate: phase.activities[0]?.targetDate ?? '',
+});
+
+/** The backend's errors ("fabrication.headId", "startDate", ...) in the editor's shape. */
+function serverErrors(err: Record<string, string>, draft: Draft, only?: PhaseKey): ScheduleErrors {
+    const e = noErrors();
+    EXECUTION_PHASES.forEach(({ key }) => {
+        const prefix = only ? (only === key ? '' : null) : `${key}.`;
+        if (prefix === null) return;
+        const id = draft[key].activities[0]?.id ?? '';
+        if (err[`${prefix}headId`]) e[key].head = err[`${prefix}headId`];
+        const scheduledDate = err[`${prefix}startDate`];
+        const targetDate = err[`${prefix}targetDate`];
+        if (scheduledDate || targetDate) e[key].activities[id] = { scheduledDate, targetDate };
+    });
+    return e;
+}
 
 type Props = StepProps & { setUpHeads: SetUpHead[]; phaseKey: PhaseKey };
 
@@ -39,10 +67,10 @@ export default function ExecutionStep({ project, usingSample, managerName, onSav
 
     // null = viewing; 'new' = first schedule (both phases); 'reschedule' = changing this phase only
     const [mode, setMode] = useState<'new' | 'reschedule' | null>(saved === null && phaseKey === 'fabrication' ? 'new' : null);
-    const [draft, setDraft] = useState<Draft>(() => saved ?? { fabrication: emptyPhase(), installation: emptyPhase() });
+    const [draft, setDraft] = useState<Draft>(() => saved ?? { fabrication: emptyPhase('Fabrication'), installation: emptyPhase('Installation') });
     const [reason, setReason] = useState('');
     const [reasonError, setReasonError] = useState('');
-        const [errors, setErrors] = useState<ScheduleErrors>(noErrors);
+    const [errors, setErrors] = useState<ScheduleErrors>(noErrors);
     const [saving, setSaving] = useState(false);
 
     const tried = hasScheduleErrors(errors);
@@ -73,7 +101,7 @@ export default function ExecutionStep({ project, usingSample, managerName, onSav
         setMode(null);
     };
 
-        const save = () => {
+    const save = () => {
         // #32 acceptance criterion 2: incomplete scheduling information is never saved.
         const e = validateSchedule(draft);
         setErrors(e);
@@ -102,10 +130,11 @@ export default function ExecutionStep({ project, usingSample, managerName, onSav
                   };
 
         const finish = () => {
+            // Work orders (#33) are still sample data only, so the real page doesn't mention them yet.
             toast.success(
                 mode === 'reschedule'
-                    ? `${info.title} rescheduled. Send the updated work order to ${draft[phaseKey].headName} below.`
-                    : `Schedule saved. Send the work order to ${draft.fabrication.headName} below.`,
+                    ? `${info.title} rescheduled.${usingSample ? ` Send the updated work order to ${draft[phaseKey].headName} below.` : ''}`
+                    : `Schedule saved.${usingSample ? ` Send the work order to ${draft.fabrication.headName} below.` : ''}`,
             );
             setMode(null);
         };
@@ -121,18 +150,28 @@ export default function ExecutionStep({ project, usingSample, managerName, onSav
             mode === 'reschedule'
                 ? `${PROJECTS_URL}/${project.id}/execution-schedule/${phaseKey}/reschedule`
                 : `${PROJECTS_URL}/${project.id}/execution-schedule`;
-        router.put(url, mode === 'reschedule' ? { ...draft[phaseKey], reason: text } : draft, {
+        const data =
+            mode === 'reschedule'
+                ? { ...toForm(draft[phaseKey]), reason: text }
+                : { fabrication: toForm(draft.fabrication), installation: toForm(draft.installation) };
+        router.put(url, data, {
             preserveScroll: true,
             onStart: () => setSaving(true),
             onFinish: () => setSaving(false),
             onSuccess: finish,
+            onError: (err) => {
+                const e = err as Record<string, string>;
+                setErrors(serverErrors(e, draft, mode === 'reschedule' ? phaseKey : undefined));
+                if (e.reason) setReasonError(e.reason);
+                if (e.schedule) toast.error(e.schedule);
+            },
         });
     };
 
-    // Which phases the editor shows: both for the first schedule, only this one when rescheduling.
+        // Which phases the editor shows: both for the first schedule, only this one when rescheduling.
     const editing = mode === 'new' ? EXECUTION_PHASES : mode === 'reschedule' ? [info] : [];
 
-        return (
+    return (
         <>
             <StepIntro title={info.title}>
                 {phaseKey === 'fabrication'
@@ -148,8 +187,10 @@ export default function ExecutionStep({ project, usingSample, managerName, onSav
                 {saved && phase && mode === null && (
                     <>
                         <CompletedNotice>
-                            <b>The {info.title.toLowerCase()} schedule is saved.</b> Saved by {saved.savedBy} on {formatDateTime(saved.savedAt)}.
-                            {!phase.completion && ` Send ${phase.headName} the work order below.`}
+                            <b>The {info.title.toLowerCase()} schedule is saved.</b> Saved by {saved.savedBy}
+                            {saved.savedAt ? ` on ${formatDateTime(saved.savedAt)}` : ''}.
+                            {!phase.completion && phase.headName && usingSample && ` Send ${phase.headName} the work order below.`}
+                            {!phase.headName && !phase.completion && ` No ${info.head} is assigned yet. Use Reschedule to assign one.`}
                         </CompletedNotice>
                         <PhaseSummary title={info.title} headLabel={info.head} phase={phase} />
                         {canReschedule && (
@@ -159,6 +200,8 @@ export default function ExecutionStep({ project, usingSample, managerName, onSav
                                 </OutlineButton>
                             </div>
                         )}
+                        {/* Work orders (#33): sample data only until that backlog is connected */}
+                        {usingSample && (
                         <WorkOrderPanel
                             project={project}
                             usingSample={usingSample}
@@ -168,6 +211,7 @@ export default function ExecutionStep({ project, usingSample, managerName, onSav
                             title={info.title}
                             setUpHeads={setUpHeads}
                         />
+                        )}
                         <PhaseCompletion
                             project={project}
                             usingSample={usingSample}
@@ -192,7 +236,7 @@ export default function ExecutionStep({ project, usingSample, managerName, onSav
                     />
                 ))}
 
-                                {mode === 'reschedule' && (
+                {mode === 'reschedule' && (
                     <Field label="Reason for rescheduling" htmlFor="reschedule-reason" required error={reasonError}>
                         <textarea
                             id="reschedule-reason"
@@ -211,8 +255,8 @@ export default function ExecutionStep({ project, usingSample, managerName, onSav
                     <p role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-700">
                         The schedule was not saved.{' '}
                         {mode === 'new'
-                            ? 'Assign both Heads and fill in every activity, scheduled date and target completion date.'
-                            : 'Fill in every activity and date, and give the reason for rescheduling.'}
+                            ? 'Assign both Heads and fill in every start date and target completion date.'
+                            : 'Assign the Head, fill in both dates, and give the reason for rescheduling.'}
                     </p>
                 )}
 
@@ -228,12 +272,13 @@ export default function ExecutionStep({ project, usingSample, managerName, onSav
                                 <Send className="size-4" /> {saving ? 'Saving...' : mode === 'reschedule' ? 'Save New Schedule' : 'Save Schedule'}
                             </GoldButton>
                         </>
-                        ) : null}
+                    ) : null}
                 </div>
             </div>
         </>
     );
 }
+
 /* ---------- one phase (Fabrication or Installation) ---------- */
 
 type EditorProps = {
@@ -247,21 +292,23 @@ type EditorProps = {
 };
 
 function PhaseEditor({ phaseKey, title, headLabel, phase, errors, heads, onChange }: EditorProps) {
-    const updateActivity = (id: string, changes: Partial<PhaseSchedule['activities'][number]>) =>
-        onChange({ activities: phase.activities.map((a) => (a.id === id ? { ...a, ...changes } : a)) });
+    const line = phase.activities[0] ?? { id: newId(), activity: title, scheduledDate: '', targetDate: '' };
+    const e = errors.activities[line.id] ?? {};
+    // One line per phase: changing a date keeps the phase's name as its activity.
+    const setDates = (changes: { scheduledDate?: string; targetDate?: string }) => onChange({ activities: [{ ...line, activity: title, ...changes }] });
 
     return (
         <Section title={`${title} Schedule`}>
-            <div className="grid gap-4">
+            <div className="grid gap-4 sm:grid-cols-3">
                 <Field label={headLabel} htmlFor={`${phaseKey}-head`} required error={errors.head}>
                     <select
                         id={`${phaseKey}-head`}
                         value={phase.headId ?? ''}
-                        onChange={(e) => {
-                            const h = heads.find((x) => x.id === Number(e.target.value));
+                        onChange={(ev) => {
+                            const h = heads.find((x) => x.id === Number(ev.target.value));
                             onChange({ headId: h?.id ?? null, headName: h?.name ?? null });
                         }}
-                        className={cx(selectClass, 'sm:max-w-sm', errors.head && 'border-red-500')}
+                        className={cx(selectClass, errors.head && 'border-red-500')}
                     >
                         <option value="">Select the {headLabel.toLowerCase()}...</option>
                         {heads.map((h) => (
@@ -270,132 +317,60 @@ function PhaseEditor({ phaseKey, title, headLabel, phase, errors, heads, onChang
                             </option>
                         ))}
                     </select>
+                    {heads.length === 0 && <p className="mt-1 text-xs text-ink-soft">No active {headLabel} in the employee records.</p>}
                 </Field>
 
-                <div className="overflow-x-auto">
-                    <table className="w-full min-w-[640px] text-left text-sm">
-                        <thead className="text-xs text-ink-soft uppercase">
-                            <tr>
-                                <th className="pb-2 font-medium">
-                                    Activity<span className="text-red-600"> *</span>
-                                </th>
-                                <th className="w-44 pb-2 font-medium">
-                                    Scheduled date<span className="text-red-600"> *</span>
-                                </th>
-                                <th className="w-44 pb-2 font-medium">
-                                    Target completion<span className="text-red-600"> *</span>
-                                </th>
-                                <th className="w-10 pb-2" />
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {phase.activities.map((a) => {
-                                const e = errors.activities[a.id] ?? {};
-                                return (
-                                    <tr key={a.id} className="align-top">
-                                        <td className="py-1.5 pr-2">
-                                            <input
-                                                aria-label={`${title} activity`}
-                                                value={a.activity}
-                                                onChange={(ev) => updateActivity(a.id, { activity: ev.target.value })}
-                                                placeholder={phaseKey === 'fabrication' ? 'e.g. Build the floral entrance arch' : 'e.g. Venue set-up and styling'}
-                                                className={cx(inputClass, e.activity && 'border-red-500')}
-                                            />
-                                            {e.activity && <p className="mt-1 text-xs text-red-600">{e.activity}</p>}
-                                        </td>
-                                        <td className="py-1.5 pr-2">
-                                            <input
-                                                aria-label={`${title} scheduled date`}
-                                                type="date"
-                                                value={a.scheduledDate}
-                                                onChange={(ev) => updateActivity(a.id, { scheduledDate: ev.target.value })}
-                                                className={cx(inputClass, e.scheduledDate && 'border-red-500')}
-                                            />
-                                            {e.scheduledDate && <p className="mt-1 text-xs text-red-600">{e.scheduledDate}</p>}
-                                        </td>
-                                        <td className="py-1.5 pr-2">
-                                            <input
-                                                aria-label={`${title} target completion date`}
-                                                type="date"
-                                                min={a.scheduledDate || undefined}
-                                                value={a.targetDate}
-                                                onChange={(ev) => updateActivity(a.id, { targetDate: ev.target.value })}
-                                                className={cx(inputClass, e.targetDate && 'border-red-500')}
-                                            />
-                                            {e.targetDate && <p className="mt-1 text-xs text-red-600">{e.targetDate}</p>}
-                                        </td>
-                                        <td className="py-1.5 pt-3 text-right">
-                                            <button
-                                                type="button"
-                                                onClick={() => onChange({ activities: phase.activities.filter((x) => x.id !== a.id) })}
-                                                aria-label={`Remove ${a.activity || 'this activity'}`}
-                                                className="rounded p-1 text-ink-soft hover:bg-black/5 hover:text-red-600"
-                                            >
-                                                <Trash2 className="size-4" />
-                                            </button>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                </div>
+                <Field label="Start date" htmlFor={`${phaseKey}-start`} required error={e.scheduledDate}>
+                    <input
+                        id={`${phaseKey}-start`}
+                        type="date"
+                        value={line.scheduledDate}
+                        onChange={(ev) => setDates({ scheduledDate: ev.target.value })}
+                        className={cx(inputClass, e.scheduledDate && 'border-red-500')}
+                    />
+                </Field>
 
-                {errors.general && <p className="text-sm text-red-600">{errors.general}</p>}
-
-                <div>
-                    <OutlineButton
-                        onClick={() =>
-                            onChange({ activities: [...phase.activities, { id: newId(), activity: '', scheduledDate: '', targetDate: '' }] })
-                        }
-                    >
-                        <Plus className="size-4" /> Add Activity
-                    </OutlineButton>
-                </div>
+                <Field label="Target completion date" htmlFor={`${phaseKey}-target`} required error={e.targetDate}>
+                    <input
+                        id={`${phaseKey}-target`}
+                        type="date"
+                        min={line.scheduledDate || undefined}
+                        value={line.targetDate}
+                        onChange={(ev) => setDates({ targetDate: ev.target.value })}
+                        className={cx(inputClass, e.targetDate && 'border-red-500')}
+                    />
+                </Field>
             </div>
+            {errors.general && <p className="mt-2 text-sm text-red-600">{errors.general}</p>}
         </Section>
     );
 }
 
 /** Read-only view of a saved phase. */
 function PhaseSummary({ title, headLabel, phase }: { title: string; headLabel: string; phase: PhaseSchedule }) {
+    const starts = phase.activities.map((a) => a.scheduledDate).sort();
+    const targets = phase.activities.map((a) => a.targetDate).sort();
+
     return (
         <Section title={`${title} Schedule`}>
-            <p className="mb-3 text-sm text-ink">
-                {headLabel}: <b>{phase.headName}</b>
-            </p>
-            <div className="overflow-x-auto">
-                <table className="w-full min-w-[520px] text-left text-sm">
-                    <thead className="text-xs text-ink-soft uppercase">
-                        <tr>
-                            <th className="pb-2 font-medium">Activity</th>
-                            <th className="pb-2 font-medium">Scheduled date</th>
-                            <th className="pb-2 font-medium">Target completion</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-black/10">
-                        {phase.activities.map((a) => (
-                            <tr key={a.id}>
-                                <td className="py-2 pr-4 text-ink">{a.activity}</td>
-                                <td className="py-2 pr-4 text-ink">
-                                    <CalendarDays className="mr-1 inline size-3.5 text-ink-soft" />
-                                    {formatDate(a.scheduledDate)}
-                                </td>
-                                <td className="py-2 text-ink">{formatDate(a.targetDate)}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+            <div className="grid gap-3 sm:grid-cols-3">
+                <Detail label={headLabel}>{phase.headName ?? 'Not assigned'}</Detail>
+                <Detail label="Start date">
+                    <CalendarDays className="mr-1 inline size-3.5 text-ink-soft" />
+                    {starts[0] ? formatDate(starts[0]) : '—'}
+                </Detail>
+                <Detail label="Target completion date">{targets.at(-1) ? formatDate(targets.at(-1)!) : '—'}</Detail>
             </div>
-                        {phase.changes && phase.changes.length > 0 && (
+            {phase.changes && phase.changes.length > 0 && (
                 <div className="mt-4">
                     <p className="mb-2 text-xs font-bold tracking-wide text-ink-soft uppercase">Rescheduled</p>
                     <ul className="grid gap-2">
-                        {[...phase.changes].reverse().map((c) => (
-                            <li key={c.changedAt} className="rounded-lg border border-black/10 p-3 text-sm">
+                        {[...phase.changes].reverse().map((c, i) => (
+                            <li key={i} className="rounded-lg border border-black/10 p-3 text-sm">
                                 <p className="text-ink">Reason: {c.reason}</p>
                                 <p className="text-xs text-ink-soft">
-                                    by {c.changedBy} on {formatDateTime(c.changedAt)}
+                                    by {c.changedBy}
+                                    {c.changedAt ? ` on ${formatDateTime(c.changedAt)}` : ''}
                                 </p>
                             </li>
                         ))}
