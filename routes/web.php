@@ -34,10 +34,11 @@ use App\Http\Controllers\ProjectManager\ServiceRequestController as PmServiceReq
 use App\Http\Controllers\ProjectManager\ProjectController as PmProjectController;
 use App\Http\Controllers\ProjectManager\ConsultationController as PmConsultationController;
 use App\Http\Controllers\ProjectManager\PaymentController as PmPaymentController;
+use App\Http\Controllers\PublicSiteController;
 
 
 
-Route::inertia('/', 'public/landing')->name('home');
+Route::get('/', [PublicSiteController::class, 'landing'])->name('home');
 
 // Email verification without logging in (the login page's "Verify your email" modal).
 Route::post('/email/verification/resend', [EmailVerificationController::class, 'resend'])
@@ -46,13 +47,13 @@ Route::post('/email/verification/resend', [EmailVerificationController::class, '
 // checks the signature itself, so an expired link lands on the login page, not a 403.
 Route::get('/email/verify-link/{id}/{hash}', [EmailVerificationController::class, 'verify'])
     ->middleware(['throttle:6,1'])->whereNumber('id')->name('verification.verify.guest');
-Route::inertia('/faq', 'public/faq')->name('faq');
-Route::inertia('/our-works', 'public/our-works')->name('our-works');
-Route::inertia('/services/corporate-events', 'public/corporate-events')->name('services.corporate-events');
-Route::inertia('/services/special-occasions', 'public/special-occasions')->name('services.special-occasions');
-Route::inertia('/services/custom-fabrication', 'public/custom-fabrication')->name('services.custom-fabrication');
-Route::inertia('/terms', 'public/terms')->name('terms');
-Route::inertia('/privacy', 'public/privacy')->name('privacy');
+Route::get('/faq', [PublicSiteController::class, 'faq'])->name('faq');
+Route::get('/our-works', [PublicSiteController::class, 'ourWorks'])->name('our-works');
+Route::get('/services/corporate-events', [PublicSiteController::class, 'corporateEvents'])->name('services.corporate-events');
+Route::get('/services/special-occasions', [PublicSiteController::class, 'specialOccasions'])->name('services.special-occasions');
+Route::get('/services/custom-fabrication', [PublicSiteController::class, 'customProjects'])->name('services.custom-fabrication');
+Route::get('/terms', [PublicSiteController::class, 'terms'])->name('terms');
+Route::get('/privacy', [PublicSiteController::class, 'privacy'])->name('privacy');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', function (Request $request) {

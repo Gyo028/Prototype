@@ -14,7 +14,7 @@ export const COMPANY = {
     name: `GR3AT A's Event Styling Services`,
     product: `E-VenturePro`,
     address: `Altezza, Deparo, Caloocan City, Philippines`,
-    email: `gr3ataseventstyling@gmail.com`,
+    email: `gr3ataseventsstyling@gmail.com`,
     phone: `09175352156`,
 };
 

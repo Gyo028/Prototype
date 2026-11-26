@@ -1,12 +1,15 @@
-export default function HeroSection() {
+import type { SitePhoto } from '@/lib/public-site';
+
+/** The background photo comes from Website Content; the headline is fixed. */
+export default function HeroSection({ photo }: { photo: SitePhoto }) {
     return (
         <section
             id="home"
             className="relative flex min-h-[min(100svh,560px)] items-center overflow-hidden bg-white md:h-[100svh] md:max-h-[1100px] md:min-h-[min(100svh,620px)] portrait:md:items-start"
         >
             <img
-                src="/images/hero-bg.webp"
-                alt="Balloon arch and floral backdrop styled by GR3AT A's"
+                src={photo.url}
+                alt={photo.alt}
                 className="absolute inset-0 h-full w-full object-cover object-[65%_center] md:object-center"
             />
 

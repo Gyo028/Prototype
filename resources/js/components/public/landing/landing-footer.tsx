@@ -1,7 +1,7 @@
 import { Link } from '@inertiajs/react';
-import { Facebook, Mail, MapPin, Phone } from 'lucide-react';
+import { Facebook, Instagram, Mail, MapPin, Phone } from 'lucide-react';
 
-import { COMPANY } from '@/data/legal';
+import { useSiteContact } from '@/lib/public-site';
 
 const quickLinks = [
     { label: 'Home', href: '/#home' },
@@ -17,16 +17,20 @@ const serviceLinks = [
     { label: 'Custom Projects', href: '/services/custom-fabrication' },
 ];
 
-const contacts = [
-    { label: 'Facebook', href: 'https://www.facebook.com/share/17uj5e738o/', Icon: Facebook },
-    { label: COMPANY.phone, href: `tel:${COMPANY.phone}`, Icon: Phone },
-    { label: COMPANY.email, href: `mailto:${COMPANY.email}`, Icon: Mail },
-];
-
 const headingClass = 'text-sm font-semibold tracking-[0.2em] text-[#C99A2E] uppercase';
 const linkClass = 'text-white/80 transition-colors duration-200 hover:text-[#F2C75C]';
 
+/** The contact details come from Website Content > Contact & Footer. */
 export default function LandingFooter() {
+    const contact = useSiteContact();
+
+    const contacts = [
+        ...(contact.facebook ? [{ label: 'Facebook', href: contact.facebook, Icon: Facebook }] : []),
+        ...(contact.instagram ? [{ label: 'Instagram', href: contact.instagram, Icon: Instagram }] : []),
+        { label: contact.phone, href: `tel:${contact.phone.replace(/[^\d+]/g, '')}`, Icon: Phone },
+        { label: contact.email, href: `mailto:${contact.email}`, Icon: Mail },
+    ];
+
     return (
         <footer className="bg-[#1F2023] text-white">
             <div className="mx-auto max-w-[1400px] px-6 py-16 lg:px-20 lg:py-20">
@@ -88,7 +92,7 @@ export default function LandingFooter() {
                             ))}
                             <li className="flex items-start gap-3 text-white/80">
                                 <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-[#C99A2E]" />
-                                <span>{COMPANY.address}</span>
+                                <span>{contact.address}</span>
                             </li>
                         </ul>
                     </div>
@@ -97,7 +101,7 @@ export default function LandingFooter() {
 
             <div className="border-t border-white/15">
                 <div className="mx-auto flex max-w-[1400px] flex-col items-center justify-between gap-3 px-6 py-6 text-sm text-white/60 sm:flex-row lg:px-20">
-                    <p>Copyright &copy; 2026 {COMPANY.name}. All rights reserved.</p>
+                    <p>{contact.copyright}</p>
                     <div className="flex gap-8">
                         <Link href="/terms" className="transition-colors hover:text-white">
                             Terms &amp; Conditions

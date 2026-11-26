@@ -2,9 +2,10 @@ import { Head } from '@inertiajs/react';
 
 import LandingFooter from '@/components/public/landing/landing-footer';
 import LandingNav from '@/components/public/landing/landing-nav';
-import { faqs } from '@/data/faqs';
+import type { Faq as FaqItem } from '@/data/faqs';
 
-export default function Faq() {
+/** Questions and answers from Website Content > FAQ Page, in the order the admin set. */
+export default function Faq({ faqs }: { faqs: FaqItem[] }) {
     return (
         <div className="min-h-screen bg-[#FBF9F5] font-sans text-black">
             <Head title="FAQs - Gr3at A's Events Styling & Services">

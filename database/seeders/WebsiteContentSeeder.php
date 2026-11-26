@@ -52,14 +52,7 @@ class WebsiteContentSeeder extends Seeder
             'section' => WebsiteContent::SECTION_HOMEPAGE,
             'block_key' => 'contact',
             'title' => 'Contact & Footer',
-            'content' => $this->json([
-                'phone' => '+63 0000000000',
-                'email' => 'gr3ataseventsstyling@gmail.com',
-                'address' => 'Altezza, Deparo, Caloocan City',
-                'facebook' => 'https://www.facebook.com/share/17uj5e738o/',
-                'instagram' => '',
-                'copyright' => "© 2026 Great A's Event Styling Services. All rights reserved.",
-            ]),
+            'content' => $this->json(array_diff_key(WebsiteDefaults::CONTACT, ['name' => true])),
             'sort_order' => 3,
         ]);
     }
