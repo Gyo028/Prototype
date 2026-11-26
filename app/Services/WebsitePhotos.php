@@ -60,8 +60,20 @@ class WebsitePhotos
      */
     public function store(UploadedFile $file, string $kind, string $field = 'photo'): array
     {
+        return $this->storeFrom((string) $file->getRealPath(), $kind, $field);
+    }
+
+    /**
+     * Converts and saves an image file on this computer. Used by store() and
+     * by the website:photos-to-storage command, which moves the photos shipped
+     * with the app (some are smaller than the upload minimum, so it skips
+     * that check with $checkSize = false).
+     *
+     * @return array{file_path: string, thumb_path: string}
+     */
+    public function storeFrom(string $source, string $kind, string $field = 'photo', bool $checkSize = true): array
+    {
         $limits = self::KINDS[$kind];
-        $source = (string) $file->getRealPath();
 
         // Reads only the header, so a huge image is refused before it is decoded.
         $header = @getimagesize($source);
@@ -91,7 +103,9 @@ class WebsitePhotos
         $width = $image->width();
         $height = $image->height();
 
-        if ($kind === 'banner') {
+        if (! $checkSize) {
+            // Photos shipped with the app: kept as they are.
+        } elseif ($kind === 'banner') {
             if ($width <= $height) {
                 $this->fail($field, 'Use a landscape (wide) photo for the banner.');
             }
@@ -122,9 +136,14 @@ class WebsitePhotos
             'thumb_path' => "website/thumbs/{$name}.webp",
         ];
 
+        // The file names are random and never reused, so browsers and the
+        // bucket's CDN may keep a copy for a year. Visibility comes from the
+        // disk (the public disk, or the public bucket itself).
+        $options = ['ContentType' => 'image/webp', 'CacheControl' => 'public, max-age=31536000, immutable'];
+
         $disk = Storage::disk(WebsiteContentImage::disk());
-        $disk->put($paths['file_path'], $photo, 'public');
-        $disk->put($paths['thumb_path'], $thumb, 'public');
+        $disk->put($paths['file_path'], $photo, $options);
+        $disk->put($paths['thumb_path'], $thumb, $options);
 
         return $paths;
     }

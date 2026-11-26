@@ -12,8 +12,9 @@ import type { Category, SlotPhoto, WorkPhoto } from '@/components/technical-admi
  *  - Hero banner and the intro photo pair: uploaded straight into their slot.
  *  - Showcase: 4 photos picked from the Our Works library, from the page's
  *    own category. "Change" swaps one photo, so the grid always has 4.
- *  - The "More services" cards at the bottom use the other pages' hero
- *    banners automatically.
+ *  - The "More services" cards at the bottom of the other pages use one of
+ *    this page's intro photos automatically (Corporate Events: intro photo 2;
+ *    Special Occasions and Custom Projects: intro photo 1).
  */
 
 export type ServicePage = {
@@ -145,8 +146,8 @@ export default function ServicePagesEditor({ pages, works }: { pages: ServicePag
                 </ul>
                 <p className="mt-4 flex items-start gap-2 text-xs text-ink-soft">
                     <Info className="mt-0.5 size-4 shrink-0 text-gold-dark" />
-                    The showcase always shows 4 photos, so a photo can only be swapped, not removed. The page text and the “More services” cards
-                    are fixed; those cards use the other pages’ hero banners.
+                    The showcase always shows 4 photos, so a photo can only be swapped, not removed. The page text is fixed. The “More services”
+                    cards on the other pages show this page’s intro photo {page.key === 'svc_corporate' ? '2' : '1'}.
                 </p>
             </Panel>
 

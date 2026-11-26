@@ -3,7 +3,7 @@ import { ArrowUpRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from '@/components/ui/carousel';
-import { works } from '@/data/works';
+import type { CarouselPhoto } from '@/lib/public-site';
 import { cn } from '@/lib/utils';
 
 const DEFAULT_DESCRIPTION = "Custom event styling and fabrication by GR3AT A's Event Styling Services.";
@@ -26,7 +26,8 @@ function ArrowButton({ direction, onClick }: { direction: 'prev' | 'next'; onCli
     );
 }
 
-export default function WorksSection() {
+/** The homepage carousel: the photos and order the Technical Admin picks in Our Works. */
+export default function WorksSection({ works }: { works: CarouselPhoto[] }) {
     const [api, setApi] = useState<CarouselApi>();
     const [selected, setSelected] = useState(0);
     const autoplay = useRef(Autoplay({ delay: 4000, stopOnInteraction: false }));
@@ -65,7 +66,7 @@ export default function WorksSection() {
 
                             return (
                                 <CarouselItem
-                                    key={work.file}
+                                    key={work.id}
                                     className="basis-[78%] pl-6 sm:basis-[55%] lg:basis-[31%]"
                                 >
                                     <div
@@ -77,8 +78,8 @@ export default function WorksSection() {
                                         )}
                                     >
                                         <img
-                                            src={`/images/works/${work.file}`}
-                                            alt={work.label}
+                                            src={work.url}
+                                            alt={work.alt}
                                             draggable={false}
                                             className={cn(
                                                 'aspect-[4/3] w-full rounded-[4px] object-cover ring-1 transition-all duration-700',
@@ -99,8 +100,8 @@ export default function WorksSection() {
             </div>
 
             {active && (
-                <div key={active.file} className="animate-in fade-in mx-auto mt-2 max-w-3xl px-6 text-center duration-700">
-                    <p className="font-['DM_Serif_Display',serif] text-2xl font-normal text-[#F2C75C]">{active.label}</p>
+                <div key={active.id} className="animate-in fade-in mx-auto mt-2 max-w-3xl px-6 text-center duration-700">
+                    <p className="font-['DM_Serif_Display',serif] text-2xl font-normal text-[#F2C75C]">{active.title}</p>
                     <p className="mt-1 text-sm text-white/70 md:text-base">{DEFAULT_DESCRIPTION}</p>
                 </div>
             )}
