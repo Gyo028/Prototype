@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import DatePicker from '@/components/customer/date-picker';
 import { MEETING_MODES, addDaysISO, formatLongDate, formatTime, isSunday, meetingModeLabel } from '@/components/customer/project-types';
 import type { AppointmentRules, AppointmentSchedule, MeetingMode } from '@/components/customer/project-types';
-import { Field, Pill, cx, textareaClass } from '@/components/dashboard/ui';
+import { Field, Pill, cx, inputClass, textareaClass } from '@/components/dashboard/ui';
 
 /*
  * Pieces shared by the appointments the customer books: the consultation and the ocular visit. 
@@ -30,8 +30,14 @@ export const durationText = (minutes: number) => {
 };
 
 /**
- * Calendar and time slots, plus the meeting mode when the appointment has one.
+ * Calendar and time slots, plus the meeting mode and place when the appointment has them.
  * Used for booking and rescheduling.
+ *
+ * Laptop: the calendar on the left; the time, how to meet and where on the right.
+ * Smaller screens: one column in the order it is filled in (date, time, how, where).
+ *
+ * A day with every slot taken shows as "Booked" (like the service request calendar)
+ * and can't be picked; a taken slot is crossed out. The server checks both again.
  */
 export function SlotPicker({
     noun,
@@ -41,6 +47,9 @@ export function SlotPicker({
     availableSlots,
     rules,
     withMeetingMode = false,
+    officeAddress,
+    placeMax = 255,
+    footer,
 }: {
     noun: string; // "consultation", "ocular visit"
     slot: AppointmentSlot;
@@ -49,33 +58,93 @@ export function SlotPicker({
     availableSlots: Record<string, string[]>;
     rules: AppointmentRules;
     withMeetingMode?: boolean;
+    /** Face to face: the place saved when the "GR3AT A's office" option is picked. */
+    officeAddress?: string;
+    placeMax?: number;
+    /** E.g. the Book button: sits at the bottom of the right column, level with the bottom of the calendar. */
+    footer?: ReactNode;
 }) {
     const Noun = noun[0].toUpperCase() + noun.slice(1);
     const lastEnd = formatTime(addMinutes(rules.slotTimes[rules.slotTimes.length - 1] ?? '16:00', rules.slotMinutes));
     const firstStart = formatTime(rules.slotTimes[0] ?? '09:00');
 
-    // Grey days with their reason. Two months past the last day cover what the calendar can show next.
-    const unavailableDates = useMemo(() => {
+    // Fully booked days (every slot taken), and Sundays with their reason.
+    // Days after the latest one are greyed by the calendar itself (maxDate).
+    const { bookedDates, unavailableDates } = useMemo(() => {
+        const booked: string[] = [];
         const out: Record<string, string> = {};
-        const until = addDaysISO(rules.latestDate, 62);
-        for (let d = rules.earliestDate; d <= until; d = addDaysISO(d, 1)) {
-            if (d > rules.latestDate) out[d] = `The ${noun} must be before your event date.`;
-            else if (isSunday(d)) out[d] = `${Noun}s are held Monday to Saturday.`;
-            else if (!availableSlots[d]) out[d] = 'All time slots on this day are taken.';
+        for (let d = rules.earliestDate; d <= rules.latestDate; d = addDaysISO(d, 1)) {
+            if (isSunday(d)) out[d] = `${Noun}s are held Monday to Saturday.`;
+            else if (!availableSlots[d]) booked.push(d);
         }
-        return out;
-    }, [availableSlots, rules, noun, Noun]);
+        return { bookedDates: booked, unavailableDates: out };
+    }, [availableSlots, rules, Noun]);
 
     const open = slot.date ? (availableSlots[slot.date] ?? []) : [];
     const longSlots = rules.slotMinutes > 60;
+    const faceToFace = withMeetingMode && slot.meetingMode === 'face_to_face';
+    const atOffice = !!officeAddress && slot.meetingPlace === officeAddress;
 
     return (
-        // Laptop: meeting mode and time on the left, the calendar on the right.
-        // Smaller screens: one column in the order it is filled in (mode, date, then time).
-        <div className="grid gap-5 lg:grid-cols-[1fr_1fr] lg:gap-6">
-            <div className="contents lg:grid lg:content-start lg:gap-5">
+        // grid-cols-1 (minmax 0) and min-w-0 keep long one-line text, like the office address, from widening the form on phones.
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:gap-6">
+            <Field label="Date" required error={errors.date}>
+                <DatePicker
+                    value={slot.date}
+                    onChange={(date) => setSlot({ ...slot, date, time: '' })}
+                    minDate={rules.earliestDate}
+                    maxDate={rules.latestDate}
+                    afterMaxText={`The ${noun} must be before your event date.`}
+                    disabledDates={bookedDates}
+                    bookedText="All time slots on this day are taken."
+                    unavailableDates={unavailableDates}
+                    tooSoonText={`Please book at least ${rules.leadDays} days ahead.`}
+                    hint={`Monday to Saturday, ${firstStart} – ${lastEnd}. Book at least ${rules.leadDays} days ahead and before your event date.`}
+                    hasError={!!errors.date}
+                />
+            </Field>
+
+            <div className="flex min-w-0 flex-col gap-5">
+                <Field label={slot.date ? `Time on ${formatLongDate(slot.date)}` : 'Time'} required error={errors.time}>
+                    <div className={cx('grid gap-2', longSlots ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-2 sm:grid-cols-4')}>
+                        {rules.slotTimes.map((t) => {
+                            // Before a date is picked every slot shows, but none can be picked yet.
+                            const taken = !!slot.date && !open.includes(t);
+                            const free = !!slot.date && !taken;
+                            const selected = slot.time === t;
+                            return (
+                                <button
+                                    key={t}
+                                    type="button"
+                                    disabled={!free}
+                                    aria-pressed={selected}
+                                    title={taken ? 'This slot is taken.' : !slot.date ? 'Pick a date first.' : undefined}
+                                    onClick={() => setSlot({ ...slot, time: selected ? '' : t })}
+                                    className={cx(
+                                        'rounded-lg border px-2 py-2.5 text-sm font-semibold transition sm:py-2',
+                                        selected
+                                            ? 'border-gold bg-gold text-white'
+                                            : free
+                                              ? 'border-black/15 bg-white text-ink hover:border-gold'
+                                              : taken
+                                                ? 'cursor-not-allowed border-black/5 bg-black/5 text-ink-soft/60 line-through'
+                                                : 'cursor-not-allowed border-black/10 bg-white text-ink-soft/70',
+                                    )}
+                                >
+                                    {formatTime(t)}
+                                    {longSlots && <> – {formatTime(addMinutes(t, rules.slotMinutes))}</>}
+                                </button>
+                            );
+                        })}
+                    </div>
+                    <span className="text-xs text-ink-soft">
+                        {slot.date ? '' : 'Pick a date to see which times are free. '}Each {noun} takes about {durationText(rules.slotMinutes)}.
+                        {slot.date && ' Crossed-out times are already taken.'}
+                    </span>
+                </Field>
+
                 {withMeetingMode && (
-                    <Field label="How would you like to meet?" required error={errors.meetingMode} className="order-1 lg:order-none">
+                    <Field label="How would you like to meet?" required error={errors.meetingMode}>
                         <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Meeting mode">
                             {MEETING_MODES.map((m) => {
                                 const selected = slot.meetingMode === m.value;
@@ -86,7 +155,8 @@ export function SlotPicker({
                                         type="button"
                                         role="radio"
                                         aria-checked={selected}
-                                        onClick={() => setSlot({ ...slot, meetingMode: m.value })}
+                                        // Switching to online forgets the place.
+                                        onClick={() => setSlot({ ...slot, meetingMode: m.value, meetingPlace: m.value === 'online' ? '' : slot.meetingPlace })}
                                         className={cx(
                                             'flex items-start gap-3 rounded-xl border p-3 text-left transition',
                                             selected ? 'border-gold bg-gold/10' : 'border-black/15 bg-white hover:border-gold',
@@ -104,56 +174,55 @@ export function SlotPicker({
                     </Field>
                 )}
 
-                <Field label={slot.date ? `Time on ${formatLongDate(slot.date)}` : 'Time'} required error={errors.time} className="order-3 lg:order-none">
-                    {!slot.date ? (
-                        <p className="rounded-lg border border-dashed border-black/15 p-4 text-center text-xs text-ink-soft">Pick a date first.</p>
-                    ) : (
-                        <div className={cx('grid gap-2', longSlots ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-2 sm:grid-cols-4')}>
-                            {rules.slotTimes.map((t) => {
-                                const free = open.includes(t);
-                                const selected = slot.time === t;
-                                return (
-                                    <button
-                                        key={t}
-                                        type="button"
-                                        disabled={!free}
-                                        aria-pressed={selected}
-                                        title={free ? undefined : 'This slot is taken.'}
-                                        onClick={() => setSlot({ ...slot, time: t })}
-                                        className={cx(
-                                            'rounded-lg border px-2 py-2.5 text-sm font-semibold transition sm:py-2',
-                                            selected
-                                                ? 'border-gold bg-gold text-white'
-                                                : free
-                                                  ? 'border-black/15 bg-white text-ink hover:border-gold'
-                                                  : 'cursor-not-allowed border-black/5 bg-black/5 text-ink-soft/60 line-through',
-                                        )}
-                                    >
-                                        {formatTime(t)}
-                                        {longSlots && <> – {formatTime(addMinutes(t, rules.slotMinutes))}</>}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    )}
-                </Field>
-                <p className="order-4 text-xs text-ink-soft lg:order-none">
-                    Each {noun} takes about {durationText(rules.slotMinutes)}.
-                </p>
-            </div>
+                {faceToFace && (
+                    <Field label="Where should we meet?" htmlFor={`${noun}-place`} required error={errors.meetingPlace}>
+                        {officeAddress && (
+                            // A radio look, but clicking it again unselects it.
+                            <button
+                                type="button"
+                                role="radio"
+                                aria-checked={atOffice}
+                                onClick={() => setSlot({ ...slot, meetingPlace: atOffice ? '' : officeAddress })}
+                                className={cx(
+                                    'flex h-10 w-full min-w-0 items-center gap-3 rounded-lg border px-3 text-left transition',
+                                    atOffice ? 'border-gold bg-gold/10' : 'border-black/15 bg-white hover:border-gold',
+                                )}
+                            >
+                                <span
+                                    className={cx(
+                                        'flex size-4 shrink-0 items-center justify-center rounded-full border-2',
+                                        atOffice ? 'border-gold-dark' : 'border-black/30',
+                                    )}
+                                >
+                                    {atOffice && <span className="size-2 rounded-full bg-gold-dark" />}
+                                </span>
+                                <span className="min-w-0 truncate text-sm">
+                                    <span className="font-bold text-ink">GR3AT A&apos;s office</span>
+                                    <span className="text-ink-soft"> · {officeAddress.replace(/^GR3AT A's office, /, '')}</span>
+                                </span>
+                            </button>
+                        )}
+                        <input
+                            id={`${noun}-place`}
+                            className={inputClass}
+                            disabled={atOffice}
+                            maxLength={placeMax}
+                            placeholder={
+                                atOffice
+                                    ? 'Unselect the office to type another place'
+                                    : officeAddress
+                                      ? 'Or another place, e.g. Café Lorenzo, SM Fairview, Quezon City'
+                                      : 'Café Lorenzo, SM Fairview, Quezon City'
+                            }
+                            value={atOffice ? '' : slot.meetingPlace}
+                            onChange={(e) => setSlot({ ...slot, meetingPlace: e.target.value })}
+                        />
+                        <span className="text-[11px] text-ink-soft">For another place, like a restaurant or a cafe, include the address.</span>
+                    </Field>
+                )}
 
-            <Field label="Date" required error={errors.date} className="order-2 lg:order-none">
-                <DatePicker
-                    value={slot.date}
-                    onChange={(date) => setSlot({ ...slot, date, time: '' })}
-                    minDate={rules.earliestDate}
-                    disabledDates={[]}
-                    unavailableDates={unavailableDates}
-                    tooSoonText={`Please book at least ${rules.leadDays} days ahead.`}
-                    hint={`Monday to Saturday, ${firstStart} – ${lastEnd}. Book at least ${rules.leadDays} days ahead and before your event date.`}
-                    hasError={!!errors.date}
-                />
-            </Field>
+                {footer && <div className="mt-auto flex flex-col pt-1 sm:flex-row sm:justify-end">{footer}</div>}
+            </div>
         </div>
     );
 }
@@ -187,7 +256,8 @@ export function AppointmentCard({ schedule, compact = false, place }: { schedule
             </div>
             {(place || schedule.meetingMode) && (
                 <div className="flex items-center gap-2 text-sm text-ink-soft">
-                    <Icon className="size-4 shrink-0" /> {place ?? meetingModeLabel(schedule.meetingMode)}
+                    <Icon className="size-4 shrink-0" />{' '}
+                    {place ?? (schedule.meetingPlace ? `${meetingModeLabel(schedule.meetingMode)} · ${schedule.meetingPlace}` : meetingModeLabel(schedule.meetingMode))}
                 </div>
             )}
             {schedule.remarks && (

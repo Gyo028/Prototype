@@ -20,11 +20,6 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
-/*
- * Backlog #18: Verify the project contract.
- *   1. The decision is saved.
- *   2. A contract cannot be rejected without remarks.
- */
 
 beforeEach(function () {
     $this->withoutVite();
@@ -94,7 +89,7 @@ beforeEach(function () {
     $this->contract = $this->contracts->issue($this->project, $proposal);
 });
 /** The customer uploads a signed copy. */
-function ctSign($test): Contract
+function pmCtSign($test): Contract
 {
     $test->contracts->upload($test->contract, UploadedFile::fake()->create('signed-contract.pdf', 300, 'application/pdf'));
 
@@ -106,7 +101,7 @@ function ctDecide($test, string $decision, array $data)
     return $test->actingAs($test->pm)->patch(route("project-manager.projects.contract.{$decision}", $test->project), $data);
 }
 
-function ctPage($test): array
+function pmCtPage($test): array
 {
     $project = null;
     $test->actingAs($test->pm)
@@ -121,10 +116,10 @@ function ctPage($test): array
 }
 
 test('the page waits for the signature, then shows the signed contract for review', function () {
-    expect(ctPage($this)['contract'])->toBeNull();
+    expect(pmCtPage($this)['contract'])->toBeNull();
 
-    ctSign($this);
-    $contract = ctPage($this)['contract'];
+    pmCtSign($this);
+    $contract = pmCtPage($this)['contract'];
 
     expect($contract['code'])->toBe($this->contract->code())
         ->and($contract['version'])->toBe(1)
@@ -136,7 +131,7 @@ test('the page waits for the signature, then shows the signed contract for revie
 });
 
 test('approving needs every checklist item', function () {
-    ctSign($this);
+    pmCtSign($this);
 
     ctDecide($this, 'approve', ['checklist' => ['signed', 'details']])->assertSessionHasErrors('checklist');
 
@@ -144,7 +139,7 @@ test('approving needs every checklist item', function () {
 });
 
 test('approving verifies the contract and issues the down payment and balance', function () {
-    ctSign($this);
+    pmCtSign($this);
 
     ctDecide($this, 'approve', ['checklist' => Contracts::CHECKLIST])->assertSessionHasNoErrors();
 
@@ -157,14 +152,14 @@ test('approving verifies the contract and issues the down payment and balance', 
         ->toBe([87500.0, 87500.0]) // (₱200,000 − ₱25,000) split 50 / 50
         ->and($this->project->refresh()->status->status_name)->toBe(ProjectStatus::CONTRACT); // fabrication waits for the down payment
 
-    $page = ctPage($this)['contract'];
+    $page = pmCtPage($this)['contract'];
     expect($page['status'])->toBe('Approved')
         ->and($page['review']['reviewedBy'])->toBe('Paolo Reyes')
         ->and($page['review']['checklist'])->toBe(Contracts::CHECKLIST);
 });
 
 test('a contract cannot be rejected without remarks', function () {
-    ctSign($this);
+    pmCtSign($this);
 
     ctDecide($this, 'reject', ['remarks' => '  '])->assertSessionHasErrors('remarks');
 
@@ -172,7 +167,7 @@ test('a contract cannot be rejected without remarks', function () {
 });
 
 test('rejecting saves the remarks and issues the next version to sign', function () {
-    ctSign($this);
+    pmCtSign($this);
 
     ctDecide($this, 'reject', ['remarks' => 'Page 2 is not signed.', 'checklist' => ['details']])->assertSessionHasNoErrors();
 
@@ -181,7 +176,7 @@ test('rejecting saves the remarks and issues the next version to sign', function
         ->and($this->project->contracts()->where('version_number', 2)->value('status'))->toBe(Contract::STATUS_ISSUED);
 
     // Until version 2 is signed, the page shows the rejection.
-    $page = ctPage($this)['contract'];
+    $page = pmCtPage($this)['contract'];
     expect($page['version'])->toBe(1)
         ->and($page['status'])->toBe('Rejected')
         ->and($page['review']['remarks'])->toBe('Page 2 is not signed.');
@@ -190,7 +185,7 @@ test('rejecting saves the remarks and issues the next version to sign', function
 test('an unsigned or already reviewed contract cannot be reviewed', function () {
     ctDecide($this, 'approve', ['checklist' => Contracts::CHECKLIST])->assertSessionHasErrors('remarks'); // not signed yet
 
-    ctSign($this);
+    pmCtSign($this);
     ctDecide($this, 'approve', ['checklist' => Contracts::CHECKLIST]);
     ctDecide($this, 'reject', ['remarks' => 'Too late.'])->assertSessionHasErrors('remarks');
 
@@ -198,7 +193,7 @@ test('an unsigned or already reviewed contract cannot be reviewed', function () 
 });
 
 test('verifying the down payment after the contract starts fabrication', function () {
-    ctSign($this);
+    pmCtSign($this);
     ctDecide($this, 'approve', ['checklist' => Contracts::CHECKLIST]);
 
     $down = $this->project->billings()->where('billing_type', Billing::TYPE_FINAL_BILLING)->orderBy('billing_id')->first();
@@ -223,7 +218,7 @@ test('verifying the down payment after the contract starts fabrication', functio
 });
 
 test('the project manager can open the signed contract; other roles cannot', function () {
-    ctSign($this);
+    pmCtSign($this);
 
     $this->actingAs($this->pm)->get(route('project-manager.projects.contract.file', [$this->project, $this->contract]))->assertOk();
     $this->actingAs($this->customerUser)->get(route('project-manager.projects.contract.file', [$this->project, $this->contract]))->assertForbidden();

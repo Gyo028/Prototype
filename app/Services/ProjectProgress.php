@@ -421,7 +421,11 @@ class ProjectProgress
         switch ($step) {
             case 'consultation':
                 if ($s = $this->active($schedules, ProjectSchedule::TYPE_CONSULTATION)) {
-                    $mode = $s->meeting_mode === ProjectSchedule::MODE_ONLINE ? 'online' : 'face to face';
+                    $mode = match (true) {
+                        $s->meeting_mode === ProjectSchedule::MODE_ONLINE => 'online',
+                        $s->meeting_place !== null => "face to face at {$s->meeting_place}",
+                        default => 'face to face',
+                    };
 
                     return $action('Attend your consultation', $this->day($s->start_datetime, true).' at '.$s->start_datetime->format('g:i A').", {$mode}.");
                 }

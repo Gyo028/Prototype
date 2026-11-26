@@ -81,6 +81,7 @@ export type AppointmentSchedule = {
     startTime: string;
     endTime: string;
     meetingMode: MeetingMode | null;
+    meetingPlace: string | null; // face-to-face consultations only
     venueOwnership: VenueOwnership | null; // ocular visits only
     status: 'pending' | 'tentative' | 'confirmed' | 'completed' | 'cancelled';
     remarks: string | null;
@@ -96,6 +97,9 @@ export type ConsultationInfo = {
     bookingBlockedReason: string | null;
     canChange: boolean;
     changeBlockedReason: string | null;
+    /** Filled in by "Use GR3AT A's office" on the meeting place field. */
+    officeAddress: string;
+    placeMax: number;
 };
 
 /** Booking rules for an appointment (AppointmentScheduler::rules on the server). */
@@ -396,7 +400,7 @@ export type RequestLayout = {
 
 export const MEETING_MODES: { value: MeetingMode; label: string; hint: string }[] = [
     { value: 'online', label: 'Online', hint: 'Video call; the link is sent before the meeting' },
-    { value: 'face_to_face', label: 'Face to face', hint: "At GR3AT A's office" },
+    { value: 'face_to_face', label: 'Face to face', hint: "At our office or a place you choose" },
 ];
 
 export const meetingModeLabel = (m: MeetingMode | null) => MEETING_MODES.find((x) => x.value === m)?.label ?? '—';

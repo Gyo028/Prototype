@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property string $schedule_status pending | tentative | confirmed | completed | cancelled
  * @property \Carbon\CarbonInterface|null $completed_at when the work was finished (fabrication, installation)
  * @property string|null $meeting_mode online | face_to_face (appointments only)
+ * @property string|null $meeting_place where a face-to-face consultation happens, as the customer typed it
  * @property string|null $venue_ownership own_property | third_party (ocular visits only)
  * @property string|null $remarks
  * @property int|null $changed_by user who rescheduled or cancelled it
@@ -66,6 +67,7 @@ class ProjectSchedule extends Model
         'schedule_status',
         'completed_at',
         'meeting_mode',
+        'meeting_place',
         'venue_ownership',
         'remarks',
         'changed_by',

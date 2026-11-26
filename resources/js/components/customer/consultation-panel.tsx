@@ -12,7 +12,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 /*
  * Schedule a consultation appointment (Plan Project, step 1).
  *
- * The customer picks online or face to face, a date and a 1-hour slot.
+ * The customer picks a date, a 1-hour slot, and online or face to face.
+ * Face to face also needs the place (one line, any address; the customer's
+ * choice is final). A day with every slot taken shows as "Booked".
  * Monday to Saturday, 9:00 AM – 5:00 PM, at least 7 days ahead and before
  * the event date. A booking is confirmed right away.
  *
@@ -40,7 +42,7 @@ type Errors = AppointmentErrors;
 
 export default function ConsultationPanel({ projectId, consultation, availableSlots, rules, decision }: Props) {
     const base = `/customer/projects/${projectId}/consultation`;
-    const { current, history, canBook, bookingBlockedReason, canChange, changeBlockedReason } = consultation;
+    const { current, history, canBook, bookingBlockedReason, canChange, changeBlockedReason, officeAddress, placeMax } = consultation;
     // The consultation that took place, shown as the summary; the rest stay in History.
     const held = history.find((s) => s.status === 'completed') ?? null;
     const earlier = history.filter((s) => s !== held);
@@ -52,7 +54,11 @@ export default function ConsultationPanel({ projectId, consultation, availableSl
     const [reason, setReason] = useState('');
 
     const openDialog = (kind: 'reschedule' | 'cancel') => {
-        setSlot(kind === 'reschedule' ? { ...EMPTY_SLOT, meetingMode: current?.meetingMode ?? '' } : EMPTY_SLOT);
+        setSlot(
+            kind === 'reschedule'
+                ? { ...EMPTY_SLOT, meetingMode: current?.meetingMode ?? '', meetingPlace: current?.meetingPlace ?? '' }
+                : EMPTY_SLOT,
+        );
         setReason('');
         setErrors({});
         setDialog(kind);
@@ -62,6 +68,7 @@ export default function ConsultationPanel({ projectId, consultation, availableSl
     const checkSlot = (): Errors => {
         const e: Errors = {};
         if (!slot.meetingMode) e.meetingMode = 'Choose online or face to face.';
+        else if (slot.meetingMode === 'face_to_face' && !slot.meetingPlace.trim()) e.meetingPlace = 'Tell us where to meet.';
         if (!slot.date) e.date = 'Pick a date.';
         else if (!slot.time) e.time = 'Pick a time.';
         return e;
@@ -140,12 +147,22 @@ export default function ConsultationPanel({ projectId, consultation, availableSl
                         description="Meet with our Project Manager to discuss your requirements."
                         icon={<CalendarCheck className="size-5" />}
                     />
-                    <SlotPicker noun="consultation" withMeetingMode slot={slot} setSlot={setSlot} errors={errors} availableSlots={availableSlots} rules={rules} />
-                    <div className="mt-6 flex flex-col sm:flex-row sm:justify-end">
-                        <GoldButton onClick={book} disabled={saving}>
-                            {saving ? 'Booking…' : 'Book Consultation'}
-                        </GoldButton>
-                    </div>
+                    <SlotPicker
+                        noun="consultation"
+                        withMeetingMode
+                        officeAddress={officeAddress}
+                        placeMax={placeMax}
+                        slot={slot}
+                        setSlot={setSlot}
+                        errors={errors}
+                        availableSlots={availableSlots}
+                        rules={rules}
+                        footer={
+                            <GoldButton onClick={book} disabled={saving}>
+                                {saving ? 'Booking…' : 'Book Consultation'}
+                            </GoldButton>
+                        }
+                    />
                 </Block>
             ) : held ? (
                 <Block>
@@ -185,7 +202,17 @@ export default function ConsultationPanel({ projectId, consultation, availableSl
                         </DialogDescription>
                     </DialogHeader>
                     {errors.consultation && <Notice tone="error">{errors.consultation}</Notice>}
-                    <SlotPicker noun="consultation" withMeetingMode slot={slot} setSlot={setSlot} errors={errors} availableSlots={availableSlots} rules={rules} />
+                    <SlotPicker
+                        noun="consultation"
+                        withMeetingMode
+                        officeAddress={officeAddress}
+                        placeMax={placeMax}
+                        slot={slot}
+                        setSlot={setSlot}
+                        errors={errors}
+                        availableSlots={availableSlots}
+                        rules={rules}
+                    />
                     <ReasonField id="consultation-reason" value={reason} onChange={setReason} error={errors.reason} max={rules.reasonMax} />
                     <DialogFooter>
                         <OutlineButton onClick={() => setDialog(null)}>Back</OutlineButton>
