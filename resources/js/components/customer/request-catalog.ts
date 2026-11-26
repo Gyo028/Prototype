@@ -20,6 +20,9 @@ export type CatalogService = {
 
 export type CatalogEventType = { id: number; name: string };
 
+/** One place in a theme's default set: the asset there can be swapped for another of the same category. */
+export type ThemeSlot = { key: string; label: string; category: string; defaultAssetId: number | null };
+
 export type CatalogTheme = {
     id: number;
     name: string;
@@ -28,13 +31,20 @@ export type CatalogTheme = {
     style: string;
     minGuests: number | null;
     maxGuests: number;
+    /** The theme's default set. Empty for a theme that has none yet. */
+    slots: ThemeSlot[];
 };
 
+/** Only assets that are switched on and priced are sent. */
 export type CatalogAsset = {
     id: number;
     name: string;
     category: string;
     placementZone: 'floor' | 'wall' | 'ceiling' | null;
+    price: number;
+    pricingType: 'fixed' | 'per_guest';
+    /** per_guest only: 1 = one per guest, 10 = one per 10 guests. */
+    guestsPerUnit: number | null;
 };
 
 export type RequestLimits = {
@@ -42,6 +52,8 @@ export type RequestLimits = {
     /** A custom project must start at least this many months from today. */
     customLeadMonths: number;
     minEventHours: number;
+    /** The lowest exact budget per request type (₱10,000 standard, ₱50,000 custom). */
+    minExactBudget: Record<RequestType, number>;
     maxProjectDays: number;
     maxFiles: number;
     maxFileMb: number;
@@ -62,13 +74,20 @@ export type RequestCatalog = {
 
 export const peso = (n: number) => `₱${n.toLocaleString('en-PH')}`;
 
-/** "₱50,000 – ₱100,000" → { min: 50000, max: 100000 }. "Above ₱500,000" has no maximum. */
+/**
+ * "₱50,000 – ₱100,000" → { min: 50000, max: 100000 }. "Above ₱500,000" has no maximum.
+ * An exact budget ("₱180,000") is one amount: { min: 180000, max: 180000 }.
+ */
 export function parseBudgetRange(budget: string): { min: number; max: number | null } | null {
     if (!budget) return null;
-    const num = (text: string) => Number(text.replace(/[^\d]/g, ''));
+    const num = (text: string) => Number(text.replace(/[^\d.]/g, ''));
 
     if (budget.startsWith('Below')) return { min: 0, max: num(budget) };
     if (budget.startsWith('Above')) return { min: num(budget), max: null };
+    if (!budget.includes('–')) {
+        const exact = num(budget);
+        return Number.isFinite(exact) && exact > 0 ? { min: exact, max: exact } : null;
+    }
 
     const [lo, hi] = budget.split('–').map(num);
     return Number.isFinite(lo) && Number.isFinite(hi) ? { min: lo, max: hi } : null;

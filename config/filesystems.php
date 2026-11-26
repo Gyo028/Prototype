@@ -26,6 +26,17 @@ return [
     */
 
     /*
+    | Website Content photos the Technical Admin uploads (hero, About Us,
+    | service pages, Our Works). Public photos, so a public disk: "public"
+    | keeps them in storage/app/public (run `php artisan storage:link` once);
+    | "supabase_website" keeps them in the public Supabase bucket, shared by
+    | the whole team like the database.
+    | The photos shipped with the app stay in public/images.
+    */
+
+    'website_disk' => env('WEBSITE_CONTENT_DISK', 'public'),
+
+    /*
     |--------------------------------------------------------------------------
     | Filesystem Disks
     |--------------------------------------------------------------------------
@@ -71,6 +82,25 @@ return [
             'use_path_style_endpoint' => true,
             'visibility' => 'private',
             // Report a failed upload instead of carrying on as if the file was saved.
+            'throw' => true,
+            'report' => true,
+        ],
+
+        // Supabase Storage, public bucket for the website photos the Technical
+        // Admin uploads (hero, About Us, service pages, Our Works). Same project
+        // and S3 keys as the private bucket above. Anyone can open a file by its
+        // link; only the server (with the keys) can upload or delete.
+        // Use it with WEBSITE_CONTENT_DISK=supabase_website.
+        'supabase_website' => [
+            'driver' => 's3',
+            'key' => env('SUPABASE_S3_ACCESS_KEY_ID'),
+            'secret' => env('SUPABASE_S3_SECRET_ACCESS_KEY'),
+            'region' => env('SUPABASE_S3_REGION'),
+            'bucket' => env('SUPABASE_WEBSITE_BUCKET', 'website'),
+            'endpoint' => env('SUPABASE_S3_ENDPOINT'),
+            'use_path_style_endpoint' => true,
+            // Public links: https://<project-ref>.supabase.co/storage/v1/object/public/website
+            'url' => env('SUPABASE_WEBSITE_URL'),
             'throw' => true,
             'report' => true,
         ],

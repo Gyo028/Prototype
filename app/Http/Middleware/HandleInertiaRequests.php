@@ -2,6 +2,8 @@
 
 namespace App\Http\Middleware;
 
+use App\Enums\Role;
+use App\Models\Customer;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -41,6 +43,10 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
             ],
+            // Customers only: false until My Profile has a contact number (the dot on "My Profile").
+            'customerProfileComplete' => fn () => $request->user()?->role === Role::Customer
+                ? (bool) Customer::query()->where('user_id', $request->user()->id)->first()?->isComplete()
+                : null,
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];
     }

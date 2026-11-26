@@ -1,52 +1,57 @@
 import { router } from '@inertiajs/react';
-import { Check, Info, RotateCcw } from 'lucide-react';
+import { Check, Images, Info, RotateCcw } from 'lucide-react';
 import { useState } from 'react';
-import { Field, GoldButton, OutlineButton, Panel, PanelHeader, inputClass, textareaClass } from '@/components/dashboard/ui';
+import { Field, GoldButton, OutlineButton, Panel, PanelHeader, textareaClass } from '@/components/dashboard/ui';
+import { BASE_URL, PhotoSlot } from '@/components/technical-admin/website-photos';
+import type { SlotPhoto } from '@/components/technical-admin/website-photos';
 import { cn } from '@/lib/utils';
 
+/*
+ * About Us: two paragraphs and the three collage photos.
+ * The section title is fixed. The limits keep the text about as tall as the
+ * photo collage beside it. Line breaks are turned into spaces (the server does
+ * the same), since each paragraph is shown as one block.
+ */
 
+const LIMITS = { first: 180, second: 420 };
 
-const LIMITS = { title: 40, content: 1500 };
+type Paragraphs = { first: string; second: string };
 
-const ABOUT_URL = '/technical-admin/website-content/about';
+export type AboutUs = Paragraphs & {
+    photos: { about_1: SlotPhoto; about_2: SlotPhoto; about_3: SlotPhoto };
+};
 
-export type AboutUs = { title: string; content: string };
+const oneLine = (text: string) => text.replace(/\s*[\r\n]+\s*/g, ' ');
 
-const toParagraphs = (text: string) =>
-    text
-        .split(/\n\s*\n/)
-        .map((p) => p.trim())
-        .filter(Boolean);
-
-export default function AboutUsEditor({ about: initial }: { about: AboutUs }) {
-    const [saved, setSaved] = useState<AboutUs>(initial);
-    const [about, setAbout] = useState<AboutUs>(initial);
+export default function AboutUsEditor({ about }: { about: AboutUs }) {
+    const initial: Paragraphs = { first: about.first, second: about.second };
+    const [saved, setSaved] = useState<Paragraphs>(initial);
+    const [data, setData] = useState<Paragraphs>(initial);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [message, setMessage] = useState('');
     const [saving, setSaving] = useState(false);
 
-    const dirty = JSON.stringify(about) !== JSON.stringify(saved);
-    const paragraphs = toParagraphs(about.content);
+    const dirty = JSON.stringify(data) !== JSON.stringify(saved);
 
-    const change = (changes: Partial<AboutUs>) => {
-        setAbout({ ...about, ...changes });
+    const change = (changes: Partial<Paragraphs>) => {
+        setData({ ...data, ...changes });
         setMessage('');
     };
 
     const save = () => {
         const e: Record<string, string> = {};
-        if (!about.title.trim()) e.title = 'Section title is required.';
-        if (!about.content.trim()) e.content = 'Content is required.';
+        if (!data.first.trim()) e.first = 'The first paragraph is required.';
+        if (!data.second.trim()) e.second = 'The second paragraph is required.';
         setErrors(e);
         if (Object.keys(e).length) return;
 
-        router.put(ABOUT_URL, about, {
+        router.put(`${BASE_URL}/about`, data, {
             preserveScroll: true,
             preserveState: true,
             onStart: () => setSaving(true),
             onFinish: () => setSaving(false),
             onSuccess: () => {
-                setSaved(about);
+                setSaved(data);
                 setMessage('Changes saved');
             },
             onError: (serverErrors) => setErrors(serverErrors),
@@ -54,67 +59,62 @@ export default function AboutUsEditor({ about: initial }: { about: AboutUs }) {
     };
 
     const reset = () => {
-        setAbout(saved);
+        setData(saved);
         setErrors({});
         setMessage('');
     };
 
+    const paragraph = (key: keyof Paragraphs, label: string, rows: number) => (
+        <Field label={label} htmlFor={`about-${key}`} required error={errors[key]}>
+            <textarea
+                id={`about-${key}`}
+                className={cn(textareaClass, 'resize-none')}
+                rows={rows}
+                maxLength={LIMITS[key]}
+                value={data[key]}
+                onChange={(e) => {
+                    const value = oneLine(e.target.value);
+                    change(key === 'first' ? { first: value } : { second: value });
+                }}
+                onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
+            />
+            <span className="text-right text-[11px] text-ink-soft">
+                {data[key].length}/{LIMITS[key]}
+            </span>
+        </Field>
+    );
+
     return (
         <div className="space-y-5">
-            <div className="grid gap-5">
-                {/* Form */}
-                <Panel>
-                    <PanelHeader
-                        title="About Us Content"
-                        description="Introduce the company below the hero section"
-                        icon={<Info className="size-5" />}
-                    />
+            <Panel>
+                <PanelHeader title="About Us Text" description="Two paragraphs shown beside the photo collage" icon={<Info className="size-5" />} />
 
-                    <div className="space-y-4">
-                        <Field label="Section title" htmlFor="about-title" required error={errors.title}>
-                            <input
-                                id="about-title"
-                                className={inputClass}
-                                maxLength={LIMITS.title}
-                                value={about.title}
-                                onChange={(e) => change({ title: e.target.value })}
-                            />
-                            <span className="text-right text-[11px] text-ink-soft">
-                                {about.title.length}/{LIMITS.title}
-                            </span>
-                        </Field>
+                <div className="space-y-4">
+                    {paragraph('first', 'First paragraph', 3)}
+                    {paragraph('second', 'Second paragraph', 6)}
+                    <p className="text-xs text-ink-soft">The section title “About Us” is fixed. It matches the menu link.</p>
+                </div>
 
-                        <Field label="Content" htmlFor="about-content" required error={errors.content}>
-                            <textarea
-                                id="about-content"
-                                className={cn(textareaClass, 'field-sizing-content')}
-                                rows={10}
-                                style={{ minHeight: 'clamp(14rem, 45vh, 32rem)' }}
-                                maxLength={LIMITS.content}
-                                value={about.content}
-                                onChange={(e) => change({ content: e.target.value })}
-                            />
-                            <div className="flex items-center justify-between text-[11px] text-ink-soft">
-                                <span>Leave a blank line between paragraphs.</span>
-                                <span>
-                                    {about.content.length}/{LIMITS.content}
-                                </span>
-                            </div>
-                        </Field>
-                    </div>
-                </Panel>
-            </div>
+                <div className="mt-5 flex flex-wrap items-center justify-end gap-3">
+                    {message && <span className="text-xs font-semibold text-green-700">{message}</span>}
+                    {dirty && !message && <span className="text-xs text-ink-soft">You have unsaved changes</span>}
+                    <OutlineButton onClick={reset} disabled={!dirty}>
+                        <RotateCcw className="size-4" /> Reset
+                    </OutlineButton>
+                    <GoldButton onClick={save} disabled={!dirty || saving}>
+                        <Check className="size-4" /> Save Changes
+                    </GoldButton>
+                </div>
+            </Panel>
 
-            <div className="flex flex-wrap items-center justify-end gap-3">
-                {message && <span className="text-xs font-semibold text-green-700">{message}</span>}
-                {dirty && !message && <span className="text-xs text-ink-soft">You have unsaved changes</span>}
-                <OutlineButton onClick={reset} disabled={!dirty}>
-                    <RotateCcw className="size-4" /> Reset
-                </OutlineButton>
-                <GoldButton onClick={save} disabled={!dirty || saving}>
-                    <Check className="size-4" /> Save Changes
-                </GoldButton>
-            </div>
+            <Panel>
+                <PanelHeader title="Photo Collage" description="Each photo saves as soon as you choose it" icon={<Images className="size-5" />} />
+                <div className="grid gap-5 sm:grid-cols-3">
+                    <PhotoSlot block="about" slot="about_1" photo={about.photos.about_1} label="Main photo" kind="photo" aspect="aspect-[3/4]" />
+                    <PhotoSlot block="about" slot="about_2" photo={about.photos.about_2} label="Top right" kind="photo" aspect="aspect-[4/5]" />
+                    <PhotoSlot block="about" slot="about_3" photo={about.photos.about_3} label="Bottom right" kind="photo" aspect="aspect-[4/5]" />
+                </div>
+            </Panel>
         </div>
     );
 }

@@ -46,7 +46,7 @@ test('the screen lists the services with the Event Styling fee first', function 
             ->has('services', 7)
             ->where('services.0.name', 'Event Styling')
             ->where('services.0.isBaseFee', true)
-            ->where('services.0.price', fn ($price) => (float) $price === 45000.0)
+            ->where('services.0.price', fn ($price) => (float) $price === 10000.0)
             ->where('services.1.isBaseFee', false)
             ->where('categories', Service::CATEGORIES)
             ->where('unitTypes', Service::UNIT_TYPES)
@@ -176,7 +176,7 @@ test('the Event Styling fee still needs a valid price and description', function
         ->patch(route('technical-admin.services-assets.services.update', baseFee()), ['description' => '', 'price' => '0'])
         ->assertSessionHasErrors(['description', 'price']);
 
-    expect(baseFee()->price)->toBe('45000.00');
+    expect(baseFee()->price)->toBe('10000.00');
 });
 
 test('the Event Styling fee cannot be switched off', function () {

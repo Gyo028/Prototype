@@ -82,9 +82,11 @@ const PREVIEW_END_BG = 'rgba(201, 160, 19, 0.45)';
 // Booked days: a muted rose.
 const BOOKED_BG = '#F6DADA';
 const BOOKED_TEXT = '#9B3B3B';
-// Every other day that can't be picked (past, too soon, outside the run, another month): grey.
+// Every other day that can't be picked (past, too soon, outside the run): grey.
 const GREY_BG = '#EEEEEE';
 const GREY_TEXT = '#A3A3A3';
+// Days of the month before or after that can be picked: white with soft gold numbers.
+const OTHER_MONTH_TEXT = '#B59A55';
 
 const COLS = 7;
 const TOTAL_ROWS = 7;
@@ -157,6 +159,9 @@ export default function DatePicker({
     const pick = (d: Date) => {
         if (isDisabled(d)) return;
         const iso = toISO(d);
+
+        // A day of the month before or after: open that month with the day picked.
+        if (!sameMonth(d, viewMonth)) setViewMonth(new Date(d.getFullYear(), d.getMonth(), 1));
 
         if (!isRange) {
             onChange(iso);
@@ -257,22 +262,22 @@ export default function DatePicker({
                         const otherReason = !past && !booked && !tooSoon ? unavailableDates?.[iso] : undefined;
                         const unavailable = past || booked || tooSoon || outOfRun || !!otherReason;
 
-                        // Why the day can't be picked, shown in the tooltip. Days of another month only say where to go.
+                        // Why the day can't be picked, shown in the tooltip, in this order: passed, booked,
+                        // too soon, another reason, outside the allowed run. A day of another month that can
+                        // be picked has no tooltip: picking it opens its month.
                         const runText = maxDays ? `A project runs ${minDays} to ${maxDays} days.` : `A project runs at least ${minDays} days.`;
                         const reason = past
                             ? 'This date has passed.'
-                            : outside
-                              ? `Switch to ${MONTH_LABELS[d.getMonth()]} to pick this date.`
-                              : booked
-                                ? 'This date is already booked.'
-                                : tooSoon
-                                  ? (tooSoonText ?? `Requests need at least ${leadText}' notice.`)
-                                  : otherReason
-                                    ? otherReason
-                                    : outOfRun
+                            : booked
+                              ? 'This date is already booked.'
+                              : tooSoon
+                                ? (tooSoonText ?? `Requests need at least ${leadText}' notice.`)
+                                : otherReason
+                                  ? otherReason
+                                  : outOfRun
                                     ? runText
                                     : '';
-                        const blocked = unavailable || outside;
+                        const blocked = unavailable;
 
                         const rangeEnd = isRange ? endValue || previewEnd : '';
                         const isStart = isRange ? value === iso : false;
@@ -289,12 +294,12 @@ export default function DatePicker({
                               ? PREVIEW_END_BG
                               : inRun
                                 ? RUN_BG
-                                : booked && !outside
+                                : booked
                                   ? BOOKED_BG
-                                  : outside || unavailable
+                                  : unavailable
                                     ? GREY_BG
                                     : undefined;
-                        const textColor = highlighted ? undefined : booked && !outside ? BOOKED_TEXT : outside || unavailable ? GREY_TEXT : undefined;
+                        const textColor = highlighted ? undefined : booked ? BOOKED_TEXT : unavailable ? GREY_TEXT : outside ? OTHER_MONTH_TEXT : undefined;
 
                         return (
                             <GridCell
@@ -315,9 +320,9 @@ export default function DatePicker({
                                 style={background || textColor ? { backgroundColor: background, color: textColor } : undefined}
                                 className={cx(
                                     'font-medium transition',
-                                    outside && 'cursor-default',
-                                    !outside && unavailable && 'cursor-not-allowed',
-                                    !outside && !unavailable && !selected && 'text-ink hover:bg-gold/15',
+                                    unavailable && 'cursor-not-allowed',
+                                    !unavailable && !selected && 'cursor-pointer hover:bg-gold/15',
+                                    !outside && !unavailable && !selected && 'text-ink',
                                     (inRun || (isEnd && !selected)) && 'font-bold text-ink',
                                     selected && 'bg-gold font-bold text-white hover:bg-gold-dark',
                                     !outside && isToday && !selected && !unavailable && !inRun && !isEnd && 'bg-gold/10 font-bold text-gold-dark',
@@ -355,6 +360,9 @@ export default function DatePicker({
                 </span>
                 <span className="flex items-center gap-1.5">
                     <span className="inline-block size-2.5 rounded-full" style={{ backgroundColor: GREY_BG, border: `1px solid ${GREY_TEXT}` }} /> Not available
+                </span>
+                <span className="flex items-center gap-1.5">
+                    <span className="inline-block size-2.5 rounded-full bg-white" style={{ border: `1px solid ${OTHER_MONTH_TEXT}` }} /> Other month (tap to pick)
                 </span>
                 {disabledSet.size > 0 && (
                     <span className="flex items-center gap-1.5">

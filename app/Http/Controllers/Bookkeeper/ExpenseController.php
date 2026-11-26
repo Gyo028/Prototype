@@ -25,7 +25,7 @@ class ExpenseController extends Controller
 
     public function index(): Response
     {
-        $expenses = ProjectExpense::with(['project.serviceRequest.eventType', 'recorder'])
+        $expenses = ProjectExpense::with(['project.serviceRequest.eventType', 'project.serviceRequest.customer', 'recorder'])
             ->orderByDesc('expense_date')
             ->orderByDesc('expense_id')
             ->get()
@@ -46,7 +46,7 @@ class ExpenseController extends Controller
             ]);
 
         // Every project can have expenses, whatever step it is at.
-        $projects = Project::with(['serviceRequest.eventType', 'status'])
+        $projects = Project::with(['serviceRequest.eventType', 'serviceRequest.customer', 'status'])
             ->withSum('billings', 'amount')
             ->orderByDesc('project_id')
             ->get()
@@ -107,7 +107,7 @@ class ExpenseController extends Controller
         return back();
     }
 
-    /** "PRJ-26-0001 · Wedding" */
+    /** "PRJ-26-0001 · Andrea's Wedding" */
     public static function projectLabel(?Project $project): string
     {
         if (! $project) {

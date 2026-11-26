@@ -64,7 +64,7 @@ class ProjectController extends Controller
         }
 
         $requests = $customer === null ? collect() : $customer->serviceRequests()
-            ->with(['eventType', 'project.status', 'project.schedules.outcome', 'project.serviceRequest', 'project.reservationFee.payments', 'project.siteAccessDocuments', 'project.designProposals', 'project.contracts', 'project.downPayment.payments'])
+            ->with(['eventType', 'customer', 'project.status', 'project.schedules.outcome', 'project.serviceRequest', 'project.reservationFee.payments', 'project.siteAccessDocuments', 'project.designProposals', 'project.contracts', 'project.downPayment.payments'])
             ->latest('service_request_id')
             ->get();
 
@@ -98,7 +98,7 @@ class ProjectController extends Controller
         // A project in Contract always has a contract to sign (e.g. sample data).
         $this->contracts->ensureIssued($project);
 
-        $project->refresh()->load(['serviceRequest.eventType', 'status', 'schedules', 'reservationFee.payments']);
+        $project->refresh()->load(['serviceRequest.eventType', 'serviceRequest.customer', 'status', 'schedules', 'reservationFee.payments']);
         $r = $project->serviceRequest;
 
         $current = $this->scheduler->current($project);
@@ -144,6 +144,7 @@ class ProjectController extends Controller
             'reservationFee' => $this->progress->feeOutstanding($project) ? [
                 'bill' => $project->reservationFee ? $this->billings->card($project->reservationFee) : null,
                 'expectedAmount' => $project->serviceRequest->reservationFee(),
+                'basis' => $project->serviceRequest->reservationFeeBasis(),
             ] : null,
             'ocularVisit' => $this->ocularVisitData($project, $request),
             'design' => $this->designData($project),
@@ -485,9 +486,32 @@ class ProjectController extends Controller
     }
 
     /** Custom: the project title. Standard: the event type, e.g. "Wedding". */
+    /** Event type names as they read in a title: "Corporate" → "Corporate Event". */
+    private const TITLE_EVENT_NAMES = ['Corporate' => 'Corporate Event'];
+
+    /**
+     * A project's title everywhere it is shown. Custom projects keep the title
+     * the customer typed; standard requests are named after the customer:
+     * "Andrea's Wedding", "Andrea's Corporate Event".
+     */
     public static function titleOf(ServiceRequest $r): string
     {
-        return $r->isCustom() ? (string) $r->project_title : ($r->eventType?->event_type_name ?? 'Event');
+        if ($r->isCustom()) {
+            return (string) $r->project_title;
+        }
+
+        $type = $r->eventType?->event_type_name ?? 'Event';
+        $event = self::TITLE_EVENT_NAMES[$type] ?? $type;
+        $name = trim((string) $r->customer?->first_name);
+
+        if ($name === '') {
+            return $event;
+        }
+
+        // "Andrea's", but "Charles'" for a name ending in s.
+        $owner = str_ends_with(mb_strtolower($name), 's') ? "{$name}'" : "{$name}'s";
+
+        return "{$owner} {$event}";
     }
 
     /** @return array{name: string, phase: string, onHold: bool, terminal: bool} */

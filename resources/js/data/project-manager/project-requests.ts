@@ -16,7 +16,7 @@ export type RequestStatus = 'Pending' | 'Approved' | 'Rejected';
 export const CONSULTATION_OUTCOMES = ['Completed', 'Rescheduled', 'Customer did not attend'] as const;
 export type ConsultationOutcome = (typeof CONSULTATION_OUTCOMES)[number];
 
-export const PROJECT_DECISIONS = ['Proceed', 'Do not proceed'] as const;
+export const PROJECT_DECISIONS = ['Proceed', 'On hold', 'Do not proceed'] as const; // 'On hold': the customer is still deciding
 export type ProjectDecision = (typeof PROJECT_DECISIONS)[number];
 
 // Same budget ranges the customer chooses from on the request form.
@@ -47,6 +47,8 @@ export type RequestedService = {
     category: string;
     price: number;
     unit: string; // '' for a flat price, 'pax' for per-guest pricing
+    quantity?: number; // sent by the backend
+    subtotal?: number; // sent by the backend
 };
 
 export type ReferenceFile = {
@@ -59,6 +61,8 @@ export type ReferenceFile = {
 export type ProjectRequest = {
     id: number;
     code: string; // shown to people, e.g. "REQ-0012"
+    title?: string; // Project Title: the event type (standard) or the customer's own title (custom). Sent by the backend.
+    requestType?: 'standard' | 'custom'; // sent by the backend
     customer: {
         name: string;
         email: string;
@@ -66,10 +70,11 @@ export type ProjectRequest = {
     };
     eventType: string; // Corporate, Wedding, Birthday, Debut, Mall Activation
     eventDate: string; // 'YYYY-MM-DD'
+    endDate?: string; // custom projects: the last day of the date range. Sent by the backend.
     startTime: string; // 'HH:mm' (24-hour)
     endTime: string; // 'HH:mm' (24-hour)
     venue: string;
-    venueSetting: 'Indoor' | 'Outdoor';
+    venueSetting: 'Indoor' | 'Outdoor' | null; // null: not stored in the database yet
     guests: number | null; // null for Mall Activation (no guest count)
     budget: string; // the budget range the customer picked
     description: string;
@@ -295,3 +300,6 @@ export const getSampleRequest = (id: number) => requestStore.find((r) => r.id ==
 export function saveSampleRequest(request: ProjectRequest) {
     requestStore = requestStore.map((r) => (r.id === request.id ? request : r));
 }
+
+/** The Project Title shown on the lists: the custom title, or the event type. */
+export const requestTitle = (r: Pick<ProjectRequest, 'title' | 'eventType'>) => r.title ?? r.eventType;

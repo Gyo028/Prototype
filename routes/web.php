@@ -8,6 +8,8 @@ use App\Http\Controllers\TechnicalAdmin\UserAccountController;
 use App\Http\Controllers\TechnicalAdmin\EmployeeController;
 use App\Http\Controllers\TechnicalAdmin\FaqController;
 use App\Http\Controllers\TechnicalAdmin\WebsiteContentController;
+use App\Http\Controllers\TechnicalAdmin\WebsitePhotoSlotController;
+use App\Http\Controllers\TechnicalAdmin\WorkPhotoController;
 use App\Http\Controllers\TechnicalAdmin\ServiceController;
 use App\Http\Controllers\TechnicalAdmin\ServicesAssetsController;
 use App\Http\Controllers\TechnicalAdmin\DesignThemeController;
@@ -22,29 +24,36 @@ use App\Http\Controllers\Customer\DashboardController as CustomerDashboardContro
 use App\Http\Controllers\Customer\DesignProposalController;
 use App\Http\Controllers\Customer\OcularVisitController;
 use App\Http\Controllers\Customer\PaymentController as CustomerPaymentController;
+use App\Http\Controllers\Customer\ProfileController as CustomerProfileController;
 use App\Http\Controllers\Customer\RequestController as CustomerRequestController;
 use App\Http\Controllers\DesignSpecialist;
 use App\Http\Controllers\Bookkeeper\ExpenseController;
 use App\Http\Controllers\Bookkeeper\FinancialReportController;
 use App\Http\Controllers\ProjectExpenseRecordController;
+use App\Http\Controllers\ProjectManager\ServiceRequestController as PmServiceRequestController;
+use App\Http\Controllers\ProjectManager\ProjectController as PmProjectController;
+use App\Http\Controllers\ProjectManager\ConsultationController as PmConsultationController;
+use App\Http\Controllers\ProjectManager\PaymentController as PmPaymentController;
+use App\Http\Controllers\PublicSiteController;
 
 
 
-Route::inertia('/', 'public/landing')->name('home');
+Route::get('/', [PublicSiteController::class, 'landing'])->name('home');
 
 // Email verification without logging in (the login page's "Verify your email" modal).
 Route::post('/email/verification/resend', [EmailVerificationController::class, 'resend'])
     ->middleware(['guest', 'throttle:6,1'])->name('verification.resend');
-// The link in the verification email: signed, expires after 60 minutes.
+// The link in the verification email: signed, expires after 60 minutes. The controller
+// checks the signature itself, so an expired link lands on the login page, not a 403.
 Route::get('/email/verify-link/{id}/{hash}', [EmailVerificationController::class, 'verify'])
-    ->middleware(['signed', 'throttle:6,1'])->whereNumber('id')->name('verification.verify.guest');
-Route::inertia('/faq', 'public/faq')->name('faq');
-Route::inertia('/our-works', 'public/our-works')->name('our-works');
-Route::inertia('/services/corporate-events', 'public/corporate-events')->name('services.corporate-events');
-Route::inertia('/services/special-occasions', 'public/special-occasions')->name('services.special-occasions');
-Route::inertia('/services/custom-fabrication', 'public/custom-fabrication')->name('services.custom-fabrication');
-Route::inertia('/terms', 'public/terms')->name('terms');
-Route::inertia('/privacy', 'public/privacy')->name('privacy');
+    ->middleware(['throttle:6,1'])->whereNumber('id')->name('verification.verify.guest');
+Route::get('/faq', [PublicSiteController::class, 'faq'])->name('faq');
+Route::get('/our-works', [PublicSiteController::class, 'ourWorks'])->name('our-works');
+Route::get('/services/corporate-events', [PublicSiteController::class, 'corporateEvents'])->name('services.corporate-events');
+Route::get('/services/special-occasions', [PublicSiteController::class, 'specialOccasions'])->name('services.special-occasions');
+Route::get('/services/custom-fabrication', [PublicSiteController::class, 'customProjects'])->name('services.custom-fabrication');
+Route::get('/terms', [PublicSiteController::class, 'terms'])->name('terms');
+Route::get('/privacy', [PublicSiteController::class, 'privacy'])->name('privacy');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', function (Request $request) {
@@ -70,6 +79,14 @@ Route::middleware(['auth', 'verified', 'role:technical_admin'])
         Route::put('website-content/about', [WebsiteContentController::class, 'updateAbout'])->name('website-content.about');
         Route::put('website-content/services', [WebsiteContentController::class, 'updateServices'])->name('website-content.services');
         Route::put('website-content/contact', [WebsiteContentController::class, 'updateContact'])->name('website-content.contact');
+        // Photos are sent with POST (multipart); PUT/PATCH cannot carry files.
+        Route::post('website-content/photos/{block}/{slot}', [WebsitePhotoSlotController::class, 'update'])->name('website-content.photos.update');
+        Route::post('website-content/works', [WorkPhotoController::class, 'store'])->name('website-content.works.store');
+        Route::put('website-content/works/carousel', [WorkPhotoController::class, 'carousel'])->name('website-content.works.carousel');
+        Route::post('website-content/works/{photo}', [WorkPhotoController::class, 'update'])->name('website-content.works.update');
+        Route::patch('website-content/works/{photo}/status', [WorkPhotoController::class, 'status'])->name('website-content.works.status');
+        Route::delete('website-content/works/{photo}', [WorkPhotoController::class, 'destroy'])->name('website-content.works.destroy');
+        Route::put('website-content/showcases/{page}', [WorkPhotoController::class, 'showcase'])->name('website-content.showcases.update');
         Route::post('website-content/faqs', [FaqController::class, 'store'])->name('website-content.faqs.store');
         Route::patch('website-content/faqs/{faq}', [FaqController::class, 'update'])->name('website-content.faqs.update');
         Route::delete('website-content/faqs/{faq}', [FaqController::class, 'destroy'])->name('website-content.faqs.destroy');
@@ -99,6 +116,8 @@ Route::middleware(['auth', 'verified', 'role:customer'])
         Route::get('new-request', [ServiceRequestController::class, 'create'])->name('new-request');
         Route::post('new-request', [ServiceRequestController::class, 'store'])->name('new-request.store');
         Route::get('projects', [CustomerProjectController::class, 'index'])->name('projects');
+        // The layout canvas on its own, full screen, in a new tab (filled from the page that opened it).
+        Route::inertia('layout-view', 'customer/layout-view')->name('layout-view');
         Route::get('requests/{serviceRequest}', [CustomerRequestController::class, 'show'])->name('requests.show');
         Route::get('requests/{serviceRequest}/files/{file}', [CustomerRequestController::class, 'file'])->name('requests.files.show');
         Route::get('projects/{project}', [CustomerProjectController::class, 'show'])->name('projects.show');
@@ -125,6 +144,8 @@ Route::middleware(['auth', 'verified', 'role:customer'])
         Route::post('billing/{billing}/dispute', [CustomerBillingController::class, 'dispute'])->name('billing.dispute');
         Route::get('billing/{billing}/dispute-proof', [CustomerBillingController::class, 'disputeProof'])->name('billing.dispute-proof');
         Route::get('payments/{payment}/receipt', [CustomerPaymentController::class, 'receipt'])->name('payments.receipt');
+        Route::get('profile', [CustomerProfileController::class, 'edit'])->name('profile');
+        Route::patch('profile', [CustomerProfileController::class, 'update'])->name('profile.update');
     });
 
 Route::middleware(['auth', 'verified', 'role:project_manager'])
@@ -132,11 +153,21 @@ Route::middleware(['auth', 'verified', 'role:project_manager'])
     ->name('project-manager.')
     ->group(function () {
         Route::inertia('/', 'project-manager/dashboard')->name('dashboard');
-        Route::inertia('service-requests', 'project-manager/service-requests')->name('service-requests');
-        Route::inertia('service-requests/{serviceRequest}', 'project-manager/service-request-show')->name('service-requests.show');
-        Route::inertia('projects', 'project-manager/projects')->name('projects');
+                // Backlog #13: Service Requests
+        Route::get('service-requests', [PmServiceRequestController::class, 'index'])->name('service-requests');
+        Route::get('service-requests/{serviceRequest}', [PmServiceRequestController::class, 'show'])->name('service-requests.show');
+        Route::patch('service-requests/{serviceRequest}/approve', [PmServiceRequestController::class, 'approve'])->name('service-requests.approve');
+        Route::patch('service-requests/{serviceRequest}/reject', [PmServiceRequestController::class, 'reject'])->name('service-requests.reject');
+        Route::get('service-requests/{serviceRequest}/files/{file}', [PmServiceRequestController::class, 'file'])->name('service-requests.file');
+                // Projects (connected step by step) and backlog #16: Consultation
+        Route::get('projects', [PmProjectController::class, 'index'])->name('projects');
+        Route::get('projects/{project}', [PmProjectController::class, 'show'])->name('projects.show');
+        Route::patch('projects/{project}/consultation', [PmConsultationController::class, 'update'])->name('projects.consultation');
+                // Backlog #27: Verify online payments
+        Route::patch('projects/{project}/payments/{payment}/verify', [PmPaymentController::class, 'verify'])->name('projects.payments.verify');
+        Route::patch('projects/{project}/payments/{payment}/reject', [PmPaymentController::class, 'reject'])->name('projects.payments.reject');
+        Route::get('payments/{payment}/receipt', [PmPaymentController::class, 'receipt'])->name('payments.receipt');
         Route::inertia('billing-payments', 'project-manager/billing-payments')->name('billing-payments');
-        Route::inertia('projects/{project}', 'project-manager/project-show')->name('projects.show');
     });
 
 Route::middleware(['auth', 'verified', 'role:design_specialist'])

@@ -7,8 +7,16 @@ import LandingNav from '@/components/public/landing/landing-nav';
 import ServicesSection from '@/components/public/landing/services-section';
 import TestimonialsSection from '@/components/public/landing/testimonials-section';
 import WorksSection from '@/components/public/landing/works-section';
+import type { CarouselPhoto, ServiceCard, SitePhoto } from '@/lib/public-site';
 
-export default function Landing() {
+type LandingProps = {
+    hero: SitePhoto;
+    about: { paragraphs: string[]; photos: SitePhoto[] };
+    services: ServiceCard[];
+    carousel: CarouselPhoto[];
+};
+
+export default function Landing({ hero, about, services, carousel }: LandingProps) {
     return (
         <div className="min-h-screen bg-white font-sans text-black [&_h1]:font-heading [&_h2]:font-heading [&_h3]:font-heading">
             <Head title="Gr3at A's Events Styling & Services">
@@ -23,10 +31,10 @@ export default function Landing() {
             <LandingNav />
 
             <main>
-                <HeroSection />
-                <AboutSection />
-                <ServicesSection />
-                <WorksSection />
+                <HeroSection photo={hero} />
+                <AboutSection paragraphs={about.paragraphs} photos={about.photos} />
+                <ServicesSection services={services} />
+                <WorksSection works={carousel} />
                 <TestimonialsSection />
             </main>
 

@@ -172,6 +172,26 @@
     html {
         scroll-behavior: smooth;
     }
+
+    /*
+     * Tailwind v4 gives buttons the normal arrow cursor. Everything that can be
+     * clicked shows the hand; a utility class (e.g. cursor-not-allowed on a
+     * day that can't be picked) still wins, since utilities come after base.
+     */
+    button:not(:disabled),
+    [role='button']:not([aria-disabled='true']),
+    [role='menuitemradio'],
+    [role='menuitem'],
+    label:has(> input[type='radio']:not(:disabled)),
+    label:has(> input[type='checkbox']:not(:disabled)),
+    select:not(:disabled),
+    summary {
+        cursor: pointer;
+    }
+
+    button:disabled {
+        cursor: not-allowed;
+    }
 }
 @keyframes float-y {
     0%,

@@ -1,5 +1,6 @@
 import {
     ArrowLeft,
+    Building2,
     Eye,
     HelpCircle,
     Images,
@@ -17,17 +18,22 @@ import ContactFooterEditor from '@/components/technical-admin/contact-footer-edi
 import type { Contact } from '@/components/technical-admin/contact-footer-editor';
 import FaqEditor from '@/components/technical-admin/faq-editor';
 import HeroEditor from '@/components/technical-admin/hero-editor';
+import type { Hero } from '@/components/technical-admin/hero-editor';
 import OurServicesEditor from '@/components/technical-admin/our-services-editor';
 import type { OurServices } from '@/components/technical-admin/our-services-editor';
 import OurWorksEditor from '@/components/technical-admin/our-works-editor';
+import ServicePagesEditor from '@/components/technical-admin/service-pages-editor';
+import type { ServicePage } from '@/components/technical-admin/service-pages-editor';
+import type { WorkPhoto } from '@/components/technical-admin/website-photos';
 import type { Faq } from '@/data/faqs';
 
 /*
- * Sections of the public site, in the order they appear on the page.
+ * Sections of the public site, in the order they appear.
  *
- * Saving a section applies right away; there is no separate publish step.
- * About Us, Our Services, Contact & Footer and FAQ are saved to the database.
- * The Hero and Our Works (photo uploads) are still placeholders for now.
+ * Saving applies right away; there is no separate publish step. Photos are
+ * converted to WebP when uploaded. Text that could break the page layout
+ * (hero headline, section titles, service card titles, Testimonials, Terms
+ * and Privacy) is fixed in the pages and not listed here.
  */
 
 type Section = {
@@ -38,23 +44,27 @@ type Section = {
 };
 
 const sections: Section[] = [
-    { id: 'hero', title: 'Hero Section', description: 'Main headline, subheadline, background and Start Project button.', icon: LayoutTemplate },
-    { id: 'about', title: 'About Us', description: 'Company introduction shown below the hero.', icon: Info },
-    { id: 'services', title: 'Our Services', description: 'Section heading and the three service cards. Selectable services are managed under Services & Assets.', icon: Layers },
-    { id: 'works', title: 'Our Works', description: 'Showcase carousel of up to 10 photos of past projects.', icon: Images },
+    { id: 'hero', title: 'Hero Section', description: 'Background photo of the top banner. The headline is fixed.', icon: LayoutTemplate },
+    { id: 'about', title: 'About Us', description: 'Two paragraphs and the three collage photos.', icon: Info },
+    { id: 'services', title: 'Our Services', description: 'Descriptions of the three service cards. Selectable services are managed under Services & Assets.', icon: Layers },
+    { id: 'pages', title: 'Service Pages', description: 'Banner, intro photos and showcase of the Corporate Events, Special Occasions and Custom Projects pages.', icon: Building2 },
+    { id: 'works', title: 'Our Works', description: 'The shared photo library, the homepage carousel and the Our Works page.', icon: Images },
     { id: 'contact', title: 'Contact & Footer', description: 'Phone, email, address and social media links.', icon: MapPin },
     { id: 'faq', title: 'FAQ Page', description: 'Questions and answers on the public FAQ page.', icon: HelpCircle },
 ];
 
-type Props = {
+export type WebsiteContentProps = {
+    hero: Hero;
     about: AboutUs;
     services: OurServices;
+    servicePages: ServicePage[];
+    works: WorkPhoto[];
     contact: Contact;
     faqs: Faq[];
     updated: Record<string, string | null>;
 };
 
-export default function WebsiteContentManagement({ about, services, contact, faqs, updated }: Props) {
+export default function WebsiteContentManagement({ hero, about, services, servicePages, works, contact, faqs, updated }: WebsiteContentProps) {
     const [activeId, setActiveId] = useState<string | null>(null);
 
     const active = sections.find((s) => s.id === activeId) ?? null;
@@ -72,15 +82,17 @@ export default function WebsiteContentManagement({ about, services, contact, faq
                 </button>
                 <PageHeader title={active.title} description={active.description} />
                 {active.id === 'hero' ? (
-                    <HeroEditor />
+                    <HeroEditor hero={hero} />
                 ) : active.id === 'about' ? (
                     <AboutUsEditor about={about} />
                 ) : active.id === 'services' ? (
                     <OurServicesEditor services={services} />
+                ) : active.id === 'pages' ? (
+                    <ServicePagesEditor pages={servicePages} works={works} />
+                ) : active.id === 'works' ? (
+                    <OurWorksEditor works={works} />
                 ) : active.id === 'contact' ? (
                     <ContactFooterEditor contact={contact} />
-                ) : active.id === 'works' ? (
-                    <OurWorksEditor />
                 ) : active.id === 'faq' ? (
                     <FaqEditor faqs={faqs} />
                 ) : (

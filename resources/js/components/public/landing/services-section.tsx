@@ -1,24 +1,9 @@
 import MoreInfoLink from '@/components/public/landing/more-info-link';
 
-const services = [
-    {
-        title: 'Corporate Events',
-        description: 'Professional styling and management for brand activations, mall events, and corporate functions.',
-        href: '/services/corporate-events',
-    },
-    {
-        title: 'Special Occasions',
-        description: 'Creative setups for weddings, birthdays, debuts, and milestone celebrations.',
-        href: '/services/special-occasions',
-    },
-    {
-        title: 'Custom Projects',
-        description: 'Design and production of customized backdrops, props, and themed event structures.',
-        href: '/services/custom-fabrication',
-    },
-];
+import type { ServiceCard } from '@/lib/public-site';
 
-export default function ServicesSection() {
+/** Card descriptions come from Website Content; the titles and links are fixed. */
+export default function ServicesSection({ services }: { services: ServiceCard[] }) {
     return (
         <section id="services" className="scroll-mt-16 bg-white py-16 lg:py-24">
             <div className="mx-auto grid max-w-[1400px] items-center gap-12 px-6 lg:grid-cols-[1fr_2.4fr] lg:px-12">

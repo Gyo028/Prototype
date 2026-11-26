@@ -1,150 +1,105 @@
 import { router } from '@inertiajs/react';
-import { Check, Layers, RotateCcw } from 'lucide-react';
+import { Check, Info, RotateCcw } from 'lucide-react';
 import { useState } from 'react';
-import { Field, GoldButton, OutlineButton, Panel, PanelHeader, inputClass, textareaClass } from '@/components/dashboard/ui';
+import { Field, GoldButton, OutlineButton, Panel, textareaClass } from '@/components/dashboard/ui';
+import { BASE_URL } from '@/components/technical-admin/website-photos';
 import { cn } from '@/lib/utils';
 
+/*
+ * Our Services: the descriptions of the three service cards.
+ * The section title and the card titles are fixed: they match the menu and
+ * the three service pages the cards link to. A minimum and a maximum keep the
+ * three cards about the same height.
+ */
 
-const LIMITS = { title: 40, intro: 200, cardTitle: 40, cardText: 150 };
+const LIMITS = { min: 50, max: 110 };
 
 type Card = { title: string; description: string };
-export type OurServices = { title: string; intro: string; cards: Card[] };
+export type OurServices = { cards: Card[] };
 
-const SERVICES_URL = '/technical-admin/website-content/services';
-
-function Counter({ value, max }: { value: string; max: number }) {
-    return (
-        <span className="text-right text-[11px] text-ink-soft">
-            {value.length}/{max}
-        </span>
-    );
-}
+const oneLine = (text: string) => text.replace(/\s*[\r\n]+\s*/g, ' ');
 
 export default function OurServicesEditor({ services }: { services: OurServices }) {
-    const [saved, setSaved] = useState<OurServices>(services);
-    const [data, setData] = useState<OurServices>(services);
+    const [saved, setSaved] = useState<Card[]>(services.cards);
+    const [cards, setCards] = useState<Card[]>(services.cards);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [message, setMessage] = useState('');
     const [saving, setSaving] = useState(false);
 
-    const dirty = JSON.stringify(data) !== JSON.stringify(saved);
+    const dirty = JSON.stringify(cards) !== JSON.stringify(saved);
 
-    const change = (next: OurServices) => {
-        setData(next);
+    const setDescription = (index: number, description: string) => {
+        setCards(cards.map((c, i) => (i === index ? { ...c, description } : c)));
         setMessage('');
     };
 
-    const setCard = (index: number, changes: Partial<Card>) =>
-        change({ ...data, cards: data.cards.map((c, i) => (i === index ? { ...c, ...changes } : c)) });
-
     const save = () => {
         const e: Record<string, string> = {};
-        if (!data.title.trim()) e.title = 'Section title is required.';
-        data.cards.forEach((c, i) => {
-            if (!c.title.trim()) e[`title-${i}`] = 'Card title is required.';
-            if (!c.description.trim()) e[`description-${i}`] = 'Card description is required.';
+        cards.forEach((c, i) => {
+            const length = c.description.trim().length;
+            if (!length) e[`cards.${i}.description`] = 'Card description is required.';
+            else if (length < LIMITS.min) e[`cards.${i}.description`] = `Write at least ${LIMITS.min} characters so the three cards stay balanced.`;
         });
         setErrors(e);
         if (Object.keys(e).length) return;
 
-        router.put(SERVICES_URL, data, {
-            preserveScroll: true,
-            preserveState: true,
-            onStart: () => setSaving(true),
-            onFinish: () => setSaving(false),
-            onSuccess: () => {
-                setSaved(data);
-                setMessage('Changes saved');
+        router.put(
+            `${BASE_URL}/services`,
+            { cards: cards.map((c) => ({ description: c.description })) },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onStart: () => setSaving(true),
+                onFinish: () => setSaving(false),
+                onSuccess: () => {
+                    setSaved(cards);
+                    setMessage('Changes saved');
+                },
+                onError: (serverErrors) => setErrors(serverErrors),
             },
-            onError: (serverErrors) => {
-                // cards.1.title -> title-1, the keys this form uses
-                const mapped: Record<string, string> = {};
-                Object.entries(serverErrors).forEach(([key, text]) => {
-                    const card = key.match(/^cards\.(\d+)\.(title|description)$/);
-                    mapped[card ? `${card[2]}-${card[1]}` : key] = text;
-                });
-                setErrors(mapped);
-            },
-        });
+        );
     };
 
     const reset = () => {
-        setData(saved);
+        setCards(saved);
         setErrors({});
         setMessage('');
     };
 
     return (
         <div className="space-y-5">
-            <div>
-                {/* Form */}
-                <div className="space-y-5">
-                    <Panel>
-                        <PanelHeader
-                            title="Section Heading"
-                            description="The title shown above the service cards"
-                            icon={<Layers className="size-5" />}
-                        />
-                        <div className="space-y-4">
-                            <Field label="Section title" htmlFor="svc-title" required error={errors.title}>
-                                <input
-                                    id="svc-title"
-                                    className={inputClass}
-                                    maxLength={LIMITS.title}
-                                    value={data.title}
-                                    onChange={(e) => change({ ...data, title: e.target.value })}
-                                />
-                                <Counter value={data.title} max={LIMITS.title} />
-                            </Field>
-                            <Field label="Intro line (optional)" htmlFor="svc-intro">
-                                <input
-                                    id="svc-intro"
-                                    className={inputClass}
-                                    maxLength={LIMITS.intro}
-                                    value={data.intro}
-                                    onChange={(e) => change({ ...data, intro: e.target.value })}
-                                />
-                                <Counter value={data.intro} max={LIMITS.intro} />
-                            </Field>
-                        </div>
-                    </Panel>
-
-                    <div className="grid gap-5 lg:grid-cols-3">
-                    {data.cards.map((card, i) => (
+            <div className="grid gap-5 lg:grid-cols-3">
+                {cards.map((card, i) => {
+                    const length = card.description.length;
+                    return (
                         <Panel key={i}>
                             <div className="mb-4 flex items-center gap-3">
-                                <span className="flex size-7 items-center justify-center rounded-full bg-gold text-xs font-bold text-white">
-                                    {i + 1}
+                                <span className="flex size-7 items-center justify-center rounded-full bg-gold text-xs font-bold text-white">{i + 1}</span>
+                                <h2 className="text-base font-bold text-ink">{card.title}</h2>
+                            </div>
+                            <Field label="Description" htmlFor={`card-text-${i}`} required error={errors[`cards.${i}.description`] ?? errors.cards}>
+                                <textarea
+                                    id={`card-text-${i}`}
+                                    className={cn(textareaClass, 'min-h-28 resize-none')}
+                                    maxLength={LIMITS.max}
+                                    value={card.description}
+                                    onChange={(e) => setDescription(i, oneLine(e.target.value))}
+                                    onKeyDown={(e) => e.key === 'Enter' && e.preventDefault()}
+                                />
+                                <span className={cn('text-right text-[11px]', length > 0 && length < LIMITS.min ? 'text-yellow-800' : 'text-ink-soft')}>
+                                    {length}/{LIMITS.max} · at least {LIMITS.min}
                                 </span>
-                                <h2 className="text-base font-bold text-ink">Card {i + 1}</h2>
-                            </div>
-                            <div className="space-y-4">
-                                <Field label="Title" htmlFor={`card-title-${i}`} required error={errors[`title-${i}`]}>
-                                    <input
-                                        id={`card-title-${i}`}
-                                        className={inputClass}
-                                        maxLength={LIMITS.cardTitle}
-                                        value={card.title}
-                                        onChange={(e) => setCard(i, { title: e.target.value })}
-                                    />
-                                    <Counter value={card.title} max={LIMITS.cardTitle} />
-                                </Field>
-                                <Field label="Description" htmlFor={`card-text-${i}`} required error={errors[`description-${i}`]}>
-                                    <textarea
-                                        id={`card-text-${i}`}
-                                        className={cn(textareaClass, 'min-h-28')}
-                                        maxLength={LIMITS.cardText}
-                                        value={card.description}
-                                        onChange={(e) => setCard(i, { description: e.target.value })}
-                                    />
-                                    <Counter value={card.description} max={LIMITS.cardText} />
-                                </Field>
-                            </div>
+                            </Field>
                         </Panel>
-                    ))}
-                    </div>
-                </div>
+                    );
+                })}
             </div>
+
+            <p className="flex items-start gap-2 rounded-lg bg-gold/10 p-3 text-xs text-ink-soft">
+                <Info className="mt-0.5 size-4 shrink-0 text-gold-dark" />
+                The section title and the card titles are fixed. They match the menu and the three service pages the cards open. The services
+                customers can request are managed under Services &amp; Assets.
+            </p>
 
             <div className="flex flex-wrap items-center justify-end gap-3">
                 {message && <span className="text-xs font-semibold text-green-700">{message}</span>}

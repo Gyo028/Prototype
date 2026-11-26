@@ -522,7 +522,7 @@ class ProjectProgress
         if ($bill === null) {
             return $action(
                 'Your reservation fee bill is being prepared',
-                $this->peso($project->serviceRequest->reservationFee()).' (10% of your budget). You will be able to pay it on Billing & Payments.',
+                $this->peso($project->serviceRequest->reservationFee()).' (10% of '.$project->serviceRequest->reservationFeeBasis().'). You will be able to pay it on Billing & Payments.',
             );
         }
 

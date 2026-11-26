@@ -1,10 +1,12 @@
 import { Link, router } from '@inertiajs/react';
-import { AlertTriangle, ArrowLeft, Building2, CheckCircle2, FileText, ImageIcon, Plus, Sparkles, Upload, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Building2, CheckCircle2, FileText, ImageIcon, Plus, Sparkles, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useRef, useState } from 'react';
 import DatePicker, { formatRange } from '@/components/customer/date-picker';
 import type { RequestCatalog, RequestType } from '@/components/customer/request-catalog';
-import { defaultThemeFor, themeFits, toISODate } from '@/components/customer/request-catalog';
+import { defaultThemeFor, peso, themeFits, toISODate } from '@/components/customer/request-catalog';
+import type { LayoutChoice } from '@/components/customer/layout-selection';
+import { EMPTY_LAYOUT_CHOICE } from '@/components/customer/layout-selection';
 import ServicesAssetsSelector from '@/components/customer/services-assets-selector';
 import { Field, GoldButton, OutlineButton, Panel, cx, inputClass, selectClass, textareaClass } from '@/components/dashboard/ui';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -78,7 +80,9 @@ type Form = {
     endDate: string;
     // both
     venue: string;
+    /** A range label, or 'exact' with the amount in budgetExact. */
     budget: string;
+    budgetExact: string;
     description: string;
 };
 
@@ -94,8 +98,12 @@ const EMPTY_FORM: Form = {
     endDate: '',
     venue: '',
     budget: '',
+    budgetExact: '',
     description: '',
 };
+
+/** The budget choice for an amount the customer types. */
+const EXACT = 'exact';
 
 type RefFile = { id: number; file: File; url?: string };
 
@@ -182,8 +190,21 @@ export default function ProjectRequestForm({ catalog }: { catalog: RequestCatalo
     const [errors, setErrors] = useState<Record<string, string>>({});
 
     const [serviceIds, setServiceIds] = useState<number[]>([]);
-    const [themeId, setThemeId] = useState<number | null>(null);
-    const [assetIds, setAssetIds] = useState<number[]>([]);
+    const [themeId, setThemeIdState] = useState<number | null>(null);
+    const [layoutChoice, setLayoutChoice] = useState<LayoutChoice>(EMPTY_LAYOUT_CHOICE);
+
+    /** Another theme starts with its own default set ticked; "Other" items stay. */
+    const setThemeId = (id: number | null) => {
+        if (id === themeId) return;
+        setThemeIdState(id);
+        setLayoutChoice((c) => ({ ...c, assetIds: null }));
+        clearErrors('layout');
+    };
+
+    const changeLayout = (choice: LayoutChoice) => {
+        setLayoutChoice(choice);
+        clearErrors('layout');
+    };
 
     const fileRef = useRef<HTMLInputElement>(null);
     const [files, setFiles] = useState<RefFile[]>([]);
@@ -200,6 +221,8 @@ export default function ProjectRequestForm({ catalog }: { catalog: RequestCatalo
     const minCustomDate = monthsFromTodayISO(limits.customLeadMonths);
     const customLeadText = plural(limits.customLeadMonths, 'month');
     const budgets = requestType ? budgetRanges[requestType] : [];
+    /** The budget as the customer chose it: a range label, or the exact amount ("₱180,000"). */
+    const budgetText = form.budget === EXACT ? (Number(form.budgetExact) > 0 ? peso(Number(form.budgetExact)) : '') : form.budget;
 
     /** Removes the messages of fields the customer has just changed. */
     const clearErrors = (...keys: string[]) =>
@@ -212,7 +235,11 @@ export default function ProjectRequestForm({ catalog }: { catalog: RequestCatalo
 
     const set = <K extends keyof Form>(key: K, value: Form[K]) => {
         setForm((f) => ({ ...f, [key]: value }));
-        clearErrors(key, ...(key === 'eventStartTime' || key === 'eventEndTime' ? ['eventTime'] : []));
+        clearErrors(
+            key,
+            ...(key === 'eventStartTime' || key === 'eventEndTime' ? ['eventTime'] : []),
+            ...(key === 'budget' || key === 'budgetExact' ? ['budget', 'budgetExact'] : []),
+        );
     };
 
     const chooseDayMode = (mode: 'one' | 'multi') => {
@@ -243,7 +270,7 @@ export default function ProjectRequestForm({ catalog }: { catalog: RequestCatalo
     const chooseType = (type: RequestType) => {
         setRequestType(type);
         // Keep what both types share; drop a budget the new type does not offer.
-        setForm((f) => ({ ...f, budget: budgetRanges[type].includes(f.budget) ? f.budget : '' }));
+        setForm((f) => ({ ...f, budget: f.budget === EXACT || budgetRanges[type].includes(f.budget) ? f.budget : '' }));
         setErrors({});
         goTo('details');
     };
@@ -266,7 +293,14 @@ export default function ProjectRequestForm({ catalog }: { catalog: RequestCatalo
         const e: Record<string, string> = {};
 
         if (!form.venue.trim()) e.venue = isCustom ? 'Venue or mall location is required.' : 'Venue is required.';
-        if (!form.budget) e.budget = 'Choose a budget range.';
+        if (!form.budget) e.budget = 'Choose a budget range, or enter an exact amount.';
+        else if (form.budget === EXACT) {
+            const amount = Number(form.budgetExact);
+            const min = limits.minExactBudget?.[isCustom ? 'custom' : 'standard'] ?? 0;
+            if (!form.budgetExact || !Number.isFinite(amount)) e.budgetExact = 'Enter your exact budget.';
+            else if (amount < min) e.budgetExact = `Your exact budget must be at least ${peso(min)}.`;
+            else if (!/^\d+(\.\d{1,2})?$/.test(form.budgetExact)) e.budgetExact = 'Use at most two decimal places.';
+        }
 
         if (isCustom) {
             if (!form.projectTitle.trim()) e.projectTitle = 'Enter a project title.';
@@ -318,10 +352,9 @@ export default function ProjectRequestForm({ catalog }: { catalog: RequestCatalo
 
     /* ---------------- Step 3 (standard): services & assets ---------------- */
 
+    // Nothing is required here: the Event Styling fee always counts, and an untouched layout is the theme's default set.
     const continueFromSelection = () => {
-        const e: Record<string, string> = {};
-        if (serviceIds.length === 0) e.services = 'Select at least one service.';
-        if (check(e)) goTo('extras');
+        if (check({})) goTo('extras');
     };
 
     /* ---------------- Last step: description & files ---------------- */
@@ -375,6 +408,9 @@ export default function ProjectRequestForm({ catalog }: { catalog: RequestCatalo
             } else if (key === 'serviceIds' || key.startsWith('serviceIds.')) {
                 e.services = message;
                 if (target === 'extras') target = 'selection';
+            } else if (['themeId', 'assetIds', 'customItems'].some((k) => key === k || key.startsWith(`${k}.`))) {
+                e.layout = e.layout ?? message;
+                if (target === 'extras') target = 'selection';
             } else if (key === 'eventStartTime' || key === 'eventEndTime') {
                 e.eventTime = message;
                 target = 'details';
@@ -397,6 +433,7 @@ export default function ProjectRequestForm({ catalog }: { catalog: RequestCatalo
             requestType,
             venue: form.venue,
             budget: form.budget,
+            budgetExact: form.budget === EXACT ? form.budgetExact : '',
             description: form.description,
             files: files.map((f) => f.file),
         };
@@ -411,7 +448,10 @@ export default function ProjectRequestForm({ catalog }: { catalog: RequestCatalo
                   eventEndTime: form.eventEndTime,
                   guests: form.guests,
                   serviceIds,
-                  // Theme and assets are not saved yet (story 14), so they are not sent.
+                  themeId: themeId ?? '',
+                  // None ticked (or untouched) = the theme's default set, on the server as here.
+                  assetIds: layoutChoice.assetIds ?? [],
+                  customItems: layoutChoice.customItems.map(({ category, name, description }) => ({ category, name, description })),
               };
 
         router.post(SUBMIT_URL, payload, {
@@ -433,8 +473,8 @@ export default function ProjectRequestForm({ catalog }: { catalog: RequestCatalo
         setForm(EMPTY_FORM);
         setRequestType(null);
         setServiceIds([]);
-        setThemeId(null);
-        setAssetIds([]);
+        setThemeIdState(null);
+        setLayoutChoice(EMPTY_LAYOUT_CHOICE);
         setFiles([]);
         setErrors({});
         setFileError('');
@@ -471,15 +511,55 @@ export default function ProjectRequestForm({ catalog }: { catalog: RequestCatalo
     const choiceButton = (on: boolean) =>
         cx('rounded-lg border p-2.5 text-left text-sm font-bold text-ink transition', on ? 'border-gold bg-gold/10' : 'border-black/15 hover:bg-black/[0.02]');
 
+    // Budget choices stay on one line, even on phones: smaller text and no wrapping.
+    const budgetButton = (on: boolean) =>
+        cx(
+            'rounded-lg border px-2.5 py-2.5 text-left text-xs font-bold whitespace-nowrap text-ink tabular-nums transition sm:text-sm',
+            on ? 'border-gold bg-gold/10' : 'border-black/15 hover:bg-black/[0.02]',
+        );
+
+    const exactMin = limits.minExactBudget?.[isCustom ? 'custom' : 'standard'] ?? 0;
+
     const budgetField = (
-        <Field label="Budget Range" required error={errors.budget}>
+        <Field label="Budget" required error={errors.budget}>
             <div data-error={errors.budget ? '' : undefined} className="grid grid-cols-2 gap-2">
                 {budgets.map((b) => (
-                    <button key={b} type="button" aria-pressed={form.budget === b} onClick={() => set('budget', b)} className={choiceButton(form.budget === b)}>
+                    <button key={b} type="button" aria-pressed={form.budget === b} onClick={() => set('budget', b)} className={budgetButton(form.budget === b)}>
                         {b}
                     </button>
                 ))}
+                <button
+                    type="button"
+                    aria-pressed={form.budget === EXACT}
+                    onClick={() => set('budget', EXACT)}
+                    className={cx(budgetButton(form.budget === EXACT), form.budget !== EXACT && 'border-dashed')}
+                >
+                    Enter exact amount
+                </button>
             </div>
+
+            {form.budget === EXACT && (
+                <div className="mt-2" data-error={errors.budgetExact ? '' : undefined}>
+                    <label htmlFor="pr-budget-exact" className="text-xs text-ink-soft">
+                        Your exact budget (at least {peso(exactMin)})
+                    </label>
+                    <div className="relative mt-1">
+                        <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm text-ink-soft">₱</span>
+                        <input
+                            id="pr-budget-exact"
+                            type="number"
+                            inputMode="decimal"
+                            min={exactMin}
+                            step="0.01"
+                            className={cx(inputClass, 'pl-7', errors.budgetExact && 'border-red-400')}
+                            placeholder={String(exactMin * 2)}
+                            value={form.budgetExact}
+                            onChange={(e) => set('budgetExact', e.target.value)}
+                        />
+                    </div>
+                    {errors.budgetExact && <p className="mt-1 text-xs text-red-600">{errors.budgetExact}</p>}
+                </div>
+            )}
         </Field>
     );
 
@@ -501,10 +581,33 @@ export default function ProjectRequestForm({ catalog }: { catalog: RequestCatalo
     );
 
     /** Reference files: the drop area and the thumbnails. `compact` puts a narrow drop area beside the thumbnails. */
-    const renderFiles = (compact: boolean) => (
-        <>
-            <p className="text-sm font-bold text-ink">Upload Peg / Reference Images</p>
-            <div className={cx('mt-3', compact ? 'flex flex-col gap-3 sm:flex-row' : 'grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]')}>
+    /**
+     * Reference files: the "+" tile comes first, and each upload fills the next
+     * tile. The whole grid takes dropped files too. Empty tiles show how many
+     * more can go in a row.
+     */
+    const renderFiles = (compact: boolean) => {
+        const perRow = compact ? 3 : 4;
+        const canAdd = files.length < limits.maxFiles;
+        const used = files.length + (canAdd ? 1 : 0);
+        // Fill the first row, then the rest of the last row; none once the limit is reached.
+        const empty = canAdd ? Math.max(perRow - used, (perRow - (used % perRow)) % perRow) : 0;
+
+        return (
+            <>
+                <p className="text-sm font-bold text-ink">Upload Peg / Reference Images</p>
+                <p className="mt-0.5 text-[11px] text-ink-soft">
+                    JPG, PNG or PDF up to {limits.maxFileMb}MB each · Max {limits.maxFiles} files. Tap + or drop files here.
+                </p>
+                <input
+                    ref={fileRef}
+                    type="file"
+                    accept=".jpg,.jpeg,.png,.pdf"
+                    multiple
+                    hidden
+                    onChange={(e) => e.target.files && addFiles(e.target.files)}
+                />
+
                 <div
                     onDragOver={(e) => {
                         e.preventDefault();
@@ -517,79 +620,57 @@ export default function ProjectRequestForm({ catalog }: { catalog: RequestCatalo
                         addFiles(e.dataTransfer.files);
                     }}
                     className={cx(
-                        'flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed text-center transition',
-                        compact ? 'shrink-0 p-4 sm:w-52' : 'p-6',
-                        dragging ? 'border-gold bg-gold/10' : 'border-black/20 bg-neutral-50',
+                        'mt-3 grid gap-2 rounded-xl transition sm:gap-3',
+                        compact ? 'grid-cols-3' : 'grid-cols-4',
+                        dragging && 'bg-gold/10 ring-2 ring-gold ring-offset-4',
                     )}
                 >
-                    <Upload className="size-8 text-gold" />
-                    <p className="text-xs font-bold text-ink">Drag and drop your reference photos here</p>
-                    <p className="text-[11px] text-ink-soft">or</p>
-                    <OutlineButton className="px-4 py-1.5 text-xs" onClick={() => fileRef.current?.click()}>
-                        Choose file
-                    </OutlineButton>
-                    <p className="text-[10px] text-ink-soft">
-                        JPG, PNG, PDF up to {limits.maxFileMb}MB each · Max {limits.maxFiles} files
-                    </p>
-                    <input
-                        ref={fileRef}
-                        type="file"
-                        accept=".jpg,.jpeg,.png,.pdf"
-                        multiple
-                        hidden
-                        onChange={(e) => e.target.files && addFiles(e.target.files)}
-                    />
-                </div>
+                    {canAdd && (
+                        <button
+                            type="button"
+                            aria-label="Add reference files"
+                            onClick={() => fileRef.current?.click()}
+                            className="flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-black/20 bg-white text-ink-soft transition hover:border-gold hover:text-gold-dark"
+                        >
+                            <Plus className="size-7 sm:size-8" />
+                            <span className="text-[10px] font-bold sm:text-xs">Add files</span>
+                        </button>
+                    )}
 
-                <div className={compact ? 'min-w-0 flex-1' : undefined}>
-                    <div className={cx('grid', compact ? 'grid-cols-3 gap-2 md:grid-cols-4' : 'grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5')}>
-                        {files.map((f) => (
-                            <div key={f.id} className="group relative aspect-square overflow-hidden rounded-xl border border-black/10 bg-neutral-100">
-                                {f.url ? (
-                                    <img src={f.url} alt={f.file.name} className="size-full object-cover" />
-                                ) : (
-                                    <div className="flex size-full flex-col items-center justify-center gap-1 p-2 text-center text-ink-soft">
-                                        <FileText className="size-8" />
-                                        <span className="line-clamp-2 text-[10px]">{f.file.name}</span>
-                                    </div>
-                                )}
-                                <button
-                                    type="button"
-                                    aria-label={`Remove ${f.file.name}`}
-                                    onClick={() => removeFile(f.id)}
-                                    className="absolute top-1.5 right-1.5 inline-flex size-6 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
-                                >
-                                    <X className="size-3.5" />
-                                </button>
-                            </div>
-                        ))}
-
-                        {files.length < limits.maxFiles && (
+                    {files.map((f) => (
+                        <div key={f.id} className="group relative aspect-square overflow-hidden rounded-xl border border-black/10 bg-neutral-100">
+                            {f.url ? (
+                                <img src={f.url} alt={f.file.name} className="size-full object-cover" />
+                            ) : (
+                                <div className="flex size-full flex-col items-center justify-center gap-1 p-2 text-center text-ink-soft">
+                                    <FileText className="size-7 sm:size-8" />
+                                    <span className="line-clamp-2 text-[10px] break-all">{f.file.name}</span>
+                                </div>
+                            )}
                             <button
                                 type="button"
-                                aria-label="Add file"
-                                onClick={() => fileRef.current?.click()}
-                                className="flex aspect-square items-center justify-center rounded-xl border border-black/20 text-ink-soft hover:border-gold hover:text-gold-dark"
+                                aria-label={`Remove ${f.file.name}`}
+                                onClick={() => removeFile(f.id)}
+                                className="absolute top-1.5 right-1.5 inline-flex size-6 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
                             >
-                                <Plus className="size-8" />
+                                <X className="size-3.5" />
                             </button>
-                        )}
+                        </div>
+                    ))}
 
-                        {files.length === 0 &&
-                            [0, 1].map((i) => (
-                                <div key={i} className="hidden aspect-square items-center justify-center rounded-xl bg-neutral-200 text-neutral-400 sm:flex">
-                                    <ImageIcon className="size-10" />
-                                </div>
-                            ))}
-                    </div>
-                    <p className="mt-2 text-[11px] text-ink-soft">
-                        {files.length}/{limits.maxFiles} files
-                    </p>
-                    {fileError && <p className="mt-1 text-xs text-red-600">{fileError}</p>}
+                    {Array.from({ length: empty }, (_, i) => (
+                        <div key={`empty-${i}`} aria-hidden className="flex aspect-square items-center justify-center rounded-xl bg-neutral-200 text-neutral-400">
+                            <ImageIcon className="size-7 sm:size-10" />
+                        </div>
+                    ))}
                 </div>
-            </div>
-        </>
-    );
+                <p className="mt-2 text-[11px] text-ink-soft">
+                    {files.length}/{limits.maxFiles} files
+                </p>
+                {fileError && <p className="mt-1 text-xs text-red-600">{fileError}</p>}
+            </>
+        );
+    };
 
     const venueField = (
         <Field label={isCustom ? 'Venue / Mall Location' : 'Venue / Location'} htmlFor="pr-venue" required error={errors.venue}>
@@ -661,7 +742,7 @@ export default function ProjectRequestForm({ catalog }: { catalog: RequestCatalo
                 {header}
                 <div className="w-full space-y-5">
                     <Panel>
-                        <div className="mb-4 flex items-center justify-between gap-3">
+                        <div className="mb-4 flex flex-col-reverse items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                             <h2 className="text-lg font-bold text-ink">Services &amp; Assets</h2>
                             {backButton('Back to Project Details', 'details')}
                         </div>
@@ -674,14 +755,14 @@ export default function ProjectRequestForm({ catalog }: { catalog: RequestCatalo
                             assetCategories={catalog.assetCategories}
                             eventTypeId={form.eventTypeId ? Number(form.eventTypeId) : null}
                             guests={Number(form.guests) || 0}
-                            budget={form.budget}
+                            budget={budgetText}
                             serviceIds={serviceIds}
                             onServiceIdsChange={setServiceIds}
-                            serviceError={errors.services}
                             themeId={themeId}
                             onThemeIdChange={setThemeId}
-                            assetIds={assetIds}
-                            onAssetIdsChange={setAssetIds}
+                            layoutChoice={layoutChoice}
+                            onLayoutChoiceChange={changeLayout}
+                            layoutError={errors.layout ?? errors.services}
                         />
                     </Panel>
 
@@ -703,7 +784,7 @@ export default function ProjectRequestForm({ catalog }: { catalog: RequestCatalo
                 {header}
                 <div className="w-full space-y-5">
                     <Panel>
-                        <div className="mb-4 flex items-center justify-between gap-3">
+                        <div className="mb-4 flex flex-col-reverse items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                             <h2 className="text-lg font-bold text-ink">Description &amp; Reference Files</h2>
                             {backButton('Back to Services & Assets', 'selection')}
                         </div>
@@ -985,7 +1066,7 @@ export default function ProjectRequestForm({ catalog }: { catalog: RequestCatalo
                             </dd>
 
                             <dt className="text-ink-soft">Budget range</dt>
-                            <dd className="text-ink">{form.budget}</dd>
+                            <dd className="text-ink">{budgetText}</dd>
 
                             <dt className="text-ink-soft">Description</dt>
                             <dd className="line-clamp-4 break-words whitespace-pre-line text-ink">

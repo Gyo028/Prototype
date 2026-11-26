@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\WebsiteContent;
+use App\Support\WebsiteDefaults;
 use Illuminate\Database\Seeder;
 
 /**
@@ -18,36 +19,32 @@ class WebsiteContentSeeder extends Seeder
 
         $this->homepage();
         $this->services();
-        $this->gallery();
         $this->faq();
+
+        // Photo slots, the service pages and the Our Works photo library.
+        WebsiteDefaults::applyPhotos();
     }
 
-    /** Hero, About Us and Contact & Footer: three rows, told apart by block_key. */
+    /**
+     * Hero, About Us and Contact & Footer: three rows, told apart by block_key.
+     * The hero text is fixed in the page, so the hero row only holds its photo.
+     */
     private function homepage(): void
     {
         WebsiteContent::create([
             'section' => WebsiteContent::SECTION_HOMEPAGE,
             'block_key' => 'hero',
             'title' => 'Hero Section',
-            'content' => $this->json([
-                'headline' => 'Unforgettable Events,',
-                'highlight' => 'Perfectly Planned',
-                'subheadline' => 'We bring ideas to life through thoughtful planning, creative styling, and smooth coordination — making every event seamless and memorable.',
-                'button' => 'Start Project',
-            ]),
+            'content' => null,
             'sort_order' => 1,
         ]);
 
-        // Paragraphs are separated by a blank line.
+        // Two paragraphs, separated by a blank line.
         WebsiteContent::create([
             'section' => WebsiteContent::SECTION_HOMEPAGE,
             'block_key' => 'about',
             'title' => 'About Us',
-            'content' => implode("\n\n", [
-                "Gr3at A's Events Styling & Services - specializes in event set-up and styling. We customize according to the needs of our clients. We supply rattan lamps, synthetic rattan furniture, drum furniture, upholstery, gigantic fabric and foam flowers, sticker decals, lighted signage, sublimation, tarp and sticker prints. We manufacture wood and steel structures with installation. We also supply plants for your greening projects.",
-                "Gr3at A's is a company with a heart. We are committed to supporting the education of our scholars and selected charitable institutions.",
-                "With Gr3at A's, graces are shared. Happy to serve!",
-            ]),
+            'content' => implode("\n\n", WebsiteDefaults::ABOUT),
             'sort_order' => 2,
         ]);
 
@@ -55,64 +52,35 @@ class WebsiteContentSeeder extends Seeder
             'section' => WebsiteContent::SECTION_HOMEPAGE,
             'block_key' => 'contact',
             'title' => 'Contact & Footer',
-            'content' => $this->json([
-                'phone' => '+63 0000000000',
-                'email' => 'gr3ataseventsstyling@gmail.com',
-                'address' => 'Altezza, Deparo, Caloocan City',
-                'facebook' => 'https://www.facebook.com/share/17uj5e738o/',
-                'instagram' => '',
-                'copyright' => "© 2026 Great A's Event Styling Services. All rights reserved.",
-            ]),
+            'content' => $this->json(array_diff_key(WebsiteDefaults::CONTACT, ['name' => true])),
             'sort_order' => 3,
         ]);
     }
 
-    /** The section heading (title and intro line) plus one row per service card. */
+    /** The section heading plus one row per service card (titles are fixed). */
     private function services(): void
     {
         WebsiteContent::create([
             'section' => WebsiteContent::SECTION_SERVICES,
             'block_key' => 'services',
             'title' => 'Our Services',
-            'content' => null, // optional intro line, empty today
+            'content' => null,
             'sort_order' => 0,
         ]);
 
-        $cards = [
-            ['Corporate Events', 'Professional styling and management for brand activations, mall events, and corporate functions.'],
-            ['Special Occasions', 'Creative setups for weddings, birthdays, debuts, and milestone celebrations.'],
-            ['Custom Fabrication', 'Design and production of customized backdrops, props, and themed event structures.'],
+        $descriptions = [
+            'Professional styling and management for brand activations, mall events, and corporate functions.',
+            'Creative setups for weddings, birthdays, debuts, and milestone celebrations.',
+            'Design and production of customized backdrops, props, and themed event structures.',
         ];
 
-        foreach ($cards as $i => [$title, $description]) {
+        foreach (WebsiteDefaults::CARD_TITLES as $i => $title) {
+            $description = $descriptions[$i];
+
             WebsiteContent::create([
                 'section' => WebsiteContent::SECTION_SERVICES,
                 'title' => $title,
                 'content' => $description,
-                'sort_order' => $i + 1,
-            ]);
-        }
-    }
-
-    /** The Our Works carousel: one gallery row and its photos. */
-    private function gallery(): void
-    {
-        $gallery = WebsiteContent::create([
-            'section' => WebsiteContent::SECTION_GALLERY,
-            'block_key' => 'works',
-            'title' => 'Our Works',
-            'sort_order' => 1,
-        ]);
-
-        $works = [
-            'Corporate Event', 'Mall Activation', 'Garden Setup', 'Birthday Styling', 'Custom Fabrication',
-            'Wedding Setup', 'Debut Styling', 'Mall Display', 'Corporate Gala', 'Special Occasion',
-        ];
-
-        foreach ($works as $i => $label) {
-            $gallery->images()->create([
-                'file_path' => '/images/works/work-'.($i + 1).'.webp',
-                'alt_text' => $label,
                 'sort_order' => $i + 1,
             ]);
         }

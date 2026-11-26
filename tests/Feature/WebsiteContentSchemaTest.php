@@ -12,7 +12,8 @@ test('website content tables follow the ERD column names', function () {
     ]);
 
     expect(Schema::getColumnListing('website_content_images'))->toEqualCanonicalizing([
-        'image_id', 'content_id', 'file_path', 'alt_text', 'sort_order', 'status', 'updated_at',
+        'image_id', 'content_id', 'slot', 'file_path', 'thumb_path', 'alt_text', 'title', 'caption',
+        'category', 'homepage_order', 'showcase_order', 'sort_order', 'status', 'updated_at',
     ]);
 });
 
@@ -65,3 +66,9 @@ test('deleting content removes its images', function () {
 
     expect(WebsiteContentImage::count())->toBe(0);
 });
+
+test('an Our Works photo only accepts the three service categories', function () {
+    $content = WebsiteContent::create(['section' => 'gallery', 'block_key' => 'works', 'title' => 'Our Works']);
+
+    $content->images()->create(['file_path' => 'a.webp', 'title' => 'Photo', 'category' => 'mall_activation']);
+})->throws(QueryException::class);

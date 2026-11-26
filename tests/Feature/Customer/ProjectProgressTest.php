@@ -116,12 +116,13 @@ test('a cancelled project stops in red at the consultation', function () {
         ->and($progress['nextAction']['title'])->toBe('This project was cancelled');
 });
 
-test('the reservation fee is 10% of the budget maximum, or of the minimum when there is none', function (int $min, ?int $max, float $fee) {
+test('without a layout (custom, or an older request), the reservation fee is 10% of the budget maximum, or of the minimum when there is none', function (int $min, ?int $max, float $fee) {
     expect((new ServiceRequest(['budget_min' => $min, 'budget_max' => $max]))->reservationFee())->toBe($fee);
 })->with([
     'Below ₱50,000' => [0, 50000, 5000.0],
     '₱100,000 – ₱250,000' => [100000, 250000, 25000.0],
     'Above ₱500,000' => [500000, null, 50000.0],
+    'exact ₱180,000' => [180000, 180000, 18000.0],
 ]);
 
 test('the pages send the steps, and My Projects flags the project that needs action', function () {

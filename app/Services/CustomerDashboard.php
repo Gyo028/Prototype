@@ -51,8 +51,10 @@ class CustomerDashboard
         $requests = $customer->serviceRequests()
             ->with([
                 'eventType',
+                'customer',
                 'project.status',
                 'project.serviceRequest.eventType',
+                'project.serviceRequest.customer',
                 'project.schedules.outcome',
                 'project.billings.payments',
                 'project.reservationFee.payments',

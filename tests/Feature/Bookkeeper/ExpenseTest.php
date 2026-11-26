@@ -44,7 +44,7 @@ function expProject(): Project
         'user_id' => $user->id,
         'first_name' => 'Andrea',
         'last_name' => 'Santos',
-        'contact_number' => '09171234567',
+        'contact_number' => uniqueMobile(),
     ]);
 
     $request = ServiceRequest::create([
@@ -121,7 +121,7 @@ test('the Bookkeeper sees the Expenses page with real projects and the five cate
             ->has('expenses', 0)
             ->has('projects', 1)
             ->where('projects.0.id', $this->project->project_id)
-            ->where('projects.0.label', $this->project->project_code.' · Wedding')
+            ->where('projects.0.label', $this->project->project_code." · Andrea's Wedding")
             ->where('projects.0.status', ProjectStatus::CONSULTATION)
             ->has('categories', 5)
             ->where('today', '2026-11-21')

@@ -1,7 +1,15 @@
 import { Link, router } from '@inertiajs/react';
-import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, SlidersHorizontal } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { cx, inputClass } from '@/components/dashboard/ui';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuLabel,
+    DropdownMenuRadioGroup,
+    DropdownMenuRadioItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 /*
  * Shared pieces for the customer's list pages (My Projects, Billing & Payments,
@@ -11,10 +19,11 @@ import { cx, inputClass } from '@/components/dashboard/ui';
  *  - the whole row opens the item; an arrow at the end of each row shows it can be opened
  *    (no "Open ›" link); no second lines under a cell
  *  - tablet and up (md, 768px): a table. Phones: one card per row.
- *  - filter chips wrap on wider screens and scroll sideways on phones
+ *  - a search box with a Filter button beside it; the filters and their counts
+ *    are in the button's menu
  */
 
-/* ---------------- Filter chips + search ---------------- */
+/* ---------------- Search + Filter button ---------------- */
 
 export function ListToolbar<F extends string>({
     filters,
@@ -25,6 +34,7 @@ export function ListToolbar<F extends string>({
     query,
     onQuery,
     placeholder,
+    allLabel,
 }: {
     filters: { value: F; label: string }[];
     value: F;
@@ -34,34 +44,65 @@ export function ListToolbar<F extends string>({
     query: string;
     onQuery: (q: string) => void;
     placeholder: string;
+    /** What the first filter ("All") shows as, e.g. "All projects". */
+    allLabel: string;
 }) {
+    const current = filters.find((f) => f.value === value) ?? filters[0];
+    // The first filter is "All": the button only names a filter that narrows the list.
+    const narrowed = current && current.value !== filters[0]?.value;
+
     return (
-        <div className="flex flex-col gap-3 border-b border-black/10 p-4 md:flex-row md:items-center md:justify-between">
-            {/* Phones: one scrollable row that runs to the panel's edges. */}
-            <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:overflow-visible md:px-0">
-                <div className="flex w-max gap-2 md:w-auto md:flex-wrap" role="tablist" aria-label={label}>
-                    {filters.map((f) => (
-                        <button
-                            key={f.value}
-                            type="button"
-                            role="tab"
-                            aria-selected={value === f.value}
-                            onClick={() => onChange(f.value)}
-                            className={cx(
-                                'shrink-0 rounded-full border px-3 py-1.5 text-xs font-bold whitespace-nowrap transition md:py-1',
-                                value === f.value ? 'border-gold bg-gold text-white' : 'border-black/15 bg-white text-ink hover:border-gold',
-                            )}
-                        >
-                            {f.label} ({count(f.value)})
+        <div className="flex flex-wrap items-center gap-2 border-b border-black/10 p-3 sm:flex-nowrap sm:p-4">
+            {/* What is showing. The Filter button itself stays plain. */}
+            <p className="w-full text-sm font-bold text-ink sm:w-auto sm:flex-1" aria-live="polite">
+                {narrowed ? (
+                    <>
+                        {current.label} <span className="font-normal text-ink-soft">· {count(current.value)} of {count(filters[0].value)}</span>
+                        <button type="button" onClick={() => onChange(filters[0].value)} className="ml-2 text-xs font-bold text-gold-dark hover:underline">
+                            Clear
                         </button>
-                    ))}
-                </div>
-            </div>
-            <label className="relative w-full md:w-64 md:shrink-0">
+                    </>
+                ) : (
+                    <>
+                        {allLabel} <span className="font-normal text-ink-soft">· {count(filters[0].value)}</span>
+                    </>
+                )}
+            </p>
+
+            <label className="relative min-w-0 flex-1 sm:max-w-72 sm:flex-none sm:basis-72">
                 <span className="sr-only">{placeholder}</span>
                 <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-soft" />
                 <input type="search" className={cx(inputClass, 'pl-9')} placeholder={placeholder} value={query} onChange={(e) => onQuery(e.target.value)} />
             </label>
+
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <button
+                        type="button"
+                        aria-label={label}
+                        className={cx(
+                            'relative inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-sm font-bold whitespace-nowrap transition',
+                            narrowed ? 'border-gold bg-white text-ink' : 'border-black/15 bg-white text-ink hover:border-gold',
+                        )}
+                    >
+                        <SlidersHorizontal className="size-4" />
+                        <span className="hidden sm:inline">Filter</span>
+                        {/* A filter is on. */}
+                        {narrowed && <span aria-hidden className="absolute -top-1 -right-1 size-2.5 rounded-full border-2 border-white bg-gold" />}
+                    </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuLabel className="text-xs text-ink-soft">{label}</DropdownMenuLabel>
+                    <DropdownMenuRadioGroup value={value} onValueChange={(v) => onChange(v as F)}>
+                        {filters.map((f) => (
+                            <DropdownMenuRadioItem key={f.value} value={f.value} className="justify-between">
+                                <span>{f.label}</span>
+                                <span className="text-xs text-ink-soft">{count(f.value)}</span>
+                            </DropdownMenuRadioItem>
+                        ))}
+                    </DropdownMenuRadioGroup>
+                </DropdownMenuContent>
+            </DropdownMenu>
         </div>
     );
 }
@@ -158,16 +199,19 @@ export function ListTable<T>({
     );
 }
 
-/** The phone card's layout: a small top line with a tag on the right, the title, then one line below. */
+/**
+ * The phone card's layout: a small top line, the title, then one line below,
+ * with the tag (e.g. the status) on the right, centred like the row's arrow.
+ */
 export function ListCard({ top, tag, title, bottom }: { top: ReactNode; tag?: ReactNode; title: ReactNode; bottom?: ReactNode }) {
     return (
-        <div className="min-w-0">
-            <div className="flex items-center justify-between gap-2">
-                <span className="truncate text-xs font-semibold text-ink-soft">{top}</span>
-                {tag && <span className="shrink-0">{tag}</span>}
+        <div className="flex min-w-0 items-center gap-3">
+            <div className="min-w-0 flex-1">
+                <span className="block truncate text-xs font-semibold text-ink-soft">{top}</span>
+                <p className="mt-0.5 truncate font-bold text-ink">{title}</p>
+                {bottom && <div className="mt-0.5 text-sm text-ink-soft">{bottom}</div>}
             </div>
-            <p className="mt-0.5 truncate font-bold text-ink">{title}</p>
-            {bottom && <div className="mt-0.5 text-sm text-ink-soft">{bottom}</div>}
+            {tag && <span className="shrink-0">{tag}</span>}
         </div>
     );
 }
