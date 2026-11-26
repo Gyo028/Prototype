@@ -67,7 +67,7 @@ const PART_TITLES: Record<PartKey, string> = {
  * Parts whose actions are connected to the backend so far (add each one as its backlog is connected).
  * With real data, the other parts show a notice instead of forms that would have nowhere to save yet.
  */
-const CONNECTED_PARTS: PartKey[] = ['consultation', 'reservationFee', 'siteAssessment'];
+const CONNECTED_PARTS: PartKey[] = ['consultation', 'reservationFee', 'siteAssessment', 'designAssignment', 'designProposal', 'contract'];
 
 /** A step is connected when at least one of its parts is. */
 const stepConnected = (key: StepKey) =>

@@ -36,6 +36,9 @@ use App\Http\Controllers\ProjectManager\ConsultationController as PmConsultation
 use App\Http\Controllers\ProjectManager\PaymentController as PmPaymentController;
 use App\Http\Controllers\ProjectManager\SiteAssessmentController as PmSiteAssessmentController;
 use App\Http\Controllers\ProjectManager\SiteAccessDocumentController as PmSiteAccessDocumentController;
+use App\Http\Controllers\ProjectManager\DesignAssignmentController as PmDesignAssignmentController;
+use App\Http\Controllers\ProjectManager\DesignProposalController as PmDesignProposalController;
+use App\Http\Controllers\ProjectManager\ContractController as PmContractController;
 
 
 
@@ -173,6 +176,16 @@ Route::middleware(['auth', 'verified', 'role:project_manager'])
         Route::get('projects/{project}/site-assessment/files/{file}', [PmSiteAssessmentController::class, 'file'])->name('projects.site-assessment.file');
         Route::patch('projects/{project}/site-access-documents/{document}', [PmSiteAccessDocumentController::class, 'review'])->name('projects.site-access-documents.review');
         Route::get('projects/{project}/site-access-documents/{document}', [PmSiteAccessDocumentController::class, 'show'])->name('projects.site-access-documents.show');
+                // Backlog #21: Assign a Design Specialist
+        Route::patch('projects/{project}/design-assignment', [PmDesignAssignmentController::class, 'update'])->name('projects.design-assignment');
+                // Backlog #24: Review the design proposal
+        Route::patch('projects/{project}/design-proposal/approve', [PmDesignProposalController::class, 'approve'])->name('projects.design-proposal.approve');
+        Route::patch('projects/{project}/design-proposal/return', [PmDesignProposalController::class, 'returnForRevision'])->name('projects.design-proposal.return');
+        Route::get('projects/{project}/design-proposal/files/{file}', [PmDesignProposalController::class, 'file'])->name('projects.design-proposal.file');
+                // Backlog #18: Verify the project contract
+        Route::patch('projects/{project}/contract/approve', [PmContractController::class, 'approve'])->name('projects.contract.approve');
+        Route::patch('projects/{project}/contract/reject', [PmContractController::class, 'reject'])->name('projects.contract.reject');
+        Route::get('projects/{project}/contracts/{contract}/file', [PmContractController::class, 'file'])->name('projects.contract.file');
         Route::inertia('billing-payments', 'project-manager/billing-payments')->name('billing-payments');
     });
 

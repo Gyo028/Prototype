@@ -6,6 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\AppointmentOutcome;
 use App\Models\AppointmentOutcomeFile;
 use App\Models\Billing;
+use App\Models\Contract;
+use App\Models\DesignProposal;
+use App\Models\DesignProposalFile;
+use App\Models\DesignProposalItem;
+use App\Models\Employee;
 use App\Models\Payment;
 use App\Models\Project;
 use App\Models\ProjectSchedule;
@@ -35,6 +40,12 @@ class ProjectController extends Controller
         'schedules.outcome.recordedBy',
         'schedules.outcome.files',
         'siteAccessDocuments',
+        'projectManager',
+        'designSpecialist',
+        'designProposals.items',
+        'designProposals.files',
+        'designProposals.designSpecialist',
+        'contracts.reviewer',
         'billings.payments',
     ];
 
@@ -91,7 +102,11 @@ class ProjectController extends Controller
     {
         $project->load(self::RELATIONS);
 
-        return Inertia::render('project-manager/project-show', ['project' => self::toArray($project)]);
+        return Inertia::render('project-manager/project-show', [
+            'project' => self::toArray($project),
+            // Backlog #21: the Design Specialists the project can be assigned to
+            'specialists' => self::specialists(),
+        ]);
     }
 
         /** @return array<string, mixed> */
@@ -136,9 +151,19 @@ class ProjectController extends Controller
             'siteAccessDocuments' => $p->siteAccessDocuments->whereNull('replaced_at')->sortBy('document_type')
                 ->map(fn (SiteAccessDocument $d) => self::document($p, $d))->values()->all(),
             'siteAssessment' => self::siteAssessment($p, $ocular),
-            'assignment' => null,
-            'designProposal' => null,
-            'contract' => null,
+            // Step 3 · Design: the assignment (backlog #21)
+            'assignment' => $p->designSpecialist ? [
+                'specialistId' => $p->designSpecialist->employee_id,
+                'specialistName' => $p->designSpecialist->full_name,
+                'notes' => null, // not stored (decided with the user)
+                'assignedBy' => $p->projectManager?->full_name ?? 'Project Manager',
+                'assignedAt' => ($p->design_assigned_at ?? $p->updated_at)->toIso8601String(),
+            ] : null,
+            'assignmentLocked' => $p->designSpecialist !== null && DesignAssignmentController::proposalSubmitted($p),
+                // Step 3 · Design: the design proposal (backlog #24)
+            'designProposal' => self::designProposal($p, $request['customer']['name']),
+                 // Step 4 · Contract (backlog #18)
+            'contract' => self::contract($p),
             'billings' => [],
             'payments' => $fee ? $fee->payments->sortBy('payment_id')->map(fn (Payment $pay) => self::payment($pay, 'Reservation Fee'))->values()->all() : [], // only the reservation fee's for now
             'disputes' => [],
@@ -147,7 +172,126 @@ class ProjectController extends Controller
         ]);
     }
 
-        /** The site assessment recorded on the held ocular visit, or null. */
+        /**
+     * The Design Specialists to choose from, with how many projects each is designing now.
+     *
+     * @return list<array{id: int, name: string, activeProjects: int}>
+     */
+    private static function specialists(): array
+    {
+        $designing = Project::query()
+            ->where('current_status_id', ProjectStatus::idFor(ProjectStatus::DESIGNING))
+            ->whereNotNull('design_specialist_id')
+            ->selectRaw('design_specialist_id, count(*) as total')
+            ->groupBy('design_specialist_id')
+            ->pluck('total', 'design_specialist_id');
+
+        return DesignAssignmentController::specialists()->orderBy('first_name')->orderBy('last_name')->get()
+            ->map(fn (Employee $e) => ['id' => $e->employee_id, 'name' => $e->full_name, 'activeProjects' => (int) ($designing[$e->employee_id] ?? 0)])
+            ->values()->all();
+    }    
+            /**
+     * The contract the Project Manager reviews, in the page's shape, or null while the
+     * customer has not signed the first version. After a rejection the group's code issues
+     * the next version to sign; until it is signed, the rejected one is shown.
+     */
+    private static function contract(Project $p): ?array
+    {
+        $versions = $p->contracts->sortByDesc('version_number')->values();
+        $c = $versions->first(fn (Contract $c) => $c->status !== Contract::STATUS_ISSUED);
+
+        if ($c === null) {
+            return null;
+        }
+
+        return [
+            'code' => $c->code(),
+            'version' => $c->version_number,
+            'amount' => (float) ($c->contract_data['quotation']['total'] ?? 0),
+            'file' => [
+                'name' => $c->downloadName('signed'),
+                'url' => "/project-manager/projects/{$p->project_id}/contracts/{$c->contract_id}/file",
+            ],
+            'submittedAt' => ($c->signed_at ?? $c->issued_at)->toIso8601String(),
+            'status' => match ($c->status) {
+                Contract::STATUS_VERIFIED => 'Approved',
+                Contract::STATUS_REJECTED => 'Rejected',
+                default => 'For Review',
+            },
+            'review' => $c->reviewed_at ? [
+                'remarks' => $c->rejection_reason,
+                'checklist' => array_values($c->checklist ?? []),
+                'reviewedBy' => $c->reviewer?->name ?? 'Project Manager',
+                'reviewedAt' => $c->reviewed_at->toIso8601String(),
+            ] : null,
+        ];
+    }
+    private const FILE_CATEGORIES = [
+        DesignProposalFile::CATEGORY_2D => '2D design',
+        DesignProposalFile::CATEGORY_3D => '3D visualization',
+        DesignProposalFile::CATEGORY_OTHER => 'Other',
+    ];
+
+    /**
+     * The newest submitted design proposal in the page's shape, or null.
+     * Status: Submitted (waiting for the PM) → Awaiting Owner → Awaiting Customer → Approved;
+     * Returned for Revision when the PM, the Owner or the customer sent it back.
+     */
+    private static function designProposal(Project $p, string $customerName): ?array
+    {
+        $d = DesignProposalController::latest($p);
+        if ($d === null) {
+            return null;
+        }
+
+        $at = fn ($time) => ($time ?? $d->updated_at)->toIso8601String();
+        $pm = $p->projectManager?->full_name ?? 'Project Manager';
+        $pmReview = ['remarks' => $d->pm_remarks, 'reviewedBy' => $pm, 'reviewedAt' => $at($d->pm_reviewed_at)];
+
+        [$status, $review] = match (true) {
+            $d->pm_review_decision === DesignProposal::PENDING => ['Submitted', null],
+            $d->pm_review_decision === DesignProposal::REVISION_REQUESTED => ['Returned for Revision', ['decision' => 'return'] + $pmReview],
+            $d->owner_review_decision === DesignProposal::PENDING => ['Awaiting Owner', ['decision' => 'approve'] + $pmReview],
+            $d->owner_review_decision === DesignProposal::REVISION_REQUESTED => ['Returned for Revision', [
+                'decision' => 'return', 'remarks' => $d->owner_remarks, 'reviewedBy' => 'Owner', 'reviewedAt' => $at($d->owner_reviewed_at),
+            ]],
+            $d->customer_decision === DesignProposal::PENDING => ['Awaiting Customer', ['decision' => 'approve'] + $pmReview],
+            $d->customer_decision === DesignProposal::REVISION_REQUESTED => ['Returned for Revision', [
+                'decision' => 'return', 'remarks' => $d->customer_remarks, 'reviewedBy' => $customerName.' (customer)', 'reviewedAt' => $at($d->decision_date),
+            ]],
+            default => ['Approved', [
+                'decision' => 'approve', 'remarks' => $d->customer_remarks, 'reviewedBy' => $customerName.' (customer)', 'reviewedAt' => $at($d->decision_date),
+            ]],
+        };
+
+        $url = fn (DesignProposalFile $f) => "/project-manager/projects/{$p->project_id}/design-proposal/files/{$f->proposal_file_id}";
+
+        return [
+            'version' => $d->version_number,
+            'status' => $status,
+            'submittedBy' => $d->designSpecialist?->full_name ?? $p->designSpecialist?->full_name ?? 'Design Specialist',
+            'submittedAt' => $at($d->submitted_at),
+            'notes' => '', // not stored
+            'layoutSnapshotUrl' => null, // not stored
+            'file' => null,
+            'files' => $d->files->where('is_current', true)->values()
+                ->map(fn (DesignProposalFile $f) => ['name' => $f->file_name, 'url' => $url($f), 'category' => self::FILE_CATEGORIES[$f->file_category] ?? 'Other'])
+                ->all(),
+            'externalLink' => $d->external_link,
+            // The designer's lines; the PM edits them when approving (decided with the user: no discount).
+            'quotation' => $d->items->isEmpty() ? null : [
+                'items' => $d->items->map(fn (DesignProposalItem $i) => [
+                    'id' => 'item-'.$i->item_id,
+                    'description' => $i->item_name,
+                    'quantity' => (int) $i->quantity,
+                    'unitPrice' => (float) $i->unit_price,
+                ])->values()->all(),
+                'discount' => 0,
+            ],
+            'review' => $review,
+        ];
+    }
+    /** The site assessment recorded on the held ocular visit, or null. */
     private static function siteAssessment(Project $p, ?ProjectSchedule $visit): ?array
     {
         $outcome = $visit?->schedule_status === ProjectSchedule::STATUS_COMPLETED ? $visit->outcome : null;

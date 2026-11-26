@@ -13,6 +13,8 @@ import type { DesignSpecialist } from '@/data/project-manager/projects';
  * Step 3 · Design Assignment (backlog #21).
  * The Project Manager assigns a Design Specialist so they can prepare the design proposal.
  * Blocked when no specialist is selected or the project information is incomplete.
+ * Connected to the database (Nov 26): no notes for the designer (not stored); Reassign only
+ * until the designer submits a design proposal.
  */
 
 type Errors = Partial<Record<'specialist' | 'project', string>>;
@@ -29,6 +31,7 @@ export default function DesignAssignmentStep({
     const [notes, setNotes] = useState(project.assignment?.notes ?? '');
     const [errors, setErrors] = useState<Errors>({});
     const [saving, setSaving] = useState(false);
+    const canReassign = usingSample || !project.assignmentLocked;
 
     const save = () => {
         // Acceptance criterion 2: no specialist, or incomplete project information, means no save.
@@ -80,8 +83,7 @@ export default function DesignAssignmentStep({
     return (
         <>
             <StepIntro title="Design Assignment">
-                Assign a Design Specialist so they can prepare the design proposal. They will see this project and its information once
-                assigned.
+                Assign a Design Specialist so they can prepare the design proposal. They will see this project and its information once assigned.
             </StepIntro>
 
             {!editing && project.assignment ? (
@@ -92,21 +94,29 @@ export default function DesignAssignmentStep({
                             <Detail label="Assigned">
                                 {formatDateTime(project.assignment.assignedAt)} by {project.assignment.assignedBy}
                             </Detail>
-                            <div className="col-span-2">
-                                <Detail label="Notes for the designer">{project.assignment.notes ?? 'No notes.'}</Detail>
-                            </div>
+                            {usingSample && (
+                                <div className="col-span-2">
+                                    <Detail label="Notes for the designer">{project.assignment.notes ?? 'No notes.'}</Detail>
+                                </div>
+                            )}
                         </div>
                     </Section>
-                    <div className="flex justify-end">
-                        <GoldButton
-                            onClick={() => {
-                                setErrors({});
-                                setEditing(true);
-                            }}
-                        >
-                            <UserCheck className="size-4" /> Reassign
-                        </GoldButton>
-                    </div>
+                    {canReassign ? (
+                        <div className="flex justify-end">
+                            <GoldButton
+                                onClick={() => {
+                                    setErrors({});
+                                    setEditing(true);
+                                }}
+                            >
+                                <UserCheck className="size-4" /> Reassign
+                            </GoldButton>
+                        </div>
+                    ) : (
+                        <p className="text-xs text-ink-soft">
+                            The Design Specialist has submitted a design proposal, so they can no longer be changed.
+                        </p>
+                    )}
                 </div>
             ) : (
                 <form
@@ -136,15 +146,17 @@ export default function DesignAssignmentStep({
                         </select>
                     </Field>
 
-                    <Field label="Notes for the designer (optional)" htmlFor="da-notes">
-                        <textarea
-                            id="da-notes"
-                            value={notes}
-                            onChange={(e) => setNotes(e.target.value)}
-                            placeholder="e.g. Client prefers pastel tones; keep the arch from the inspiration photo."
-                            className={textareaClass}
-                        />
-                    </Field>
+                    {usingSample && (
+                        <Field label="Notes for the designer (optional)" htmlFor="da-notes">
+                            <textarea
+                                id="da-notes"
+                                value={notes}
+                                onChange={(e) => setNotes(e.target.value)}
+                                placeholder="e.g. Client prefers pastel tones; keep the arch from the inspiration photo."
+                                className={textareaClass}
+                            />
+                        </Field>
+                    )}
 
                     {errors.project && (
                         <div role="alert" className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm font-bold text-red-700">
@@ -167,3 +179,4 @@ export default function DesignAssignmentStep({
         </>
     );
 }
+

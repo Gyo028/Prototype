@@ -94,7 +94,7 @@ export const quotationTotal = (q: Quotation) => Math.max(0, quotationSubtotal(q)
  * Awaiting Customer     = approved by the Project Manager, quotation finalized, waiting for the customer
  * Approved              = approved by the customer too (the contract comes next)
  */
-export type ProposalStatus = 'Submitted' | 'Returned for Revision' | 'Awaiting Customer' | 'Approved';
+export type ProposalStatus = 'Submitted' | 'Returned for Revision' | 'Awaiting Owner' | 'Awaiting Customer' | 'Approved';
 
 export type DesignProposal = {
     version: number; // 2 or more = re-submitted after a revision
@@ -105,6 +105,8 @@ export type DesignProposal = {
     layoutSnapshotUrl: string | null; // image exported from the 2D Layout Designer
     file: StoredFile | null; // the design proposal document
     quotation: Quotation | null; // finalized by the Project Manager when approving
+    files?: (StoredFile & { category: string })[]; // backend only: the designer's files (2D design, 3D visualization, other)
+    externalLink?: string | null; // backend only: e.g. a shared folder with large 3D files
     review: {
         decision: 'approve' | 'return';
         remarks: string | null; // required when returned for revision
@@ -167,6 +169,7 @@ export type Project = ProjectRequest & {
     consultationNote?: string | null; // why the last booking was closed (rescheduled / did not attend)
     ocularVisitStatus?: 'pending' | 'tentative' | 'confirmed' | 'completed' | null; // pending = waiting for the site access documents
     siteAccessDocuments?: SiteAccessDocument[]; // third-party venues only: authorization letter + venue permit
+    assignmentLocked?: boolean; // the designer already submitted a design proposal, so they can no longer be changed
 };
 /* ---------- wizard steps (revision, Nov 19) ---------- */
 
@@ -281,6 +284,7 @@ export function waitingReason(p: Project, key: PartKey): string | null {
             const designer = p.assignment?.specialistName ?? 'the Design Specialist';
             if (!p.designProposal) return `Waiting for ${designer} to submit the design proposal.`;
             if (p.designProposal.status === 'Returned for Revision') return `Waiting for ${designer} to revise and re-submit the design proposal.`;
+            if (p.designProposal.status === 'Awaiting Owner') return 'Waiting for the Owner to review the design proposal.';
             if (p.designProposal.status === 'Awaiting Customer') return 'Waiting for the customer to approve the design proposal and quotation.';
             return null;
         }

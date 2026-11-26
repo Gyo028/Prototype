@@ -25,6 +25,8 @@ import type { DesignProposal, ProposalStatus, Quotation } from '@/data/project-m
  *   - Approve is blocked while the quotation is incomplete or has missing prices (acceptance criterion 3).
  *   - The proposal, the finalized quotation and the decision are saved (acceptance criterion 1).
  * After approval, the customer reviews the proposal and quotation (Plan Project use case).
+ * Connected to the database (Nov 26): the quotation starts from the Design Specialist's lines and the
+ * PM can edit them (no discount); after the PM approves, the Owner reviews it before the customer.
  */
 
 type Decision = 'approve' | 'return';
@@ -32,6 +34,7 @@ type Decision = 'approve' | 'return';
 const statusTone: Record<ProposalStatus, PillTone> = {
     Submitted: 'yellow',
     'Returned for Revision': 'red',
+    'Awaiting Owner': 'blue',
     'Awaiting Customer': 'blue',
     Approved: 'green',
 };
@@ -81,7 +84,7 @@ export default function DesignProposalStep({ project, usingSample, managerName, 
         const finish = () => {
             toast.success(
                 decision === 'approve'
-                    ? `Design proposal approved and quotation finalized (${peso(quotationTotal(quotation))}). Sent to the customer for approval.`
+                    ? `Design proposal approved and quotation finalized (${peso(quotationTotal(quotation))}). ${usingSample ? 'Sent to the customer for approval.' : 'Sent to the Owner for review.'}`
                     : `Design proposal returned to ${proposal.submittedBy} for revision.`,
             );
             setDecision(null);
@@ -114,12 +117,10 @@ export default function DesignProposalStep({ project, usingSample, managerName, 
     };
 
     const itemErrorCount = Object.keys(quoteErrors.items).length;
-
-    return (
+        return (
         <>
             <StepIntro title="Design Proposal">
-                Review the design proposal from the Design Specialist, finalize the project quotation, then approve it or return it for
-                revision.
+                Review the design proposal from the Design Specialist, finalize the project quotation, then approve it or return it for revision.
             </StepIntro>
 
             {!proposal ? (
@@ -150,37 +151,41 @@ export default function DesignProposalStep({ project, usingSample, managerName, 
                             <Pill tone={statusTone[proposal.status]}>{proposal.status}</Pill>
                         </div>
 
-                        <div className="grid gap-4 md:grid-cols-2">
-                            <div className="overflow-hidden rounded-lg border border-black/10 bg-neutral-100">
-                                {proposal.layoutSnapshotUrl ? (
-                                    <a href={proposal.layoutSnapshotUrl} target="_blank" rel="noreferrer">
-                                        <img src={proposal.layoutSnapshotUrl} alt="Proposed layout" className="w-full object-contain" />
-                                    </a>
-                                ) : (
-                                    <div className="flex aspect-video flex-col items-center justify-center gap-2 p-4 text-center">
-                                        <LayoutGrid className="size-8 text-ink-soft" />
-                                        <p className="text-xs text-ink-soft">Layout snapshot not available</p>
-                                    </div>
-                                )}
+                        {!usingSample ? (
+                            <ProposalFiles files={proposal.files ?? []} externalLink={proposal.externalLink ?? null} />
+                        ) : (
+                            <div className="grid gap-4 md:grid-cols-2">
+                                <div className="overflow-hidden rounded-lg border border-black/10 bg-neutral-100">
+                                    {proposal.layoutSnapshotUrl ? (
+                                        <a href={proposal.layoutSnapshotUrl} target="_blank" rel="noreferrer">
+                                            <img src={proposal.layoutSnapshotUrl} alt="Proposed layout" className="w-full object-contain" />
+                                        </a>
+                                    ) : (
+                                        <div className="flex aspect-video flex-col items-center justify-center gap-2 p-4 text-center">
+                                            <LayoutGrid className="size-8 text-ink-soft" />
+                                            <p className="text-xs text-ink-soft">Layout snapshot not available</p>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="grid content-start gap-3">
+                                    <Detail label="Designer's notes">{proposal.notes || 'No notes.'}</Detail>
+                                    {proposal.file && (
+                                        <a
+                                            href={proposal.file.url || undefined}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="flex items-center gap-3 rounded-lg border border-black/15 p-3 transition hover:border-gold hover:bg-gold/10"
+                                        >
+                                            <FileText className="size-6 shrink-0 text-red-600" />
+                                            <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{proposal.file.name}</span>
+                                            <span className="flex items-center gap-1 text-xs font-semibold text-gold-dark">
+                                                Open <ExternalLink className="size-3.5" />
+                                            </span>
+                                        </a>
+                                    )}
+                                </div>
                             </div>
-                            <div className="grid content-start gap-3">
-                                <Detail label="Designer's notes">{proposal.notes || 'No notes.'}</Detail>
-                                {proposal.file && (
-                                    <a
-                                        href={proposal.file.url || undefined}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="flex items-center gap-3 rounded-lg border border-black/15 p-3 transition hover:border-gold hover:bg-gold/10"
-                                    >
-                                        <FileText className="size-6 shrink-0 text-red-600" />
-                                        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{proposal.file.name}</span>
-                                        <span className="flex items-center gap-1 text-xs font-semibold text-gold-dark">
-                                            Open <ExternalLink className="size-3.5" />
-                                        </span>
-                                    </a>
-                                )}
-                            </div>
-                        </div>
+                        )}
                     </Section>
 
                     {/* Last decision (read-only) */}
@@ -205,16 +210,17 @@ export default function DesignProposalStep({ project, usingSample, managerName, 
                             <QuotationSummary quotation={proposal.quotation} />
                         </Section>
                     )}
-
-                    {/* Submitted: finalize the quotation and decide */}
+                                        {/* Submitted: finalize the quotation and decide */}
                     {proposal.status === 'Submitted' && (
                         <>
                             <Section title="Finalize the Project Quotation">
                                 <p className="mb-3 text-xs text-ink-soft">
-                                    Started from the customer's services and the layout assets in the proposal. Check every price, add any missing
-                                    items, then approve.
+                                    {usingSample
+                                        ? "Started from the customer's services and the layout assets in the proposal."
+                                        : "Started from the Design Specialist's quotation lines."}{' '}
+                                    Check every price, add any missing items, then approve.
                                 </p>
-                                <QuotationEditor quotation={quotation} errors={quoteErrors} onChange={changeQuotation} />
+                                <QuotationEditor quotation={quotation} errors={quoteErrors} onChange={changeQuotation} noDiscount={!usingSample} />
                             </Section>
 
                             {hasQuotationErrors(quoteErrors) && (
@@ -224,7 +230,8 @@ export default function DesignProposalStep({ project, usingSample, managerName, 
                                         {quoteErrors.general && <li>{quoteErrors.general}</li>}
                                         {itemErrorCount > 0 && (
                                             <li>
-                                                {itemErrorCount} {itemErrorCount === 1 ? 'line is' : 'lines are'} missing a description, quantity or price
+                                                {itemErrorCount} {itemErrorCount === 1 ? 'line is' : 'lines are'} missing a description, quantity or
+                                                price
                                             </li>
                                         )}
                                         {quoteErrors.discount && <li>{quoteErrors.discount}</li>}
@@ -251,8 +258,8 @@ export default function DesignProposalStep({ project, usingSample, managerName, 
                                 >
                                     {decision === 'approve' && (
                                         <p className="text-sm text-ink">
-                                            Approve this proposal with a finalized quotation of <b>{peso(quotationTotal(quotation))}</b>? It will be sent
-                                            to the customer for approval.
+                                            Approve this proposal with a finalized quotation of <b>{peso(quotationTotal(quotation))}</b>? It will be
+                                            sent to the {usingSample ? 'customer for approval' : 'Owner for review'}.
                                         </p>
                                     )}
                                     <Field
@@ -299,5 +306,41 @@ export default function DesignProposalStep({ project, usingSample, managerName, 
                 </div>
             )}
         </>
+    );
+}
+
+/** Real data: the files the Design Specialist uploaded with this version. */
+function ProposalFiles({ files, externalLink }: { files: NonNullable<DesignProposal['files']>; externalLink: string | null }) {
+    if (files.length === 0 && !externalLink) return <p className="text-sm text-ink-soft">No files were uploaded with this version.</p>;
+
+    return (
+        <div className="grid gap-2">
+            {files.map((f) => (
+                <a
+                    key={f.url}
+                    href={f.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-3 rounded-lg border border-black/15 p-3 transition hover:border-gold hover:bg-gold/10"
+                >
+                    <FileText className="size-6 shrink-0 text-red-600" />
+                    <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{f.name}</span>
+                    <span className="text-xs text-ink-soft">{f.category}</span>
+                    <span className="flex items-center gap-1 text-xs font-semibold text-gold-dark">
+                        Open <ExternalLink className="size-3.5" />
+                    </span>
+                </a>
+            ))}
+            {externalLink && (
+                <a
+                    href={externalLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-1 text-sm font-semibold text-gold-dark hover:underline"
+                >
+                    Open the shared files link <ExternalLink className="size-3.5" />
+                </a>
+            )}
+        </div>
     );
 }
