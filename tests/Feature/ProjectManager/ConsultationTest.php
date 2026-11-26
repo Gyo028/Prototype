@@ -42,7 +42,7 @@ beforeEach(function () {
         'contact_number' => '09171234567',
     ]);
 
-    $this->project = csProject($this->customer, $this->manager);
+    $this->project = pmConsultationProject($this->customer, $this->manager);
     // The customer booked the consultation for tomorrow, 10:00 to 11:00.
     $this->booking = $this->project->schedules()->create([
         'schedule_type' => ProjectSchedule::TYPE_CONSULTATION,
@@ -54,7 +54,7 @@ beforeEach(function () {
 });
 
 /** An approved Wedding request (₱100,000 – ₱250,000) and its project, still at the consultation. */
-function csProject(Customer $customer, Employee $manager): Project
+function pmConsultationProject(Customer $customer, Employee $manager): Project
 {
     $request = ServiceRequest::create([
         'customer_id' => $customer->customer_id,

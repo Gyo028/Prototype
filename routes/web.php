@@ -8,6 +8,8 @@ use App\Http\Controllers\TechnicalAdmin\UserAccountController;
 use App\Http\Controllers\TechnicalAdmin\EmployeeController;
 use App\Http\Controllers\TechnicalAdmin\FaqController;
 use App\Http\Controllers\TechnicalAdmin\WebsiteContentController;
+use App\Http\Controllers\TechnicalAdmin\WebsitePhotoSlotController;
+use App\Http\Controllers\TechnicalAdmin\WorkPhotoController;
 use App\Http\Controllers\TechnicalAdmin\ServiceController;
 use App\Http\Controllers\TechnicalAdmin\ServicesAssetsController;
 use App\Http\Controllers\TechnicalAdmin\DesignThemeController;
@@ -78,6 +80,14 @@ Route::middleware(['auth', 'verified', 'role:technical_admin'])
         Route::put('website-content/about', [WebsiteContentController::class, 'updateAbout'])->name('website-content.about');
         Route::put('website-content/services', [WebsiteContentController::class, 'updateServices'])->name('website-content.services');
         Route::put('website-content/contact', [WebsiteContentController::class, 'updateContact'])->name('website-content.contact');
+        // Photos are sent with POST (multipart); PUT/PATCH cannot carry files.
+        Route::post('website-content/photos/{block}/{slot}', [WebsitePhotoSlotController::class, 'update'])->name('website-content.photos.update');
+        Route::post('website-content/works', [WorkPhotoController::class, 'store'])->name('website-content.works.store');
+        Route::put('website-content/works/carousel', [WorkPhotoController::class, 'carousel'])->name('website-content.works.carousel');
+        Route::post('website-content/works/{photo}', [WorkPhotoController::class, 'update'])->name('website-content.works.update');
+        Route::patch('website-content/works/{photo}/status', [WorkPhotoController::class, 'status'])->name('website-content.works.status');
+        Route::delete('website-content/works/{photo}', [WorkPhotoController::class, 'destroy'])->name('website-content.works.destroy');
+        Route::put('website-content/showcases/{page}', [WorkPhotoController::class, 'showcase'])->name('website-content.showcases.update');
         Route::post('website-content/faqs', [FaqController::class, 'store'])->name('website-content.faqs.store');
         Route::patch('website-content/faqs/{faq}', [FaqController::class, 'update'])->name('website-content.faqs.update');
         Route::delete('website-content/faqs/{faq}', [FaqController::class, 'destroy'])->name('website-content.faqs.destroy');
