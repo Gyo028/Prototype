@@ -6,9 +6,8 @@ import LandingFooter from '@/components/public/landing/landing-footer';
 import LandingNav from '@/components/public/landing/landing-nav';
 import Reveal from '@/components/public/landing/reveal';
 import ServiceSwitcher from '@/components/public/service-switcher';
-import { COMPANY } from '@/data/legal';
-
-const heroImage = '/images/hero-bg5.webp';
+import { useSiteContact } from '@/lib/public-site';
+import type { ServicePageProps } from '@/lib/public-site';
 
 const pillars = [
     {
@@ -65,12 +64,8 @@ const occasions = [
 
 type TileSize = 'regular' | 'tall' | 'feature';
 
-const showcase: { image: string; title: string; category: string; size: TileSize }[] = [
-    { image: '/images/works/work-15.webp', title: 'The Garden Arch Aisle', category: 'Wedding & Reception Styling', size: 'feature' },
-    { image: '/images/works/work-18.webp', title: 'Festive Centerpiece', category: 'Seasonal Celebration', size: 'tall' },
-    { image: '/images/works/work-10.webp', title: 'Paris-Themed Setup', category: 'Themed Celebration', size: 'regular' },
-    { image: '/images/works/work-17.webp', title: 'Carnival Tent Party', category: 'Birthday & Party Styling', size: 'regular' },
-];
+/** Tile sizes of the showcase grid, in order (the 4 photos come from Website Content). */
+const SHOWCASE_SIZES: TileSize[] = ['feature', 'tall', 'regular', 'regular'];
 
 const tileClasses: Record<TileSize, string> = {
     regular: '',
@@ -86,25 +81,12 @@ const steps = [
     { title: 'Celebrate & Teardown', text: 'We look after the setup during your event, then clear the venue afterward.' },
 ];
 
-const moreServices = [
-    {
-        title: 'Corporate Events',
-        text: 'Professional styling and management for brand activations, mall events, and corporate functions.',
-        image: '/images/works/work-3.webp',
-        href: '/services/corporate-events',
-    },
-    {
-        title: 'Custom Projects',
-        text: 'Design and production of customized backdrops, props, and themed event structures.',
-        image: '/images/works/work-8.webp',
-        href: '/services/custom-fabrication',
-    },
-];
-
 const primaryButton =
     'group inline-flex items-center justify-center gap-3 rounded-full bg-[#C99A2E] px-8 py-4 text-sm font-bold tracking-[0.14em] text-[#1F2023] uppercase transition-all duration-300 hover:bg-[#F2C75C] hover:shadow-[0_14px_40px_-12px_rgba(242,199,92,0.7)] focus-visible:ring-2 focus-visible:ring-[#F2C75C] focus-visible:ring-offset-2 focus-visible:ring-offset-[#1F2023] focus-visible:outline-none';
 
-export default function SpecialOccasions() {
+/** Photos and the other services' cards come from Website Content; the text is fixed. */
+export default function SpecialOccasions({ hero, intro, showcase, moreServices }: ServicePageProps) {
+    const contact = useSiteContact();
     const [heroReady, setHeroReady] = useState(false);
 
     useEffect(() => {
@@ -134,8 +116,8 @@ export default function SpecialOccasions() {
                 {/* HERO: full-bleed, left-aligned, sharp editorial */}
                 <section className="relative isolate flex min-h-[640px] items-end overflow-hidden bg-[#1F2023] text-white lg:min-h-[800px]">
                     <img
-                        src={heroImage}
-                        alt="A pastel balloon and floral backdrop styled for a celebration, with a light blue sofa at the center"
+                        src={hero.url}
+                        alt={hero.alt}
                         className={`absolute inset-0 -z-20 h-full w-full object-cover transition-transform duration-[2800ms] ease-out motion-reduce:transition-none ${
                             heroReady ? 'scale-100' : 'scale-[1.08]'
                         }`}
@@ -217,8 +199,8 @@ export default function SpecialOccasions() {
                         <Reveal delay={100} className="mt-16 lg:mt-24">
                             <div className="relative">
                                 <img
-                                    src="/images/works/work-7.webp"
-                                    alt="A grand arched entrance styled with colorful lighting and a red carpet"
+                                    src={intro[0]?.url}
+                                    alt={intro[0]?.alt}
                                     loading="lazy"
                                     decoding="async"
                                     className="aspect-[16/9] w-full object-cover shadow-[0_30px_60px_-30px_rgba(31,32,35,0.5)] lg:aspect-[21/9]"
@@ -229,8 +211,8 @@ export default function SpecialOccasions() {
                                         className="absolute inset-0 -translate-x-3 translate-y-3 border border-[#C99A2E]/80"
                                     />
                                     <img
-                                        src="/images/works/work-19.webp"
-                                        alt="Giant handcrafted paper flowers in soft pastel colors"
+                                        src={intro[1]?.url}
+                                        alt={intro[1]?.alt}
                                         loading="lazy"
                                         decoding="async"
                                         className="relative aspect-[4/3] w-full border-[6px] border-white object-cover shadow-[0_30px_60px_-24px_rgba(31,32,35,0.55)] sm:border-8"
@@ -305,22 +287,22 @@ export default function SpecialOccasions() {
 
                         <Reveal delay={100} className="mt-12 lg:mt-16">
                             <div className="grid auto-rows-[220px] grid-flow-dense grid-cols-1 gap-3 sm:auto-rows-[200px] sm:grid-cols-2 sm:gap-4 lg:auto-rows-[210px] lg:grid-cols-4 lg:gap-5">
-                                {showcase.map((tile) => (
+                                {showcase.map((tile, i) => (
                                     <figure
-                                        key={tile.title}
+                                        key={tile.id}
                                         tabIndex={0}
-                                        className={`group relative isolate overflow-hidden bg-neutral-800 outline-none focus-visible:ring-2 focus-visible:ring-[#F2C75C] ${tileClasses[tile.size]}`}
+                                        className={`group relative isolate overflow-hidden bg-neutral-800 outline-none focus-visible:ring-2 focus-visible:ring-[#F2C75C] ${tileClasses[SHOWCASE_SIZES[i] ?? 'regular']}`}
                                     >
                                         <img
-                                            src={tile.image}
-                                            alt={`${tile.title} - ${tile.category}`}
+                                            src={tile.url}
+                                            alt={tile.alt}
                                             loading="lazy"
                                             decoding="async"
                                             className="h-full w-full object-cover transition-transform duration-[1200ms] ease-out group-hover:scale-[1.05] group-focus-visible:scale-[1.05]"
                                         />
                                         <figcaption className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/75 via-black/10 to-transparent p-5 sm:p-6">
                                             <span className="text-[10px] font-semibold tracking-[0.2em] text-[#F2C75C] uppercase">
-                                                {tile.category}
+                                                {tile.caption}
                                             </span>
                                             <span className="mt-1 font-['DM_Serif_Display',serif] text-lg leading-snug sm:text-xl">
                                                 {tile.title}
@@ -397,11 +379,11 @@ export default function SpecialOccasions() {
                                 <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
                             </a>
                             <a
-                                href={`tel:${COMPANY.phone}`}
+                                href={`tel:${contact.phone.replace(/[^\d+]/g, '')}`}
                                 className="inline-flex items-center justify-center gap-3 rounded-full border border-[#1F2023]/60 px-9 py-4 text-sm font-bold tracking-[0.14em] text-[#1F2023] uppercase transition-colors duration-300 hover:bg-[#1F2023] hover:text-white focus-visible:ring-2 focus-visible:ring-[#1F2023] focus-visible:outline-none"
                             >
                                 <Phone className="h-4 w-4" />
-                                {COMPANY.phone}
+                                {contact.phone}
                             </a>
                         </div>
                     </Reveal>

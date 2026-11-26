@@ -1,32 +1,18 @@
-import { Head, Link } from '@inertiajs/react';
-import { ArrowLeft } from 'lucide-react';
+import { Head } from '@inertiajs/react';
+import { useState } from 'react';
 
 import LandingFooter from '@/components/public/landing/landing-footer';
 import LandingNav from '@/components/public/landing/landing-nav';
+import type { WorkPhoto } from '@/lib/public-site';
+
+type Category = { value: string; label: string };
 
 type TileSize = 'regular' | 'wide' | 'tall' | 'feature';
 
-type Project = {
-    image: string;
-    title: string;
-    category: string;
-    size: TileSize;
-};
+/** Fixed tile pattern, repeated every 12 photos, so the grid stays balanced whatever the admin uploads. */
+const PATTERN: TileSize[] = ['feature', 'tall', 'regular', 'regular', 'wide', 'tall', 'regular', 'wide', 'regular', 'tall', 'feature', 'tall'];
 
-const projects: Project[] = [
-    { image: '/images/works/work-7.webp', title: 'A Night in Paris', category: 'Themed Event', size: 'feature' },
-    { image: '/images/works/work-8.webp', title: 'Garden Signage', category: 'Custom Projects', size: 'tall' },
-    { image: '/images/works/work-11.webp', title: 'A Celebration in Bloom', category: 'Event Styling', size: 'regular' },
-    { image: '/images/works/work-14.webp', title: 'Wellness Place', category: 'Mall Activation', size: 'regular' },
-    { image: '/images/works/work-4.webp', title: 'Corporate Launch', category: 'Corporate Event', size: 'wide' },
-    { image: '/images/works/work-18.webp', title: 'Holiday Installation', category: 'Mall Activation', size: 'tall' },
-    { image: '/images/works/work-6.webp', title: 'Golden Moments', category: 'Wedding Styling', size: 'regular' },
-    { image: '/images/works/work-9.webp', title: 'Hanging Gardens', category: 'Event Styling', size: 'wide' },
-    { image: '/images/works/work-19.webp', title: 'Paper Blooms', category: 'Mall Activation', size: 'regular' },
-    { image: '/images/works/work-15.webp', title: 'Wedding of Joy & Jordan', category: 'Wedding Styling', size: 'tall' },
-    { image: '/images/works/work-2.webp', title: 'Gala Night', category: 'Corporate Event', size: 'feature' },
-    { image: '/images/works/work-16.webp', title: 'The Mirror Arch', category: 'Custom Projects', size: 'tall' },
-];
+const PAGE_SIZE = 12;
 
 const sizeClasses: Record<TileSize, string> = {
     regular: '',
@@ -35,15 +21,15 @@ const sizeClasses: Record<TileSize, string> = {
     feature: 'row-span-2 sm:col-span-2',
 };
 
-function ProjectTile({ project }: { project: Project }) {
+function ProjectTile({ project, size }: { project: WorkPhoto; size: TileSize }) {
     return (
         <figure
             tabIndex={0}
-            className={`group relative isolate overflow-hidden bg-neutral-200 outline-none focus-visible:ring-2 focus-visible:ring-[#C99A2E] focus-visible:ring-offset-2 focus-visible:ring-offset-[#FBF9F5] ${sizeClasses[project.size]}`}
+            className={`group relative isolate overflow-hidden bg-neutral-200 outline-none focus-visible:ring-2 focus-visible:ring-[#C99A2E] focus-visible:ring-offset-2 focus-visible:ring-offset-[#FBF9F5] ${sizeClasses[size]}`}
         >
             <img
-                src={project.image}
-                alt={`${project.title} - ${project.category}`}
+                src={project.url}
+                alt={project.alt}
                 loading="lazy"
                 decoding="async"
                 className="h-full w-full object-cover transition-transform duration-[1200ms] ease-out group-hover:scale-[1.04] group-focus-visible:scale-[1.04]"
@@ -51,7 +37,7 @@ function ProjectTile({ project }: { project: Project }) {
 
             <figcaption className="absolute inset-0 flex flex-col justify-end bg-gradient-to-t from-black/70 via-black/15 to-transparent p-5 text-white opacity-100 transition-opacity duration-500 ease-out sm:p-6 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-focus-visible:opacity-100 [@media(hover:hover)]:group-hover:opacity-100">
                 <span className="text-[10px] font-semibold tracking-[0.2em] text-[#F2C75C] uppercase">
-                    {project.category}
+                    {project.categoryLabel}
                 </span>
                 <span className="mt-1 font-['DM_Serif_Display',serif] text-lg leading-snug font-normal tracking-wide sm:text-xl">
                     {project.title}
@@ -61,7 +47,15 @@ function ProjectTile({ project }: { project: Project }) {
     );
 }
 
-export default function OurWorks() {
+/** Every shown photo of the Our Works library (Technical Admin > Website Content > Our Works). */
+export default function OurWorks({ works, categories }: { works: WorkPhoto[]; categories: Category[] }) {
+    const [category, setCategory] = useState('all');
+    const [shown, setShown] = useState(PAGE_SIZE);
+
+    const filtered = category === 'all' ? works : works.filter((w) => w.category === category);
+    const visible = filtered.slice(0, shown);
+    const chips: Category[] = [{ value: 'all', label: 'All' }, ...categories.filter((c) => works.some((w) => w.category === c.value))];
+
     return (
         <div className="min-h-screen bg-[#FBF9F5] font-sans text-black">
             <Head title="Our Works - Gr3at A's Events Styling & Services">
@@ -95,11 +89,48 @@ export default function OurWorks() {
                     </div>
                 </header>
 
+                {chips.length > 2 && (
+                    <div role="group" aria-label="Filter by category" className="mb-8 flex flex-wrap justify-center gap-2 lg:mb-10">
+                        {chips.map((chip) => (
+                            <button
+                                key={chip.value}
+                                type="button"
+                                aria-pressed={category === chip.value}
+                                onClick={() => {
+                                    setCategory(chip.value);
+                                    setShown(PAGE_SIZE);
+                                }}
+                                className={`rounded-full border px-5 py-2 text-xs font-semibold tracking-[0.12em] uppercase transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-[#C99A2E] focus-visible:ring-offset-2 focus-visible:outline-none ${
+                                    category === chip.value
+                                        ? 'border-[#0D0D33] bg-[#0D0D33] text-white'
+                                        : 'border-[#0D0D33]/25 text-[#0D0D33] hover:border-[#C99A2E] hover:text-[#C99A2E]'
+                                }`}
+                            >
+                                {chip.label}
+                            </button>
+                        ))}
+                    </div>
+                )}
+
                 <div className="grid auto-rows-[170px] grid-flow-dense grid-cols-1 gap-3 sm:auto-rows-[190px] sm:grid-cols-2 sm:gap-4 lg:auto-rows-[190px] lg:grid-cols-4 lg:gap-5">
-                    {projects.map((project) => (
-                        <ProjectTile key={project.title} project={project} />
+                    {visible.map((project, i) => (
+                        <ProjectTile key={project.id} project={project} size={PATTERN[i % PATTERN.length]} />
                     ))}
                 </div>
+
+                {filtered.length === 0 && <p className="py-16 text-center text-neutral-500">No photos in this category yet.</p>}
+
+                {shown < filtered.length && (
+                    <div className="mt-10 text-center lg:mt-14">
+                        <button
+                            type="button"
+                            onClick={() => setShown(shown + PAGE_SIZE)}
+                            className="inline-flex items-center justify-center rounded-full border border-[#0D0D33] px-9 py-3.5 text-sm font-bold tracking-[0.14em] text-[#0D0D33] uppercase transition-colors duration-300 hover:bg-[#0D0D33] hover:text-white focus-visible:ring-2 focus-visible:ring-[#C99A2E] focus-visible:ring-offset-2 focus-visible:outline-none"
+                        >
+                            Load more
+                        </button>
+                    </div>
+                )}
             </main>
 
             <LandingFooter />

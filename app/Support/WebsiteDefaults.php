@@ -46,6 +46,34 @@ class WebsiteDefaults
         'svc_custom' => ['hero' => 'banner', 'intro_1' => 'photo', 'intro_2' => 'photo'],
     ];
 
+    /** Public address of each service page. */
+    public const SERVICE_PAGE_URLS = [
+        'svc_corporate' => '/services/corporate-events',
+        'svc_special' => '/services/special-occasions',
+        'svc_custom' => '/services/custom-fabrication',
+    ];
+
+    /**
+     * The photo each service page shows of itself on the other pages' "More
+     * services" cards (as the pages looked when they were hard-coded).
+     */
+    public const MORE_SERVICES_PHOTO = [
+        'svc_corporate' => 'intro_2',
+        'svc_special' => 'intro_1',
+        'svc_custom' => 'intro_1',
+    ];
+
+    /** Contact & Footer details, used until the Technical Admin saves them. */
+    public const CONTACT = [
+        'name' => "GR3AT A's Event Styling Services",
+        'phone' => '09175352156',
+        'email' => 'gr3ataseventsstyling@gmail.com',
+        'address' => 'Altezza, Deparo, Caloocan City, Philippines',
+        'facebook' => 'https://www.facebook.com/share/17uj5e738o/',
+        'instagram' => '',
+        'copyright' => "Copyright © 2026 GR3AT A's Event Styling Services. All rights reserved.",
+    ];
+
     /** Photos shown on the homepage carousel at most. */
     public const CAROUSEL_MAX = 10;
 
@@ -61,8 +89,8 @@ class WebsiteDefaults
     /** The service card titles. Fixed: they match the three service pages. */
     public const CARD_TITLES = ['Corporate Events', 'Special Occasions', 'Custom Projects'];
 
-    /** Seeded slot photos: block_key => [slot => file]. */
-    private const SLOT_PHOTOS = [
+    /** Seeded slot photos: block_key => [slot => [file, alt text]]. Also the fallback when a slot is empty. */
+    public const SLOT_PHOTOS = [
         'hero' => ['hero' => ['/images/hero-bg.webp', 'Balloon arch and floral backdrop styled by GR3AT A\'s']],
         'about' => [
             'about_1' => ['/images/works/work-8.webp', 'Green hedge wall with illuminated signage'],

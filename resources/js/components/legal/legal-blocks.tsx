@@ -1,4 +1,5 @@
 import { COMPANY } from '@/data/legal';
+import { useSiteContact } from '@/lib/public-site';
 import type { LegalBlock } from '@/data/legal';
 
 export type LegalSize = 'dialog' | 'page';
@@ -59,6 +60,8 @@ function Inline({ text }: { text: string }) {
 /** Renders the paragraphs, numbered clauses, bullet lists and contact box of one section. */
 export default function LegalBlocks({ blocks, size }: { blocks: LegalBlock[]; size: LegalSize }) {
     const s = styles[size];
+    // The contact block shows the Contact & Footer details from Website Content.
+    const contact = useSiteContact();
 
     return (
         <div className={`${s.gap} ${s.text} text-ink-soft`}>
@@ -123,10 +126,10 @@ export default function LegalBlocks({ blocks, size }: { blocks: LegalBlock[]; si
                                 key={index}
                                 className="border-l-2 border-[#C99A2E] bg-[#FBF9F5] px-5 py-4 not-italic"
                             >
-                                <p className="font-semibold text-ink">{COMPANY.name}</p>
-                                <p className="mt-2">Business Address: {COMPANY.address}</p>
-                                <p>Email Address: {COMPANY.email}</p>
-                                <p>Contact Number: {COMPANY.phone}</p>
+                                <p className="font-semibold text-ink">{contact.name}</p>
+                                <p className="mt-2">Business Address: {contact.address}</p>
+                                <p>Email Address: {contact.email}</p>
+                                <p>Contact Number: {contact.phone}</p>
                                 {block.dpo && <p>Data Protection Officer / Privacy Contact: {COMPANY.privacyContact}</p>}
                             </address>
                         );
