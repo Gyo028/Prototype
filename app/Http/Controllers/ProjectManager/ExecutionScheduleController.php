@@ -157,7 +157,7 @@ class ExecutionScheduleController extends Controller
                     'scheduledDate' => $s->start_datetime->toDateString(),
                     'targetDate' => $s->end_datetime->toDateString(),
                 ]],
-                'workOrder' => null, // backlog #33
+                'workOrder' => WorkOrderController::page($project, $s, $key), // backlog #33
                 'completion' => $s->schedule_status === ProjectSchedule::STATUS_COMPLETED ? [
                     'completedBy' => $s->outcome?->recordedBy?->name ?? 'Project Manager',
                     'completedAt' => ($s->completed_at ?? $s->end_datetime)->toIso8601String(),

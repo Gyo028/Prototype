@@ -189,7 +189,7 @@ export default function ExecutionStep({ project, usingSample, managerName, onSav
                         <CompletedNotice>
                             <b>The {info.title.toLowerCase()} schedule is saved.</b> Saved by {saved.savedBy}
                             {saved.savedAt ? ` on ${formatDateTime(saved.savedAt)}` : ''}.
-                            {!phase.completion && phase.headName && usingSample && ` Send ${phase.headName} the work order below.`}
+                            {!phase.completion && phase.headName && !phase.workOrder && ` Send ${phase.headName} the work order below.`}
                             {!phase.headName && !phase.completion && ` No ${info.head} is assigned yet. Use Reschedule to assign one.`}
                         </CompletedNotice>
                         <PhaseSummary title={info.title} headLabel={info.head} phase={phase} />
@@ -200,8 +200,8 @@ export default function ExecutionStep({ project, usingSample, managerName, onSav
                                 </OutlineButton>
                             </div>
                         )}
-                        {/* Work orders (#33): sample data only until that backlog is connected */}
-                        {usingSample && (
+                        {/* Work order (backlog #33) */}
+                        {!phase.completion && (
                         <WorkOrderPanel
                             project={project}
                             usingSample={usingSample}

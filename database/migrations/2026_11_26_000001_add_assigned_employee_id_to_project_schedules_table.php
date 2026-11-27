@@ -16,13 +16,16 @@ return new class extends Migration
         Schema::table('project_schedules', function (Blueprint $table) {
             $table->foreignId('assigned_employee_id')->nullable()
                 ->constrained('employees', 'employee_id')->nullOnDelete();
+                $table->text('work_order_instructions')->nullable();
+            $table->timestamp('work_order_sent_at')->nullable();
         });
     }
 
     public function down(): void
     {
         Schema::table('project_schedules', function (Blueprint $table) {
-            $table->dropConstrainedForeignId('assigned_employee_id');
+        $table->dropColumn(['work_order_instructions', 'work_order_sent_at']);
+        $table->dropConstrainedForeignId('assigned_employee_id');
         });
     }
 };

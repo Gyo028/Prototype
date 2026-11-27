@@ -70,6 +70,8 @@ class ProjectSchedule extends Model
         'remarks',
         'changed_by',
         'assigned_employee_id',
+        'work_order_instructions',
+        'work_order_sent_at',
     ];
 
     protected function casts(): array
@@ -78,6 +80,7 @@ class ProjectSchedule extends Model
             'start_datetime' => 'datetime',
             'end_datetime' => 'datetime',
             'completed_at' => 'datetime',
+            'work_order_sent_at' => 'datetime',
         ];
     }
 

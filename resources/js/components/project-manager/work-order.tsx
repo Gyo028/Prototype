@@ -29,10 +29,11 @@ export default function WorkOrderPanel({ project, usingSample, managerName, onSa
     const [instructions, setInstructions] = useState(sent?.instructions ?? '');
     const [tried, setTried] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [serverError, setServerError] = useState('');
 
     if (!phase || !project.execution) return null;
 
-    const code = `WO-${project.code.replace('REQ-', '')}-${phaseKey === 'fabrication' ? 'F' : 'I'}`;
+    const code = sent?.code ?? `WO-${project.code.replace(/^(REQ|PRJ)-/, '')}-${phaseKey === 'fabrication' ? 'F' : 'I'}`;
     const problems = workOrderProblems(phase, head, instructions);
 
     const send = () => {
@@ -41,9 +42,8 @@ export default function WorkOrderPanel({ project, usingSample, managerName, onSa
         if (problems.length || !head?.email) return;
 
         const finish = () => {
-            toast.success(
-                `Work order ${code} was emailed to ${head.name} (${head.email}). A work summary confirmation was sent to you.`,
-            );
+            toast.success(`Work order ${code} was emailed to ${head.name} (${head.email}).`);
+            setServerError('');
             setOpen(false);
             setTried(false);
         };
@@ -71,6 +71,8 @@ export default function WorkOrderPanel({ project, usingSample, managerName, onSa
                 onStart: () => setSaving(true),
                 onFinish: () => setSaving(false),
                 onSuccess: finish,
+                // The backend re-checks everything; e.g. the Head's email may have changed.
+                onError: (err) => setServerError(String(err.workOrder ?? err.instructions ?? 'The work order was not sent.')),
             },
         );
     };
@@ -154,6 +156,11 @@ export default function WorkOrderPanel({ project, usingSample, managerName, onSa
                         />
                     </Field>
 
+                    {serverError && (
+                        <p role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-700">
+                            The work order was not sent. {serverError}
+                        </p>
+                    )}
                     {tried && problems.length > 0 && (
                         <div role="alert" className="flex items-start gap-3 rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-700">
                             <AlertTriangle className="mt-0.5 size-5 shrink-0" />
