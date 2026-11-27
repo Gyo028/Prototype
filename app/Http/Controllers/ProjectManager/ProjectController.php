@@ -53,7 +53,7 @@ class ProjectController extends Controller
     ];
 
     /** The database status → the status shown on the pages (revision, Nov 19). */
-    private const STATUS_NAMES = [
+    public const STATUS_NAMES = [
         ProjectStatus::CONSULTATION => 'Consultation',
         ProjectStatus::BOOKED => 'Ocular Visit',
         ProjectStatus::SITE_ASSESSMENT => 'Ocular Visit',
@@ -143,6 +143,8 @@ class ProjectController extends Controller
             'consultationAt' => $booked ? self::slot($booked) : null,
             'consultationNote' => ! $booked && ! $held ? $closed?->remarks : null,
             'consultation' => self::consultation($p, $held),
+            // Adviser revision G3: online (with the link sent) or face to face (with the place)
+            'consultationMeeting' => $booked ? MeetingLinkController::page($booked) : null,
 
             // Step 2 · Ocular Visit: the reservation fee (backlog #27); the site assessment comes with #20
             'reservationFee' => [

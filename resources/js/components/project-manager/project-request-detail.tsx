@@ -119,7 +119,7 @@ export default function ProjectRequestDetail({ request: serverRequest, requestId
             </div>
 
             {/* Everything the customer submitted */}
-            <RequestDetails request={request} />
+            <RequestDetails request={request} tabbed />
 
             {/* Already decided: show the saved decision (read-only) */}
             {request.status !== 'Pending' && request.decision && (

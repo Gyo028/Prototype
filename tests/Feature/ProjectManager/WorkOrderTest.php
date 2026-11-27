@@ -11,6 +11,7 @@ use App\Models\ProjectSchedule;
 use App\Models\ProjectStatus;
 use App\Models\ServiceRequest;
 use App\Models\User;
+use App\Mail\NoticeMail;
 use App\Mail\WorkOrderMail;
 use App\Services\ExecutionSchedules;
 use Database\Seeders\ServiceAssetSeeder;
@@ -85,8 +86,8 @@ beforeEach(function () {
 
     // The schedule from #32: both phases with their Heads.
     $this->actingAs($this->pm)->put(route('project-manager.projects.execution-schedule', $this->project), [
-        'fabrication' => ['headId' => $this->fabHead->employee_id, 'startDate' => '2027-01-10', 'targetDate' => '2027-01-20'],
-        'installation' => ['headId' => $this->instHead->employee_id, 'startDate' => '2027-02-12', 'targetDate' => '2027-02-13'],
+        'fabrication' => ['headId' => $this->fabHead->employee_id, 'activity' => 'Build the stage backdrop and floral arch', 'startDate' => '2027-01-10', 'targetDate' => '2027-01-20'],
+        'installation' => ['headId' => $this->instHead->employee_id, 'activity' => 'Set up the stage and ceiling drapes', 'startDate' => '2027-02-12', 'targetDate' => '2027-02-13'],
     ])->assertSessionHasNoErrors();
 });
 
@@ -165,7 +166,7 @@ test('rescheduling a phase clears its work order', function () {
     woSend($this, 'fabrication');
 
     $this->actingAs($this->pm)->put(route('project-manager.projects.execution-schedule.reschedule', [$this->project, 'fabrication']), [
-        'headId' => $this->fabHead->employee_id, 'startDate' => '2027-01-13', 'targetDate' => '2027-01-23', 'reason' => 'The supplier delivered late.',
+    'headId' => $this->fabHead->employee_id, 'activity' => 'Build the stage backdrop and floral arch', 'startDate' => '2027-01-13', 'targetDate' => '2027-01-23', 'reason' => 'The supplier delivered late.',
     ])->assertSessionHasNoErrors();
 
     expect(woPage($this)['fabrication']['workOrder'])->toBeNull();
@@ -179,4 +180,14 @@ test('a finished phase or a completed project gets no work order', function () {
     woSend($this, 'installation')->assertSessionHasErrors('workOrder');
 
     Mail::assertNothingSent();
+});
+
+/* ---------- fix list (Nov 27): Use Case Table 8, work summary confirmation to the PM ---------- */
+
+test('the project manager receives a work summary confirmation', function () {
+    woSend($this, 'fabrication')->assertSessionHasNoErrors();
+
+    Mail::assertSent(NoticeMail::class, fn (NoticeMail $m) => $m->hasTo('pm@example.com')
+        && $m->heading === 'Work order sent'
+        && $m->details['Activity'] === 'Build the stage backdrop and floral arch');
 });

@@ -112,6 +112,8 @@ class ConsultationController extends Controller
             }
         });
 
+        // Workflow: notify the customer by email (fix list, Nov 27).
+        \App\Services\ProjectNotices::consultationRecorded($project->fresh());
         return back();
     }
 

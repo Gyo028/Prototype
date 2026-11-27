@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\ProjectManager;
 
 use App\Http\Controllers\Controller;
+use App\Mail\NoticeMail;
 use App\Models\Billing;
 use App\Models\Project;
 use App\Services\Billings;
 use App\Services\ConsultationScheduler;
 use App\Services\Contracts;
+use App\Services\ProjectNotices;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -96,9 +98,32 @@ class DisputeController extends Controller
             $contracts->startFabricationIfReady($project);
         }
 
+        // Acceptance criterion 2: the customer is notified of the resolution (by email, fix list Nov 27).
+        self::notifyResolution($project, $billing->fresh());
         return back();
     }
-        /** Opens the customer's proof file (add ?download=1 to download it). */
+    /** Emails the customer the dispute resolution: decision, remarks, bill amount and new due date. */
+    private static function notifyResolution(Project $project, Billing $billing): void
+    {
+        $project->loadMissing('serviceRequest.customer');
+        $decision = ucfirst((string) $billing->dispute_resolution);
+
+        ProjectNotices::toCustomer($project, new NoticeMail(
+            subjectLine: "Your billing dispute was resolved · {$project->project_code}",
+            heading: 'Your billing dispute was resolved',
+            greeting: 'Hi '.($project->serviceRequest?->customer?->full_name ?? 'there').',',
+            lines: ['We reviewed your billing dispute. Here is the result.'],
+            details: [
+                'Project' => (string) $project->project_code,
+                'Dispute' => sprintf('DSP-%04d', $billing->billing_id),
+                'Decision' => $decision,
+                'Remarks' => (string) $billing->dispute_remarks,
+                'Bill amount' => ProjectNotices::peso((float) $billing->amount),
+                'New due date' => $billing->due_date->format('M j, Y'),
+            ],
+        ));
+    }
+    /** Opens the customer's proof file (add ?download=1 to download it). */
     public function proof(Request $request, Project $project, Billing $billing): StreamedResponse
     {
         self::ensureBelongs($project, $billing);

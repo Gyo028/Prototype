@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { GoldButton } from '@/components/dashboard/ui';
 import ConsultationForm from '@/components/project-manager/consultation-form';
+import MeetingLinkForm from '@/components/project-manager/meeting-link-form';
 import type { ConsultationErrors, ConsultationValues } from '@/components/project-manager/consultation-form';
 import { ConsultationSummary, formatDateTime } from '@/components/project-manager/request-details';
 import { PROJECTS_URL, StepIntro, WaitingNotice } from '@/components/project-manager/steps/step-ui';
@@ -122,6 +123,10 @@ export default function ConsultationStep({ project, usingSample, managerName, on
                 </p>
             )}
 
+            {/* Adviser revision G3: the online meeting link (or where a face-to-face one is held) */}
+            {!c && project.consultationAt && project.consultationMeeting && (
+                <MeetingLinkForm projectId={project.id} meeting={project.consultationMeeting} />
+            )}
             {notBooked ? (
                 <WaitingNotice>
                     <p>Waiting for the customer to book the consultation.</p>

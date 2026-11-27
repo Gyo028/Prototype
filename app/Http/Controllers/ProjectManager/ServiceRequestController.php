@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\ProjectManager;
 
 use App\Http\Controllers\Controller;
+use App\Mail\NoticeMail;
 use App\Http\Controllers\Customer\ProjectController as CustomerProjectController;
 use App\Models\Employee;
 use App\Models\Project;
@@ -11,6 +12,7 @@ use App\Models\ProjectStatus;
 use App\Models\ServiceRequest;
 use App\Models\ServiceRequestFile;
 use App\Models\ServiceRequestService;
+use App\Services\ProjectNotices;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -94,6 +96,8 @@ class ServiceRequestController extends Controller
                 ]);
         });
 
+        // Acceptance criterion 1: the customer is notified (Workflow: by email).
+        self::notifyDecision($serviceRequest->fresh(), true);
         return back();
     }
 
@@ -113,9 +117,39 @@ class ServiceRequestController extends Controller
             'reviewed_at' => now(),
         ]);
 
+        // Acceptance criterion 1: the customer is notified (Workflow: by email).
+        self::notifyDecision($serviceRequest->fresh(), false);
         return back();
     }
 
+        /**
+     * Emails the customer the decision (fix list, Nov 27). Approved: prompts them to book a
+     * consultation (Workflow). Rejected: includes the remarks.
+     */
+    private static function notifyDecision(ServiceRequest $serviceRequest, bool $approved): void
+    {
+        $serviceRequest->loadMissing(['customer.user', 'eventType']);
+        $event = $serviceRequest->isCustom() ? (string) $serviceRequest->project_title : ($serviceRequest->eventType?->event_type_name ?? 'Event');
+
+        $details = [
+            'Request' => (string) $serviceRequest->request_code,
+            'Event' => $event.' · '.$serviceRequest->start_date->format('M j, Y'),
+            'Decision' => $approved ? 'Approved' : 'Rejected',
+        ];
+        if ($serviceRequest->pm_remarks) {
+            $details['Remarks'] = $serviceRequest->pm_remarks;
+        }
+
+        ProjectNotices::send($serviceRequest->customer?->user?->email, new NoticeMail(
+            subjectLine: 'Your service request was '.($approved ? 'approved' : 'rejected')." · {$serviceRequest->request_code}",
+            heading: $approved ? 'Your service request was approved' : 'Your service request was rejected',
+            greeting: 'Hi '.($serviceRequest->customer?->full_name ?? 'there').',',
+            lines: [$approved
+                ? 'Good news! Your request is now a project. Please log in and book your consultation appointment.'
+                : 'We are sorry, we cannot take this request. Please see the remarks below.'],
+            details: $details,
+        ));
+    }
     /** Shows a reference file in the browser, or downloads it with ?download=1. */
     public function file(Request $request, ServiceRequest $serviceRequest, ServiceRequestFile $file): StreamedResponse
     {

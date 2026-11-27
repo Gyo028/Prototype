@@ -14,6 +14,7 @@
                     <tr><td style="color:#777;">Event</td><td>{{ $order['event'] }}</td></tr>
                     <tr><td style="color:#777;">Customer</td><td>{{ $order['customer'] }}</td></tr>
                     <tr><td style="color:#777;">Venue</td><td>{{ $order['venue'] }}</td></tr>
+                    <tr><td style="color:#777;">Activity</td><td>{{ $order['activity'] }}</td></tr>
                     <tr><td style="color:#777;">Start date</td><td>{{ $order['start'] }}</td></tr>
                     <tr><td style="color:#777;">Target completion date</td><td>{{ $order['target'] }}</td></tr>
                 </table>

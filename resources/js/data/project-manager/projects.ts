@@ -147,6 +147,12 @@ export type ContractSubmission = {
 /* ---------- the project ---------- */
 
 /** An approved service request plus everything recorded while planning it. */
+/** Adviser revision G3: how the booked consultation is held (sent by the backend only). */
+export type ConsultationMeeting = {
+    mode: 'Online' | 'Face to face';
+    place: string | null; // face to face: where it is held
+    link: string | null; // online: the meeting link the Project Manager sent
+};  
 export type Project = ProjectRequest & {
     reservationFee: { amount: number; paid: boolean }; // billed after the consultation, verified in step 2
     ocularVisitAt: string | null; // 'YYYY-MM-DDTHH:mm', booked by the customer
@@ -167,6 +173,7 @@ export type Project = ProjectRequest & {
     onHold?: boolean; // the customer is still deciding after the consultation
     consultationAt?: string | null; // 'YYYY-MM-DDTHH:mm', the consultation the customer booked; null when none is booked
     consultationNote?: string | null; // why the last booking was closed (rescheduled / did not attend)
+    consultationMeeting?: ConsultationMeeting | null; // adviser revision G3: how the booked consultation is held
     ocularVisitStatus?: 'pending' | 'tentative' | 'confirmed' | 'completed' | null; // pending = waiting for the site access documents
     siteAccessDocuments?: SiteAccessDocument[]; // third-party venues only: authorization letter + venue permit
     assignmentLocked?: boolean; // the designer already submitted a design proposal, so they can no longer be changed

@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\ProjectManager;
 
 use App\Http\Controllers\Controller;
+use App\Mail\NoticeMail;
 use App\Models\Billing;
 use App\Models\Payment;
 use App\Models\Project;
 use App\Models\ProjectStatus;
 use App\Services\ConsultationScheduler;
 use App\Services\Contracts;
+use App\Services\ProjectNotices;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -61,6 +63,8 @@ class PaymentController extends Controller
             $contracts->startFabricationIfReady($project);
         }
 
+        // Use Case / Workflow: a payment confirmation after verifying (fix list, Nov 27).
+        self::sendConfirmation($project, $billing->fresh(), $payment->fresh());
         return back();
     }
 
@@ -133,9 +137,51 @@ class PaymentController extends Controller
             $contracts->startFabricationIfReady($project);
         }
 
+        // Acceptance criterion 1: "… and a payment confirmation is sent" (fix list, Nov 27).
+        self::sendConfirmation($project, $billing->fresh(), $billing->payments()->latest('payment_id')->first());
         return back();
     }
 
+        /**
+     * Emails the customer a payment confirmation (#28 cash / cheque, #27 verified GCash).
+     * After the reservation fee is fully paid it also prompts them to book the ocular visit (Workflow).
+     */
+    public static function sendConfirmation(Project $project, Billing $billing, ?Payment $payment): void
+    {
+        if ($payment === null) {
+            return;
+        }
+
+        $project->loadMissing('serviceRequest.customer');
+        $paid = (float) $billing->payments()->where('status', Payment::STATUS_VERIFIED)->sum('amount_paid');
+        $balance = max(0, round((float) $billing->amount - $paid, 2));
+        $method = match ($payment->payment_method) {
+            Payment::METHOD_CASH => 'Cash',
+            Payment::METHOD_CHEQUE => 'Cheque no. '.$payment->payment_reference,
+            default => 'GCash (ref. '.$payment->payment_reference.')',
+        };
+        $bill = $billing->billing_type === Billing::TYPE_RESERVATION_FEE ? 'Reservation Fee' : ($billing->description ?: 'Project bill');
+
+        $lines = ['We received and verified your payment. Thank you!'];
+        if ($billing->billing_type === Billing::TYPE_RESERVATION_FEE && $balance <= 0) {
+            $lines[] = 'Your reservation is confirmed. Please log in and book your ocular visit.';
+        }
+
+        ProjectNotices::toCustomer($project, new NoticeMail(
+            subjectLine: "Payment confirmation · {$project->project_code}",
+            heading: 'Payment confirmation',
+            greeting: 'Hi '.($project->serviceRequest?->customer?->full_name ?? 'there').',',
+            lines: $lines,
+            details: [
+                'Project' => (string) $project->project_code,
+                'Bill' => $bill,
+                'Amount paid' => ProjectNotices::peso((float) $payment->amount_paid),
+                'Payment method' => $method,
+                'Payment date' => Carbon::parse($payment->payment_date)->format('M j, Y'),
+                'Remaining balance of this bill' => ProjectNotices::peso($balance),
+            ],
+        ));
+    }
     /** After a payment is verified: the bill is paid once covered; a paid reservation fee books the project. */
     public static function settle(Billing $billing, Project $project): void
     {

@@ -83,6 +83,8 @@ class DesignProposalController extends Controller
         $proposal = self::waitingForReview($project);
         $proposals->review($proposal, 'pm', false, self::clean($data['remarks']));
 
+        // Workflow: notify the Design Specialist that a new revision cycle has begun (fix list, Nov 27).
+        \App\Services\ProjectNotices::revisionRequested($project, trim($data['remarks']));
         return back();
     }
         /** Opens a design proposal file (add ?download=1 to download it). */

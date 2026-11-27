@@ -1,8 +1,9 @@
 import { FileText, ImageIcon, LayoutGrid } from 'lucide-react';
+import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { Pill } from '@/components/dashboard/ui';
+import { Pill, cx } from '@/components/dashboard/ui';
 import type { PillTone } from '@/components/dashboard/ui';
-import type { Consultation, ProjectRequest, RequestStatus, RequestedService } from '@/data/project-manager/project-requests';
+import type { Consultation, ProjectRequest, RequestStatus } from '@/data/project-manager/project-requests';
 
 /*
  * Pieces shared by the Service Requests page (backlog #13) and the Projects page (backlog #16).
@@ -33,7 +34,6 @@ export const formatTime = (time: string) => {
     return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
 };
 
-const servicePrice = (s: RequestedService) => (s.unit ? `${peso(s.price)} / ${s.unit}` : peso(s.price));
 
 export const statusTone: Record<RequestStatus, PillTone> = {
     Pending: 'yellow',
@@ -63,9 +63,21 @@ export function Detail({ label, children }: { label: string; children: ReactNode
 
 /* ---------- everything the customer submitted ---------- */
 
-export function RequestDetails({ request: r }: { request: ProjectRequest }) {
-    return (
-        <div className="grid gap-4 md:grid-cols-2">
+/** The tabs of a request's details (adviser revision G2, Nov 27). */
+const REQUEST_TABS = ['Customer', 'Event Details', 'Description', 'Design Theme and Layout Assets', 'Preliminary Layout and Quotation', 'Reference Files'] as const;
+type RequestTab = (typeof REQUEST_TABS)[number];
+
+/**
+ * A request's details. tabbed (the Service Request page, adviser revision G2): one section at a
+ * time behind a segmented tab bar, so there is less scrolling. Otherwise (the project page) all
+ * sections are shown. The separate "Services" box was removed in both: the services are already
+ * listed in the Preliminary Layout and Quotation table (leader + adviser, Nov 27).
+ */
+export function RequestDetails({ request: r, tabbed = false }: { request: ProjectRequest; tabbed?: boolean }) {
+    const [tab, setTab] = useState<RequestTab>('Customer');
+
+    const sections: Record<RequestTab, ReactNode> = {
+        Customer: (
             <Section title="Customer">
                 <div className="grid gap-3">
                     <Detail label="Name">{r.customer.name}</Detail>
@@ -77,7 +89,8 @@ export function RequestDetails({ request: r }: { request: ProjectRequest }) {
                     <Detail label="Contact number">{r.customer.phone ?? '—'}</Detail>
                 </div>
             </Section>
-
+        ),
+        'Event Details': (
             <Section title="Event Details">
                 <div className="grid grid-cols-2 gap-3">
                     <Detail label={r.endDate && r.endDate !== r.eventDate ? 'Event dates' : 'Event date'}>
@@ -95,31 +108,13 @@ export function RequestDetails({ request: r }: { request: ProjectRequest }) {
                     </div>
                 </div>
             </Section>
-
-            <div className="md:col-span-2">
-                <Section title="Description">
-                    <p className="text-sm whitespace-pre-line text-ink">{r.description || 'No description provided.'}</p>
-                </Section>
-            </div>
-
-            <Section title="Services">
-                {r.services.length === 0 ? (
-                    <p className="text-sm text-ink-soft">No services selected.</p>
-                ) : (
-                    <ul className="divide-y divide-black/10">
-                        {r.services.map((s) => (
-                            <li key={s.id} className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0">
-                                <div>
-                                    <p className="text-sm text-ink">{s.name}</p>
-                                    <p className="text-xs text-ink-soft">{s.category}</p>
-                                </div>
-                                <span className="text-sm font-semibold text-ink">{servicePrice(s)}</span>
-                            </li>
-                        ))}
-                    </ul>
-                )}
+        ),
+        Description: (
+            <Section title="Description">
+                <p className="text-sm whitespace-pre-line text-ink">{r.description || 'No description provided.'}</p>
             </Section>
-
+        ),
+        'Design Theme and Layout Assets': (
             <Section title="Design Theme and Layout Assets">
                 <Detail label="Theme">{r.theme ?? 'No theme selected'}</Detail>
                 <p className="mt-3 mb-1.5 text-xs text-ink-soft">Layout assets</p>
@@ -135,42 +130,75 @@ export function RequestDetails({ request: r }: { request: ProjectRequest }) {
                     </div>
                 )}
             </Section>
+        ),
+        'Preliminary Layout and Quotation': <PreliminaryLayoutAndQuotation request={r} />,
+        'Reference Files': (
+            <Section title="Reference Files">
+                {r.files.length === 0 ? (
+                    <p className="text-sm text-ink-soft">No files uploaded.</p>
+                ) : (
+                    <div className="flex flex-wrap gap-2">
+                        {r.files.map((f) => (
+                            <a
+                                key={f.id}
+                                href={f.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-2 rounded-lg border border-black/15 px-3 py-2 text-sm text-ink transition hover:border-gold hover:bg-gold/10"
+                            >
+                                {f.type === 'pdf' ? <FileText className="size-4 text-red-600" /> : <ImageIcon className="size-4 text-sky-600" />}
+                                {f.name}
+                            </a>
+                        ))}
+                    </div>
+                )}
+            </Section>
+        ),
+    };
 
-            <div className="md:col-span-2">
-                <PreliminaryLayoutAndQuotation request={r} />
+    if (!tabbed) {
+        // The project page: every section, two columns on wide screens.
+        return (
+            <div className="grid gap-4 md:grid-cols-2">
+                {sections.Customer}
+                {sections['Event Details']}
+                <div className="md:col-span-2">{sections.Description}</div>
+                <div className="md:col-span-2">{sections['Design Theme and Layout Assets']}</div>
+                <div className="md:col-span-2">{sections['Preliminary Layout and Quotation']}</div>
+                <div className="md:col-span-2">{sections['Reference Files']}</div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="grid gap-4">
+            {/* Segmented tab bar; scrolls sideways on small screens */}
+            <div className="overflow-x-auto">
+                <div role="tablist" aria-label="Request details" className="flex w-max min-w-full gap-1 rounded-xl bg-black/5 p-1">
+                    {REQUEST_TABS.map((t) => (
+                        <button
+                            key={t}
+                            type="button"
+                            role="tab"
+                            aria-selected={tab === t}
+                            onClick={() => setTab(t)}
+                            className={cx(
+                                'flex-1 rounded-lg px-3 py-2 text-sm font-semibold whitespace-nowrap transition',
+                                tab === t ? 'bg-white text-ink shadow-sm' : 'text-ink-soft hover:text-ink',
+                            )}
+                        >
+                            {t}
+                        </button>
+                    ))}
+                </div>
             </div>
 
-            <div className="md:col-span-2">
-                <Section title="Reference Files">
-                    {r.files.length === 0 ? (
-                        <p className="text-sm text-ink-soft">No files uploaded.</p>
-                    ) : (
-                        <div className="flex flex-wrap gap-2">
-                            {r.files.map((f) => (
-                                <a
-                                    key={f.id}
-                                    href={f.url}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="inline-flex items-center gap-2 rounded-lg border border-black/15 px-3 py-2 text-sm text-ink transition hover:border-gold hover:bg-gold/10"
-                                >
-                                    {f.type === 'pdf' ? (
-                                        <FileText className="size-4 text-red-600" />
-                                    ) : (
-                                        <ImageIcon className="size-4 text-sky-600" />
-                                    )}
-                                    {f.name}
-                                </a>
-                            ))}
-                        </div>
-                    )}
-                </Section>
+            <div role="tabpanel" aria-label={tab}>
+                {sections[tab]}
             </div>
         </div>
     );
 }
-
-/* ---------- preliminary layout and quotation (Manage Service Request use case) ---------- */
 
 /** One line of the preliminary quotation. Per-guest services are multiplied by the guest count. */
 export function quotationLines(r: ProjectRequest) {

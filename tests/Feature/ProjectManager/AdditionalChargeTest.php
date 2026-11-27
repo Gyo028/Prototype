@@ -123,13 +123,21 @@ test('nothing is saved without an amount or a reason', function () {
     expect(acCharges($this))->toHaveCount(0);
 });
 
-test('a charge cannot be added before the contract is verified or after the project is completed', function () {
+test('a charge cannot be added before the contract is verified or on a cancelled project', function () {
     $this->project->contracts()->update(['status' => Contract::STATUS_SIGNED]);
     acAdd($this, ['amount' => 1000, 'reason' => 'Extra chairs.'])->assertSessionHasErrors('amount');
 
     $this->project->contracts()->update(['status' => Contract::STATUS_VERIFIED]);
-    $this->project->update(['current_status_id' => ProjectStatus::idFor(ProjectStatus::COMPLETED)]);
+    $this->project->update(['current_status_id' => ProjectStatus::idFor(ProjectStatus::CANCELLED)]);
     acAdd($this, ['amount' => 1000, 'reason' => 'Extra chairs.'])->assertSessionHasErrors('amount');
 
     expect(acCharges($this))->toHaveCount(0);
+});
+
+test('a charge can still be added after the event (completed project)', function () {
+    $this->project->update(['current_status_id' => ProjectStatus::idFor(ProjectStatus::COMPLETED)]);
+
+    acAdd($this, ['amount' => 1000, 'reason' => 'Extra chairs requested at the event.'])->assertSessionHasNoErrors();
+
+    expect(acCharges($this))->toHaveCount(1);
 });

@@ -30,6 +30,7 @@ export const projectManagerNav: NavGroup[] = [
             { title: 'Service Requests', href: '/project-manager/service-requests' },
             { title: 'Projects', href: '/project-manager/projects' },
             { title: 'Billing and Payments', href: '/project-manager/billing-payments' },
+            { title: 'Calendar', href: '/project-manager/calendar' }, // adviser revision G1
         ],
     },
 ];

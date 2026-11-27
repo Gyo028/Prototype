@@ -3,12 +3,14 @@
 namespace App\Http\Controllers\ProjectManager;
 
 use App\Http\Controllers\Controller;
+use App\Mail\NoticeMail;
 use App\Mail\WorkOrderMail;
 use App\Models\Project;
 use App\Models\ProjectSchedule;
 use App\Models\ProjectStatus;
 use App\Services\ConsultationScheduler;
 use App\Services\ExecutionSchedules;
+use App\Services\ProjectNotices;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -78,10 +80,35 @@ class WorkOrderController extends Controller
 
         $schedule->update(['work_order_instructions' => $instructions, 'work_order_sent_at' => $now]);
 
+        // Use Case Table 8: "sends a work summary confirmation to the Project Manager" (fix list, Nov 27).
+        self::sendWorkSummary($project, $schedule->fresh(), $phase, $head->full_name, (string) $head->email, $instructions, $now);
         return back();
     }
 
-        /** "WO-26-0007-F": the project number with F (fabrication) or I (installation). */
+        /** The work summary confirmation emailed to the project's Project Manager after a work order is sent. */
+    private static function sendWorkSummary(Project $project, ProjectSchedule $schedule, string $phase, string $head, string $headEmail, string $instructions, Carbon $now): void
+    {
+        $manager = $project->projectManager;
+
+        ProjectNotices::send($manager?->email ?: $manager?->user?->email, new NoticeMail(
+            subjectLine: 'Work summary: '.self::code($project, $phase)." sent · {$project->project_code}",
+            heading: 'Work order sent',
+            greeting: 'Hi '.($manager?->full_name ?? 'Project Manager').',',
+            lines: ['This confirms the work order below was emailed to the assigned Head.'],
+            details: [
+                'Work order' => self::code($project, $phase),
+                'Project' => (string) $project->project_code,
+                'Phase' => ExecutionScheduleController::PHASES[$phase]['title'],
+                'Activity' => (string) ($schedule->activity ?? ExecutionScheduleController::PHASES[$phase]['title']),
+                'Sent to' => "{$head} ({$headEmail})",
+                'Start date' => $schedule->start_datetime->format('M j, Y'),
+                'Target completion date' => $schedule->end_datetime->format('M j, Y'),
+                'Instructions' => $instructions,
+                'Sent on' => $now->format('M j, Y g:i A'),
+            ],
+        ));
+    }   
+    /** "WO-26-0007-F": the project number with F (fabrication) or I (installation). */
     public static function code(Project $project, string $phase): string
     {
         return 'WO-'.preg_replace('/^PRJ-/', '', (string) $project->project_code).'-'.($phase === ProjectSchedule::TYPE_FABRICATION ? 'F' : 'I');
@@ -121,6 +148,7 @@ class WorkOrderController extends Controller
             'event' => $event.' · '.$request->start_date->format('M j, Y'),
             'customer' => $request->customer?->full_name ?? 'Customer',
             'venue' => (string) $request->venue,
+            'activity' => (string) ($schedule->activity ?? ExecutionScheduleController::PHASES[$phase]['title']),
             'start' => $schedule->start_datetime->format('M j, Y'),
             'target' => $schedule->end_datetime->format('M j, Y'),
             'instructions' => $instructions,

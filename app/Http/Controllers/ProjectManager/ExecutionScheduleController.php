@@ -53,7 +53,7 @@ class ExecutionScheduleController extends Controller
             foreach (array_keys(self::PHASES) as $key) {
                 [$start, $end] = self::dates($data[$key]);
                 $schedule = $execution->schedule($project, $key, $start, $end, $request->user());
-                $schedule->update(['assigned_employee_id' => (int) $data[$key]['headId']]);
+                $schedule->update(['assigned_employee_id' => (int) $data[$key]['headId'], 'activity' => trim($data[$key]['activity'])]);
             }
         });
 
@@ -84,7 +84,7 @@ class ExecutionScheduleController extends Controller
         DB::transaction(function () use ($data, $current, $execution, $request) {
             [$start, $end] = self::dates($data);
             $new = $execution->reschedule($current, $start, $end, $data['reason'], $request->user());
-            $new->update(['assigned_employee_id' => (int) $data['headId']]);
+            $new->update(['assigned_employee_id' => (int) $data['headId'], 'activity' => trim($data['activity'])]);
         });
 
         return back();
@@ -153,7 +153,7 @@ class ExecutionScheduleController extends Controller
                 'headName' => $s->assignedEmployee?->full_name,
                 'activities' => [[
                     'id' => "{$key}-{$s->schedule_id}",
-                    'activity' => $phase['title'],
+                    'activity' => $s->activity ?? $phase['title'],
                     'scheduledDate' => $s->start_datetime->toDateString(),
                     'targetDate' => $s->end_datetime->toDateString(),
                 ]],
@@ -185,6 +185,7 @@ class ExecutionScheduleController extends Controller
                     $fail("Choose a {$head}.");
                 }
             }],
+            "{$p}activity" => ['required', 'string', 'max:255'],
             "{$p}startDate" => ['required', 'date'],
             "{$p}targetDate" => ['required', 'date', "after_or_equal:{$p}startDate"],
         ];
@@ -198,6 +199,8 @@ class ExecutionScheduleController extends Controller
 
         return [
             "{$p}headId.required" => "Assign the {$phase['head']}.",
+            "{$p}activity.required" => "Enter the {$title} activity.",
+            "{$p}activity.max" => 'The activity can be up to 255 characters.',
             "{$p}startDate.required" => "Enter the {$title} start date.",
             "{$p}targetDate.required" => "Enter the {$title} target completion date.",
             "{$p}targetDate.after_or_equal" => 'The target completion date cannot be before the start date.',

@@ -42,7 +42,7 @@ export default function WorkOrderPanel({ project, usingSample, managerName, onSa
         if (problems.length || !head?.email) return;
 
         const finish = () => {
-            toast.success(`Work order ${code} was emailed to ${head.name} (${head.email}).`);
+            toast.success(`Work order ${code} was emailed to ${head.name} (${head.email}). A work summary confirmation was sent to you.`);
             setServerError('');
             setOpen(false);
             setTried(false);

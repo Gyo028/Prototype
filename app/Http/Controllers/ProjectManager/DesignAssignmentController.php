@@ -62,6 +62,8 @@ class DesignAssignmentController extends Controller
             'current_status_id' => ProjectStatus::idFor(ProjectStatus::DESIGNING),
         ]);
 
+        // Workflow: notify the assigned Design Specialist by email (fix list, Nov 27).
+        \App\Services\ProjectNotices::designerAssigned($project->fresh());
         return back();
     }
 

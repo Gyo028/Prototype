@@ -42,6 +42,8 @@ use App\Http\Controllers\ProjectManager\ContractController as PmContractControll
 use App\Http\Controllers\ProjectManager\AdditionalChargeController as PmAdditionalChargeController;
 use App\Http\Controllers\ProjectManager\DisputeController as PmDisputeController;
 use App\Http\Controllers\ProjectManager\ExecutionScheduleController as PmExecutionScheduleController;
+use App\Http\Controllers\ProjectManager\CalendarController as PmCalendarController;
+use App\Http\Controllers\ProjectManager\MeetingLinkController as PmMeetingLinkController;
 use App\Http\Controllers\ProjectManager\WorkOrderController as PmWorkOrderController;
 use App\Http\Controllers\PublicSiteController;
 
@@ -191,6 +193,8 @@ Route::middleware(['auth', 'verified', 'role:project_manager'])
         Route::put('projects/{project}/execution-schedule/{phase}/reschedule', [PmExecutionScheduleController::class, 'reschedule'])->whereIn('phase', ['fabrication', 'installation'])->name('projects.execution-schedule.reschedule');
                 // Backlog #33: Generate and send work orders
         Route::post('projects/{project}/work-orders/{phase}', [PmWorkOrderController::class, 'send'])->whereIn('phase', ['fabrication', 'installation'])->name('projects.work-orders.send');
+                // Adviser revision G3: send the online consultation link
+        Route::patch('projects/{project}/consultation/meeting-link', [PmMeetingLinkController::class, 'send'])->name('projects.consultation.meeting-link');
                 // Backlog #20: Site assessment (and the site access documents)
         Route::post('projects/{project}/site-assessment', [PmSiteAssessmentController::class, 'store'])->name('projects.site-assessment');
         Route::get('projects/{project}/site-assessment/files/{file}', [PmSiteAssessmentController::class, 'file'])->name('projects.site-assessment.file');
@@ -207,6 +211,8 @@ Route::middleware(['auth', 'verified', 'role:project_manager'])
         Route::patch('projects/{project}/contract/reject', [PmContractController::class, 'reject'])->name('projects.contract.reject');
         Route::get('projects/{project}/contracts/{contract}/file', [PmContractController::class, 'file'])->name('projects.contract.file');
         Route::inertia('billing-payments', 'project-manager/billing-payments')->name('billing-payments');
+                // Adviser revision G1: the Calendar of event dates
+        Route::get('calendar', [PmCalendarController::class, 'index'])->name('calendar');
     });
 
 Route::middleware(['auth', 'verified', 'role:design_specialist'])

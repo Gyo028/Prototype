@@ -74,6 +74,8 @@ class ProjectSchedule extends Model
         'assigned_employee_id',
         'work_order_instructions',
         'work_order_sent_at',
+        'activity',
+        'meeting_link',
     ];
 
     protected function casts(): array

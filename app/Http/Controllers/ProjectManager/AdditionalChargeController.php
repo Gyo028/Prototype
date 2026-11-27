@@ -44,11 +44,12 @@ class AdditionalChargeController extends Controller
             'reason.max' => 'The reason can be up to 140 characters.',
         ]);
 
-        // My addition: only after the contract is verified, and not on a completed or cancelled project.
+        // My addition: only after the contract is verified, and not on a cancelled project.
+        // A completed project can still get one (Workflow: "during execution or after the event").
         $project->loadMissing('status');
         $status = $project->status->status_name;
-        if (in_array($status, [ProjectStatus::COMPLETED, ProjectStatus::CANCELLED], true)) {
-            throw ValidationException::withMessages(['amount' => 'This project is '.strtolower($status).'.']);
+        if ($status === ProjectStatus::CANCELLED) {
+            throw ValidationException::withMessages(['amount' => 'This project is cancelled.']);
         }
         if ($project->contracts()->where('status', Contract::STATUS_VERIFIED)->doesntExist()) {
             throw ValidationException::withMessages(['amount' => 'Additional charges can be added once the contract is verified.']);

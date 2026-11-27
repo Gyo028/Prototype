@@ -29,16 +29,17 @@ import { executionStatus } from '@/data/project-manager/projects';
 type Draft = Pick<ExecutionSchedule, PhaseKey>;
 
 const newId = () => `act-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-const emptyPhase = (title: string): PhaseSchedule => ({
+const emptyPhase = (): PhaseSchedule => ({
     headId: null,
     headName: null,
-    activities: [{ id: newId(), activity: title, scheduledDate: '', targetDate: '' }],
+    activities: [{ id: newId(), activity: '', scheduledDate: '', targetDate: '' }],
 });
 const noErrors = (): ScheduleErrors => ({ fabrication: { activities: {} }, installation: { activities: {} } });
 
 /** One phase as the backend expects it: the Head and one start / target completion date. */
 const toForm = (phase: PhaseSchedule) => ({
     headId: phase.headId,
+    activity: phase.activities[0]?.activity.trim() ?? '',
     startDate: phase.activities[0]?.scheduledDate ?? '',
     targetDate: phase.activities[0]?.targetDate ?? '',
 });
@@ -51,9 +52,10 @@ function serverErrors(err: Record<string, string>, draft: Draft, only?: PhaseKey
         if (prefix === null) return;
         const id = draft[key].activities[0]?.id ?? '';
         if (err[`${prefix}headId`]) e[key].head = err[`${prefix}headId`];
+        const activity = err[`${prefix}activity`];
         const scheduledDate = err[`${prefix}startDate`];
         const targetDate = err[`${prefix}targetDate`];
-        if (scheduledDate || targetDate) e[key].activities[id] = { scheduledDate, targetDate };
+        if (activity || scheduledDate || targetDate) e[key].activities[id] = { activity, scheduledDate, targetDate };
     });
     return e;
 }
@@ -67,7 +69,7 @@ export default function ExecutionStep({ project, usingSample, managerName, onSav
 
     // null = viewing; 'new' = first schedule (both phases); 'reschedule' = changing this phase only
     const [mode, setMode] = useState<'new' | 'reschedule' | null>(saved === null && phaseKey === 'fabrication' ? 'new' : null);
-    const [draft, setDraft] = useState<Draft>(() => saved ?? { fabrication: emptyPhase('Fabrication'), installation: emptyPhase('Installation') });
+    const [draft, setDraft] = useState<Draft>(() => saved ?? { fabrication: emptyPhase(), installation: emptyPhase() });
     const [reason, setReason] = useState('');
     const [reasonError, setReasonError] = useState('');
     const [errors, setErrors] = useState<ScheduleErrors>(noErrors);
@@ -255,8 +257,8 @@ export default function ExecutionStep({ project, usingSample, managerName, onSav
                     <p role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-semibold text-red-700">
                         The schedule was not saved.{' '}
                         {mode === 'new'
-                            ? 'Assign both Heads and fill in every start date and target completion date.'
-                            : 'Assign the Head, fill in both dates, and give the reason for rescheduling.'}
+                            ? 'Assign both Heads and fill in every activity, start date and target completion date.'
+                            : 'Assign the Head, fill in the activity and both dates, and give the reason for rescheduling.'}
                     </p>
                 )}
 
@@ -292,14 +294,29 @@ type EditorProps = {
 };
 
 function PhaseEditor({ phaseKey, title, headLabel, phase, errors, heads, onChange }: EditorProps) {
-    const line = phase.activities[0] ?? { id: newId(), activity: title, scheduledDate: '', targetDate: '' };
+    const line = phase.activities[0] ?? { id: newId(), activity: '', scheduledDate: '', targetDate: '' };
     const e = errors.activities[line.id] ?? {};
-    // One line per phase: changing a date keeps the phase's name as its activity.
-    const setDates = (changes: { scheduledDate?: string; targetDate?: string }) => onChange({ activities: [{ ...line, activity: title, ...changes }] });
+    // One line per phase (decided with the user, Nov 27): the activity and its two dates.
+    const setDates = (changes: { activity?: string; scheduledDate?: string; targetDate?: string }) => onChange({ activities: [{ ...line, ...changes }] });
 
     return (
         <Section title={`${title} Schedule`}>
             <div className="grid gap-4 sm:grid-cols-3">
+                <Field label="Activity" htmlFor={`${phaseKey}-activity`} required error={e.activity} className="sm:col-span-3">
+                    <input
+                        id={`${phaseKey}-activity`}
+                        maxLength={255}
+                        value={line.activity}
+                        onChange={(ev) => setDates({ activity: ev.target.value })}
+                        placeholder={
+                            phaseKey === 'fabrication'
+                                ? 'e.g. Build the stage backdrop, floral arch and welcome signage'
+                                : 'e.g. Set up the stage, ceiling drapes and table centerpieces at the venue'
+                        }
+                        className={cx(inputClass, e.activity && 'border-red-500')}
+                    />
+                </Field>
+
                 <Field label={headLabel} htmlFor={`${phaseKey}-head`} required error={errors.head}>
                     <select
                         id={`${phaseKey}-head`}
@@ -354,6 +371,9 @@ function PhaseSummary({ title, headLabel, phase }: { title: string; headLabel: s
     return (
         <Section title={`${title} Schedule`}>
             <div className="grid gap-3 sm:grid-cols-3">
+                <div className="sm:col-span-3">
+                    <Detail label="Activity">{phase.activities.map((a) => a.activity).filter(Boolean).join('; ') || '—'}</Detail>
+                </div>
                 <Detail label={headLabel}>{phase.headName ?? 'Not assigned'}</Detail>
                 <Detail label="Start date">
                     <CalendarDays className="mr-1 inline size-3.5 text-ink-soft" />

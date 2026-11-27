@@ -42,6 +42,8 @@ class ContractController extends Controller
 
         $contracts->review(self::waitingForReview($project, $contracts), true, $request->user(), null, $data['checklist']);
 
+        // Workflow: notify the customer by email (fix list, Nov 27).
+        \App\Services\ProjectNotices::contractReviewed($project, true);
         return back();
     }
 
@@ -58,6 +60,8 @@ class ContractController extends Controller
 
         $contracts->review(self::waitingForReview($project, $contracts), false, $request->user(), trim($data['remarks']), $data['checklist'] ?? []);
 
+        // Workflow: notify the customer by email (fix list, Nov 27).
+        \App\Services\ProjectNotices::contractReviewed($project, false, trim($data['remarks']));
         return back();
     }
 
