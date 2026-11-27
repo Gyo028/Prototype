@@ -90,7 +90,7 @@ class ConsultationController extends Controller
         return back();
     }
 
-    /** @param array{date: string, time: string, meetingMode: string} $data */
+    /** @param array{date: string, time: string, meetingMode: string, meetingPlace: ?string} $data */
     private function createBooking(Project $project, array $data): void
     {
         [$start, $end] = $this->scheduler->slotBounds($data['date'], $data['time']);
@@ -101,6 +101,7 @@ class ConsultationController extends Controller
             'end_datetime' => $end,
             'schedule_status' => ProjectSchedule::STATUS_CONFIRMED,
             'meeting_mode' => $data['meetingMode'],
+            'meeting_place' => $data['meetingMode'] === ProjectSchedule::MODE_FACE_TO_FACE ? $data['meetingPlace'] : null,
         ]);
     }
 }

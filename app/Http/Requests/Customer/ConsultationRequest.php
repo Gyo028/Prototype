@@ -9,8 +9,8 @@ use Illuminate\Validation\Rule;
 /**
  * Booking, rescheduling or cancelling a consultation.
  *
- *  - book:        date, time, meetingMode
- *  - reschedule:  date, time, meetingMode, reason
+ *  - book:        date, time, meetingMode, meetingPlace (face to face only)
+ *  - reschedule:  date, time, meetingMode, meetingPlace, reason
  *  - cancel:      reason
  *
  * Whether the slot itself is free is checked by ConsultationScheduler.
@@ -18,6 +18,8 @@ use Illuminate\Validation\Rule;
 class ConsultationRequest extends FormRequest
 {
     public const REASON_MAX = 200;
+
+    public const PLACE_MAX = 255;
 
     public function authorize(): bool
     {
@@ -30,6 +32,14 @@ class ConsultationRequest extends FormRequest
         if (is_string($this->input('reason'))) {
             $this->merge(['reason' => trim($this->input('reason'))]);
         }
+
+        // One line; an online meeting has no place.
+        $place = $this->input('meetingPlace');
+        $this->merge([
+            'meetingPlace' => $this->input('meetingMode') === ProjectSchedule::MODE_FACE_TO_FACE && is_string($place)
+                ? (trim((string) preg_replace('/\s+/u', ' ', $place)) ?: null)
+                : null,
+        ]);
     }
 
     /** @return array<string, mixed> */
@@ -45,6 +55,7 @@ class ConsultationRequest extends FormRequest
             'date' => ['required', 'date_format:Y-m-d'],
             'time' => ['required', 'date_format:H:i'],
             'meetingMode' => ['required', Rule::in([ProjectSchedule::MODE_ONLINE, ProjectSchedule::MODE_FACE_TO_FACE])],
+            'meetingPlace' => ['nullable', 'required_if:meetingMode,'.ProjectSchedule::MODE_FACE_TO_FACE, 'string', 'max:'.self::PLACE_MAX],
         ];
 
         return $this->routeIs('customer.projects.consultation.reschedule')
@@ -59,6 +70,8 @@ class ConsultationRequest extends FormRequest
             'date.required' => 'Pick a date.',
             'time.required' => 'Pick a time.',
             'meetingMode.required' => 'Choose online or face to face.',
+            'meetingPlace.required_if' => 'Tell us where to meet.',
+            'meetingPlace.max' => 'Keep the place under '.self::PLACE_MAX.' characters.',
             'reason.required' => 'Please give a reason.',
             'reason.max' => 'Keep the reason under '.self::REASON_MAX.' characters.',
         ];

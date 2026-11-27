@@ -25,6 +25,7 @@ use App\Services\OcularVisitScheduler;
 use App\Services\ProjectProgress;
 use App\Services\ReservationFees;
 use App\Services\SiteAccessDocuments;
+use App\Support\PublicWebsite;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -139,6 +140,9 @@ class ProjectController extends Controller
                 'bookingBlockedReason' => $current ? null : $bookingBlocked,
                 'canChange' => $current !== null && $changeBlocked === null,
                 'changeBlockedReason' => $changeBlocked,
+                // Filled in by "Use GR3AT A's office" on the meeting place field.
+                'officeAddress' => "GR3AT A's office, ".app(PublicWebsite::class)->contact()['address'],
+                'placeMax' => ConsultationRequest::PLACE_MAX,
             ],
             // Shown on the step after the consultation until the fee is verified.
             'reservationFee' => $this->progress->feeOutstanding($project) ? [
@@ -542,6 +546,7 @@ class ProjectController extends Controller
             'startTime' => $s->start_datetime->format('H:i'),
             'endTime' => $s->end_datetime->format('H:i'),
             'meetingMode' => $s->meeting_mode,
+            'meetingPlace' => $s->meeting_place,
             'venueOwnership' => $s->venue_ownership,
             'status' => $s->schedule_status,
             'remarks' => $s->remarks,

@@ -63,13 +63,20 @@ type Props = {
     maxDays?: number;
     /** Replaces the small note under the calendar (the default one talks about the booking lead time). */
     hint?: string;
+    /** Called with '' when the picked day is clicked again (single mode). */
     onChange: (iso: string) => void;
     minDate?: string;
+    /** The last day that can be picked (e.g. the day before the event). Later days are grey and the calendar stops at its month. */
+    maxDate?: string;
+    /** Tooltip for days after maxDate. */
+    afterMaxText?: string;
     /** How many months ahead a request must be; sets the earliest day when minDate is not given, and the tooltip text. */
     leadMonths?: number;
     disabledDates?: string[];
     /** Days that can't be picked for other reasons, shown grey with this reason as the tooltip (e.g. Sundays, fully booked days). */
     unavailableDates?: Record<string, string>;
+    /** Replaces the tooltip of the booked days ("This date is already booked."). */
+    bookedText?: string;
     /** Replaces the "too soon" tooltip, which by default talks about the request lead time. */
     tooSoonText?: string;
     hasError?: boolean;
@@ -131,9 +138,12 @@ export default function DatePicker({
     hint,
     onChange,
     minDate,
+    maxDate,
+    afterMaxText,
     leadMonths = 1,
     disabledDates = sampleBookedDates,
     unavailableDates,
+    bookedText,
     tooSoonText,
     hasError,
     className,
@@ -155,7 +165,10 @@ export default function DatePicker({
 
     const [viewMonth, setViewMonth] = useState(() => (value ? fromISO(value) : min));
 
-    const isDisabled = (d: Date) => startOfDay(d) < min || disabledSet.has(toISO(d));
+    const max = maxDate ? startOfDay(fromISO(maxDate)) : null;
+    const isDisabled = (d: Date) => startOfDay(d) < min || (max !== null && startOfDay(d) > max) || disabledSet.has(toISO(d));
+    // The calendar does not go past the month of the last day that can be picked.
+    const canGoNext = max === null || addMonths(new Date(viewMonth.getFullYear(), viewMonth.getMonth(), 1), 1) <= max;
     const pick = (d: Date) => {
         if (isDisabled(d)) return;
         const iso = toISO(d);
@@ -164,7 +177,7 @@ export default function DatePicker({
         if (!sameMonth(d, viewMonth)) setViewMonth(new Date(d.getFullYear(), d.getMonth(), 1));
 
         if (!isRange) {
-            onChange(iso);
+            onChange(iso === value ? '' : iso); // clicking the picked day again clears it
             return;
         }
 
@@ -228,7 +241,13 @@ export default function DatePicker({
                 <span className="text-sm font-bold text-ink">
                     {MONTH_LABELS[viewMonth.getMonth()]} {viewMonth.getFullYear()}
                 </span>
-                <button type="button" aria-label="Next month" onClick={() => setViewMonth((m) => addMonths(m, 1))} className="rounded p-1.5 hover:bg-black/5">
+                <button
+                    type="button"
+                    aria-label="Next month"
+                    disabled={!canGoNext}
+                    onClick={() => setViewMonth((m) => addMonths(m, 1))}
+                    className="rounded p-1.5 hover:bg-black/5 disabled:opacity-30"
+                >
                     <ChevronRight className="size-4" />
                 </button>
             </div>
@@ -257,10 +276,11 @@ export default function DatePicker({
                         const past = startOfDay(d) < today0;
                         const booked = !past && disabledSet.has(iso);
                         const tooSoon = !past && !booked && startOfDay(d) < min;
+                        const tooLate = !past && !booked && !tooSoon && max !== null && startOfDay(d) > max;
                         // While picking the last day, days before the earliest or after the latest allowed one are out.
                         const outOfRun = !past && !booked && !tooSoon && picking && iso > value && (iso < firstEnd || (!!lastEnd && iso > lastEnd));
-                        const otherReason = !past && !booked && !tooSoon ? unavailableDates?.[iso] : undefined;
-                        const unavailable = past || booked || tooSoon || outOfRun || !!otherReason;
+                        const otherReason = !past && !booked && !tooSoon && !tooLate ? unavailableDates?.[iso] : undefined;
+                        const unavailable = past || booked || tooSoon || tooLate || outOfRun || !!otherReason;
 
                         // Why the day can't be picked, shown in the tooltip, in this order: passed, booked,
                         // too soon, another reason, outside the allowed run. A day of another month that can
@@ -269,10 +289,12 @@ export default function DatePicker({
                         const reason = past
                             ? 'This date has passed.'
                             : booked
-                              ? 'This date is already booked.'
+                              ? (bookedText ?? 'This date is already booked.')
                               : tooSoon
                                 ? (tooSoonText ?? `Requests need at least ${leadText}' notice.`)
-                                : otherReason
+                                : tooLate
+                                  ? (afterMaxText ?? 'This date is too far ahead.')
+                                  : otherReason
                                   ? otherReason
                                   : outOfRun
                                     ? runText

@@ -66,7 +66,7 @@ beforeEach(function () {
         'ocular_visit_required' => false,
     ]);
 
-    $this->proposal = dpProposal($this->project, $this->designer, 1);
+    $this->proposal = pmDpProposal($this->project, $this->designer, 1);
 });
 
 function dpEmployee(User $user, string $position, string $first, string $last): Employee
@@ -83,7 +83,7 @@ function dpEmployee(User $user, string $position, string $first, string $last): 
 }
 
 /** A submitted version with two quotation lines (₱150,000) and a 2D design file. */
-function dpProposal(Project $project, Employee $designer, int $version, array $attributes = []): DesignProposal
+function pmDpProposal(Project $project, Employee $designer, int $version, array $attributes = []): DesignProposal
 {
     $proposal = DesignProposal::create([
         'project_id' => $project->project_id,
@@ -105,7 +105,7 @@ function dpProposal(Project $project, Employee $designer, int $version, array $a
     return $proposal;
 }
 
-function dpPage($test): array
+function pmDpPage($test): array
 {
     $project = null;
     $test->actingAs($test->pm)
@@ -129,7 +129,7 @@ function dpDecide($test, string $decision, array $data)
     return $test->actingAs($test->pm)->patch(route("project-manager.projects.design-proposal.{$decision}", $test->project), $data);
 }
 test('the project page shows the submitted proposal with the designer\'s quotation lines', function () {
-    $proposal = dpPage($this)['designProposal'];
+    $proposal = pmDpPage($this)['designProposal'];
 
     expect($proposal['version'])->toBe(1)
         ->and($proposal['status'])->toBe('Submitted')
@@ -158,7 +158,7 @@ test('approving saves the finalized quotation and the decision; the Owner review
         ->and($this->proposal->items->pluck('item_name')->all())->toBe(['Stage backdrop', 'Entrance signage'])
         ->and($this->proposal->items[0]->description)->toBe('Fabric draping'); // the designer's details are kept
 
-    $page = dpPage($this)['designProposal'];
+    $page = pmDpPage($this)['designProposal'];
     expect($page['status'])->toBe('Awaiting Owner')
         ->and($page['review']['reviewedBy'])->toBe('Paolo Reyes');
 });
@@ -192,15 +192,15 @@ test('returning for revision needs remarks', function () {
     $this->proposal->refresh();
     expect($this->proposal->pm_review_decision)->toBe(DesignProposal::REVISION_REQUESTED)
         ->and($this->proposal->pm_remarks)->toBe('Move the stage to the north wall.')
-        ->and(dpPage($this)['designProposal']['status'])->toBe('Returned for Revision');
+        ->and(pmDpPage($this)['designProposal']['status'])->toBe('Returned for Revision');
 });
 
 test('a reviewed version cannot be reviewed again; the next version can', function () {
     dpDecide($this, 'return', ['remarks' => 'Change the colors.']);
     dpDecide($this, 'approve', ['quotation' => ['items' => dpLines($this->proposal), 'discount' => 0]])->assertSessionHasErrors('remarks');
 
-    $next = dpProposal($this->project, $this->designer, 2);
-    expect(dpPage($this)['designProposal']['version'])->toBe(2);
+    $next = pmDpProposal($this->project, $this->designer, 2);
+    expect(pmDpPage($this)['designProposal']['version'])->toBe(2);
 
     dpDecide($this, 'approve', ['quotation' => ['items' => dpLines($next), 'discount' => 0]])->assertSessionHasNoErrors();
     expect($next->refresh()->pm_review_decision)->toBe(DesignProposal::APPROVED)
@@ -212,16 +212,16 @@ test('the page shows who sent a version back and when the customer approved', fu
         'pm_review_decision' => DesignProposal::APPROVED, 'pm_reviewed_at' => now(),
         'owner_review_decision' => DesignProposal::REVISION_REQUESTED, 'owner_remarks' => 'Use the brand colors.', 'owner_reviewed_at' => now(),
     ]);
-    $page = dpPage($this)['designProposal'];
+    $page = pmDpPage($this)['designProposal'];
     expect($page['status'])->toBe('Returned for Revision')
         ->and($page['review']['reviewedBy'])->toBe('Owner')
         ->and($page['review']['remarks'])->toBe('Use the brand colors.');
 
     $this->proposal->update(['owner_review_decision' => DesignProposal::APPROVED]);
-    expect(dpPage($this)['designProposal']['status'])->toBe('Awaiting Customer');
+    expect(pmDpPage($this)['designProposal']['status'])->toBe('Awaiting Customer');
 
     $this->proposal->update(['customer_decision' => DesignProposal::APPROVED, 'decision_date' => now()]);
-    expect(dpPage($this)['designProposal']['status'])->toBe('Approved');
+    expect(pmDpPage($this)['designProposal']['status'])->toBe('Approved');
 });
 
 test('nothing can be reviewed once the project has left Designing', function () {

@@ -265,6 +265,7 @@ class CustomerDashboard
                     'where' => match (true) {
                         $s->schedule_type === ProjectSchedule::TYPE_OCULAR_VISIT => 'At the venue',
                         $s->meeting_mode === ProjectSchedule::MODE_ONLINE => 'Online',
+                        $s->meeting_place !== null => 'Face to face · '.$s->meeting_place,
                         default => 'Face to face',
                     },
                     // A third-party venue's visit waits for the Project Manager to approve the documents.

@@ -157,6 +157,7 @@ test('the folder offers Monday to Saturday slots from 7 days ahead, without take
         ->assertInertia(fn (Assert $page) => $page
             ->component('customer/project-show')
             ->where('consultation.canBook', true)
+            ->where('consultation.officeAddress', fn (string $address) => str_starts_with($address, "GR3AT A's office, "))
             ->where('rules.earliestDate', '2026-11-23')
             ->where('rules.latestDate', '2027-01-15')
             ->missing('availableSlots.2026-11-22') // too soon
@@ -168,13 +169,16 @@ test('the folder offers Monday to Saturday slots from 7 days ahead, without take
 
 /* ---------------- Booking ---------------- */
 
-test('a booking is saved as confirmed, with the meeting mode', function () {
-    $this->actingAs($this->user)->post(csUrl($this->project), csBook(['meetingMode' => 'face_to_face']))->assertSessionHasNoErrors();
+test('a booking is saved as confirmed, with the meeting mode and place', function () {
+    $this->actingAs($this->user)
+        ->post(csUrl($this->project), csBook(['meetingMode' => 'face_to_face', 'meetingPlace' => "  Café Lorenzo,\n SM Fairview,  Quezon City "]))
+        ->assertSessionHasNoErrors();
 
     $booking = csConsultations($this->project)->sole();
 
     expect($booking->schedule_status)->toBe(ProjectSchedule::STATUS_CONFIRMED)
         ->and($booking->meeting_mode)->toBe(ProjectSchedule::MODE_FACE_TO_FACE)
+        ->and($booking->meeting_place)->toBe('Café Lorenzo, SM Fairview, Quezon City')
         ->and($booking->start_datetime->format('Y-m-d H:i'))->toBe('2026-11-23 09:00')
         ->and($booking->end_datetime->format('Y-m-d H:i'))->toBe('2026-11-23 10:00');
 });
@@ -192,7 +196,35 @@ test('a booking must follow the slot rules', function (array $data, string $fiel
     'no meeting mode' => [['meetingMode' => ''], 'meetingMode'],
     'an unknown meeting mode' => [['meetingMode' => 'phone'], 'meetingMode'],
     'no date' => [['date' => ''], 'date'],
+    'face to face without a place' => [['meetingMode' => 'face_to_face', 'meetingPlace' => '   '], 'meetingPlace'],
+    'a place that is too long' => [['meetingMode' => 'face_to_face', 'meetingPlace' => str_repeat('a', 256)], 'meetingPlace'],
 ]);
+
+test('an online booking keeps no place', function () {
+    $this->actingAs($this->user)
+        ->post(csUrl($this->project), csBook(['meetingMode' => 'online', 'meetingPlace' => 'Somewhere']))
+        ->assertSessionHasNoErrors();
+
+    expect(csConsultations($this->project)->sole()->meeting_place)->toBeNull();
+});
+
+test('rescheduling can change the meeting place', function () {
+    $this->actingAs($this->user)->post(csUrl($this->project), csBook(['meetingMode' => 'face_to_face', 'meetingPlace' => 'Café Lorenzo, Quezon City']));
+
+    $this->actingAs($this->user)
+        ->patch(csUrl($this->project, 'reschedule'), csBook([
+            'date' => '2026-11-25',
+            'meetingMode' => 'face_to_face',
+            'meetingPlace' => "GR3AT A's office, Altezza, Deparo, Caloocan City, Philippines",
+            'reason' => 'Closer to the office.',
+        ]))
+        ->assertSessionHasNoErrors();
+
+    [$old, $new] = csConsultations($this->project)->all();
+
+    expect($old->meeting_place)->toBe('Café Lorenzo, Quezon City')
+        ->and($new->meeting_place)->toBe("GR3AT A's office, Altezza, Deparo, Caloocan City, Philippines");
+});
 
 test('a slot taken by another project\'s ocular visit cannot be booked', function () {
     [, $other] = csCustomer();
