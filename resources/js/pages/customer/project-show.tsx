@@ -20,14 +20,15 @@ type Props = {
     steps: Step[];
     currentStep: StepKey;
     nextAction: NextAction;
-    consultation: ConsultationInfo;
     reservationFee: ReservationFeeCard;
-    ocularVisit: OcularVisitInfo;
-    design: DesignInfo;
-    contract: ContractInfo;
-    execution: ExecutionInfo;
-    availableSlots: Record<string, string[]>;
-    rules: ConsultationRules;
+    // Deferred unless it is the current step's (see ProjectController::show).
+    consultation?: ConsultationInfo;
+    ocularVisit?: OcularVisitInfo;
+    design?: DesignInfo;
+    contract?: ContractInfo;
+    execution?: ExecutionInfo;
+    availableSlots?: Record<string, string[]>;
+    rules?: ConsultationRules;
 };
 
 export default function ProjectShow(props: Props) {

@@ -10,6 +10,7 @@ use App\Models\ProjectSchedule;
 use App\Models\ServiceRequest;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 
 /**
@@ -49,29 +50,24 @@ class CustomerDashboard
         $this->fees->cancelOverdue($customer->customer_id);
 
         $requests = $customer->serviceRequests()
-            ->with([
-                'eventType',
-                'customer',
-                'project.status',
-                'project.serviceRequest.eventType',
-                'project.serviceRequest.customer',
-                'project.schedules.outcome',
-                'project.billings.payments',
-                'project.reservationFee.payments',
-                'project.downPayment.payments',
-                'project.siteAccessDocuments',
-                'project.designProposals',
-                'project.contracts',
-            ])
+            ->with(['eventType', 'project'])
             ->latest('service_request_id')
             ->get();
+
+        // The customer and each project's service request are already in memory:
+        // attach them instead of loading them again (each query is a trip to the database).
+        foreach ($requests as $r) {
+            $r->setRelation('customer', $customer);
+            $r->project?->setRelation('serviceRequest', $r);
+        }
 
         if ($requests->isEmpty()) {
             return $this->empty($customer);
         }
 
-        /** @var Collection<int, Project> $projects */
-        $projects = $requests->pluck('project')->filter()->values();
+        /** @var EloquentCollection<int, Project> $projects */
+        $projects = new EloquentCollection($requests->pluck('project')->filter()->values()->all());
+        $this->progress->preload($projects);
         $open = $projects->reject(fn (Project $p) => $p->status->is_terminal)->values();
 
         return [

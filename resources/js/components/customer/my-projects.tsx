@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { ListCard, ListEmpty, ListPager, ListTable, ListToolbar, pageSlice } from '@/components/customer/list-parts';
 import { formatDay, statusText, statusTone } from '@/components/customer/project-types';
 import { PageHeader, Panel, Pill } from '@/components/dashboard/ui';
-import type { ProjectListItem } from '@/components/customer/project-types';
+import type { NextAction, ProjectListItem } from '@/components/customer/project-types';
 
 /*
  * Customer > My Projects.
@@ -43,7 +43,18 @@ const groupOf = (item: ProjectListItem): Exclude<Filter, 'all' | 'action'> => {
     return item.status.terminal ? 'closed' : 'active';
 };
 
-export default function MyProjects({ items, profileMissing }: { items: ProjectListItem[]; profileMissing: boolean }) {
+type Props = {
+    // Without nextAction: it comes separately (nextActions).
+    items: Omit<ProjectListItem, 'nextAction'>[];
+    profileMissing: boolean;
+    /** { requestId: nextAction }: deferred, so the table shows first and the "Action needed" count fills in after. */
+    nextActions?: Record<number, NextAction | null>;
+};
+
+export default function MyProjects({ items: rows, profileMissing, nextActions }: Props) {
+    // Each row with its next action, once the deferred data has arrived (null until then).
+    const items = useMemo(() => rows.map((i) => ({ ...i, nextAction: nextActions?.[i.requestId] ?? null })), [rows, nextActions]);
+
     const [filter, setFilter] = useState<Filter>('all');
     const [query, setQuery] = useState('');
     const [page, setPage] = useState(1);

@@ -169,7 +169,7 @@ function ctSign($test, array $overrides = [])
 
 function ctPage($test)
 {
-    return $test->actingAs($test->user)->get("/customer/projects/{$test->project->project_id}");
+    return customerProjectPage($test->actingAs($test->user), $test->project);
 }
 
 /* ---------------- Issuing ---------------- */
@@ -515,10 +515,10 @@ test('another customer cannot open, sign or upload the contract', function () {
 test('My Projects flags the contract waiting for a signature', function () {
     ctIssue($this);
 
-    $this->actingAs($this->user)->get('/customer/projects')
+    inertiaPage($this->actingAs($this->user), '/customer/projects')
         ->assertInertia(fn (Assert $page) => $page
-            ->where('items.0.nextAction.title', 'Review and sign your contract')
-            ->where('items.0.nextAction.actionNeeded', true));
+            ->where("nextActions.{$this->project->service_request_id}.title", 'Review and sign your contract')
+            ->where("nextActions.{$this->project->service_request_id}.actionNeeded", true));
 });
 
 test('the PDF template can be rebuilt for unsigned contracts', function () {

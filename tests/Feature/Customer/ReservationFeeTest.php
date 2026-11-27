@@ -113,7 +113,7 @@ function rfPayUrl(Billing $bill): string
 
 function rfPage($test, Project $project)
 {
-    return $test->actingAs($test->user)->get("/customer/projects/{$project->project_id}");
+    return customerProjectPage($test->actingAs($test->user), $project);
 }
 
 /* ---------------- The bill ---------------- */

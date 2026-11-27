@@ -11,6 +11,7 @@ use App\Models\ProjectSchedule;
 use App\Models\ProjectStatus;
 use App\Models\SiteAccessDocument;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -56,6 +57,25 @@ class ProjectProgress
     public const SKIPPED = 'skipped';
 
     public const CANCELLED = 'cancelled';
+
+    /**
+     * Loads what for() reads, for many projects at once: one query per relation for
+     * the whole list, not per project. The reservation fee and down payment are picked
+     * out of the project's bills (same rule as Project::reservationFee() and
+     * downPayment()) instead of being queried again.
+     *
+     * @param  EloquentCollection<int, Project>  $projects
+     */
+    public function preload(EloquentCollection $projects): void
+    {
+        $projects->loadMissing(['status', 'serviceRequest', 'schedules.outcome', 'billings.payments', 'siteAccessDocuments', 'designProposals', 'contracts']);
+
+        foreach ($projects as $project) {
+            $bills = $project->billings->sortBy('billing_id');
+            $project->setRelation('reservationFee', $bills->where('billing_type', Billing::TYPE_RESERVATION_FEE)->last());
+            $project->setRelation('downPayment', $bills->where('billing_type', Billing::TYPE_FINAL_BILLING)->first());
+        }
+    }
 
     /**
      * @return array{

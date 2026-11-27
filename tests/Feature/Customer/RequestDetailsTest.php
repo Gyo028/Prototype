@@ -103,7 +103,7 @@ test('an approved request shows as Project Details, linked to its project', func
 test('the project page links back to its details page', function () {
     $r = rdApproved();
 
-    $this->actingAs($this->customer)->get("/customer/projects/{$r->project->project_id}")
+    customerProjectPage($this->actingAs($this->customer), $r->project)
         ->assertInertia(fn (Assert $page) => $page->where('project.requestId', $r->service_request_id));
 });
 

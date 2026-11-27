@@ -135,8 +135,7 @@ test('the folder offers 2-hour ocular visit slots, without taken ones', function
         'schedule_status' => ProjectSchedule::STATUS_CONFIRMED,
     ]);
 
-    $this->actingAs($this->user)
-        ->get("/customer/projects/{$this->project->project_id}")
+    customerProjectPage($this->actingAs($this->user), $this->project)
         ->assertInertia(fn (Assert $page) => $page
             ->component('customer/project-show')
             ->where('currentStep', 'ocular_visit')
@@ -208,8 +207,7 @@ test('an ocular visit also blocks the consultation slots it covers', function ()
     $consulting = ovProject(ovCustomer()[1], ProjectStatus::CONSULTATION, null);
     $consulting->update(['customer_proceed_decision' => null]);
 
-    $this->actingAs(User::find($consulting->serviceRequest->customer->user_id))
-        ->get("/customer/projects/{$consulting->project_id}")
+    customerProjectPage($this->actingAs(User::find($consulting->serviceRequest->customer->user_id)), $consulting)
         ->assertInertia(fn (Assert $page) => $page
             ->where('availableSlots.2026-11-24', ['11:00', '12:00', '13:00', '14:00', '15:00', '16:00']));
 });
@@ -282,8 +280,7 @@ test('rescheduling needs a reason', function () {
 test('changes are allowed until the day before the visit, not on the day itself', function () {
     ovVisit($this->project, '2026-11-17', '13:00', '15:00'); // tomorrow
 
-    $this->actingAs($this->user)
-        ->get("/customer/projects/{$this->project->project_id}")
+    customerProjectPage($this->actingAs($this->user), $this->project)
         ->assertInertia(fn (Assert $page) => $page->where('ocularVisit.canChange', true));
 
     Carbon::setTestNow(Carbon::parse('2026-11-17 07:00', 'Asia/Manila'));
@@ -326,8 +323,7 @@ test('before the report, the held visit shows that the assessment is being writt
     ovVisit($this->project, '2026-11-10', '09:00', '11:00', ProjectSchedule::STATUS_COMPLETED);
     $this->project->update(['current_status_id' => ProjectStatus::idFor(ProjectStatus::SITE_ASSESSMENT)]);
 
-    $this->actingAs($this->user)
-        ->get("/customer/projects/{$this->project->project_id}")
+    customerProjectPage($this->actingAs($this->user), $this->project)
         ->assertInertia(fn (Assert $page) => $page
             ->where('nextAction.title', 'Waiting for the site assessment')
             ->where('ocularVisit.canBook', false)
@@ -338,8 +334,7 @@ test('before the report, the held visit shows that the assessment is being writt
 test('the customer sees the site assessment report and photos', function () {
     ovAssessment($this->project);
 
-    $this->actingAs($this->user)
-        ->get("/customer/projects/{$this->project->project_id}")
+    customerProjectPage($this->actingAs($this->user), $this->project)
         ->assertInertia(fn (Assert $page) => $page
             ->where('nextAction.title', 'Your site assessment is ready')
             ->where('ocularVisit.assessment.notes', 'Main hall is 18 m x 12 m.')
@@ -405,8 +400,7 @@ test('a third-party venue visit without documents is pending, and uploading is t
         ->and($visit->venue_ownership)->toBe(ProjectSchedule::VENUE_THIRD_PARTY)
         ->and($this->project->refresh()->status->status_name)->toBe(ProjectStatus::SITE_ASSESSMENT);
 
-    $this->actingAs($this->user)
-        ->get("/customer/projects/{$this->project->project_id}")
+    customerProjectPage($this->actingAs($this->user), $this->project)
         ->assertInertia(fn (Assert $page) => $page
             ->where('nextAction.title', 'Upload your site access documents')
             ->where('nextAction.actionNeeded', true)
@@ -477,7 +471,7 @@ test('a rejected document shows its reason, and replacing it keeps the old file 
     $permit = ovDocs($this->project)->firstWhere('document_type', 'venue_permit');
     app(SiteAccessDocuments::class)->review($permit, false, User::factory()->create(['role' => Role::ProjectManager]), 'The permit has expired');
 
-    $this->actingAs($this->user)->get("/customer/projects/{$this->project->project_id}")
+    customerProjectPage($this->actingAs($this->user), $this->project)
         ->assertInertia(fn (Assert $page) => $page
             ->where('nextAction.title', 'Upload your site access documents')
             ->where('nextAction.detail', fn ($d) => str_contains($d, 'The permit has expired'))
@@ -496,7 +490,7 @@ test('a rejected document shows its reason, and replacing it keeps the old file 
         ->and($permits[1]->status)->toBe('submitted')
         ->and($permits[1]->file_name)->toBe('permit-2027.pdf');
 
-    $this->actingAs($this->user)->get("/customer/projects/{$this->project->project_id}")
+    customerProjectPage($this->actingAs($this->user), $this->project)
         ->assertInertia(fn (Assert $page) => $page
             ->where('ocularVisit.documents.1.current.name', 'permit-2027.pdf')
             ->has('ocularVisit.documents.1.history', 1));

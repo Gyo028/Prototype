@@ -1,6 +1,9 @@
 <?php
 
+use App\Models\Project;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
+use Inertia\Support\Header;
 use Tests\TestCase;
 
 /*
@@ -58,4 +61,37 @@ function uniqueMobile(): string
     static $next = 0;
 
     return '0999'.str_pad((string) ++$next, 7, '0', STR_PAD_LEFT);
+}
+
+/*
+| A page as the browser ends up with it: the first request, then the deferred
+| props it fetches right after (Inertia::defer). A 404 or redirect comes back as is.
+*/
+function inertiaPage(TestCase $test, string $url): TestResponse
+{
+    $first = $test->get($url);
+
+    if ($first->status() !== 200) {
+        return $first;
+    }
+
+    $page = json_decode(json_encode($first->viewData('page')), true);
+    $deferred = collect($page['deferredProps'] ?? [])->flatten()->all();
+
+    if ($deferred === []) {
+        return $first;
+    }
+
+    // The second request asks for everything, so the test sees the whole page in one response.
+    return $test->get($url, [
+        Header::VERSION => (string) $page['version'],
+        Header::PARTIAL_COMPONENT => $page['component'],
+        Header::PARTIAL_ONLY => implode(',', [...array_keys($page['props']), ...$deferred]),
+    ]);
+}
+
+/* The customer's project page with every step's details (see Customer\ProjectController::show). */
+function customerProjectPage(TestCase $test, Project $project): TestResponse
+{
+    return inertiaPage($test, "/customer/projects/{$project->project_id}");
 }

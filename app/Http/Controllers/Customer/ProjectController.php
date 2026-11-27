@@ -26,9 +26,11 @@ use App\Services\ProjectProgress;
 use App\Services\ReservationFees;
 use App\Services\SiteAccessDocuments;
 use App\Support\PublicWebsite;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Inertia\Support\Header;
 
 /**
  * Customer > My Projects (Plan Project, customer side).
@@ -59,19 +61,31 @@ class ProjectController extends Controller
     {
         $customer = Customer::query()->where('user_id', $request->user()->id)->first();
 
-        // Unpaid reservation fees past their due date cancel the project first.
-        if ($customer !== null) {
+        // The table (code, title, date, status) comes with the page. What each request
+        // needs next feeds only the "Action needed" filter and reads every project's
+        // steps, so it is deferred: the browser fetches it right after the page appears.
+        $loadingDeferred = $request->header(Header::PARTIAL_COMPONENT) === 'customer/projects';
+
+        // Unpaid reservation fees past their due date cancel the project first (once, on the first request).
+        if ($customer !== null && ! $loadingDeferred) {
             $this->fees->cancelOverdue($customer->customer_id);
         }
 
         $requests = $customer === null ? collect() : $customer->serviceRequests()
-            ->with(['eventType', 'customer', 'project.status', 'project.schedules.outcome', 'project.serviceRequest', 'project.reservationFee.payments', 'project.siteAccessDocuments', 'project.designProposals', 'project.contracts', 'project.downPayment.payments'])
+            ->with(['eventType', 'project.status'])
             ->latest('service_request_id')
             ->get();
 
+        // The customer and each project's service request are already in memory:
+        // attach them instead of loading them again (each query is a trip to the database).
+        foreach ($requests as $r) {
+            $r->setRelation('customer', $customer);
+            $r->project?->setRelation('serviceRequest', $r);
+        }
+
         return Inertia::render('customer/projects', [
             'profileMissing' => $customer === null,
-            'items' => $requests->map(fn (ServiceRequest $r) => [
+            'items' => fn () => $requests->map(fn (ServiceRequest $r) => [
                 'requestId' => $r->service_request_id,
                 'requestCode' => self::requestCode($r),
                 'projectId' => $r->project?->project_id,
@@ -86,8 +100,15 @@ class ProjectController extends Controller
                 'requestStatus' => $r->request_status,
                 'requestDate' => $r->request_date->toDateString(),
                 'status' => $r->project ? self::statusOf($r->project) : null,
-                'nextAction' => $this->listAction($r),
             ])->values(),
+            // { requestId: nextAction } for the "Action needed" filter.
+            'nextActions' => Inertia::defer(function () use ($requests) {
+                $this->progress->preload(new EloquentCollection($requests->pluck('project')->filter()->values()->all()));
+
+                return (object) $requests
+                    ->mapWithKeys(fn (ServiceRequest $r) => [$r->service_request_id => $this->listAction($r)])
+                    ->all();
+            }, 'list'),
         ]);
     }
 
@@ -95,12 +116,111 @@ class ProjectController extends Controller
     {
         self::ensureOwned($request, $project);
 
-        $this->fees->cancelOverdue($project->serviceRequest()->value('customer_id'));
-        // A project in Contract always has a contract to sign (e.g. sample data).
-        $this->contracts->ensureIssued($project);
+        // The page opens on the current step and loads only that step's details. The
+        // other steps are deferred: the browser fetches them in a second request right
+        // after the page appears (Inertia deferred props). This is that second request.
+        $loadingDeferred = $request->header(Header::PARTIAL_COMPONENT) === 'customer/project-show';
 
-        $project->refresh()->load(['serviceRequest.eventType', 'serviceRequest.customer', 'status', 'schedules', 'reservationFee.payments']);
+        // Housekeeping runs once, on the first request.
+        if (! $loadingDeferred) {
+            $cancelled = $this->fees->cancelOverdue($project->serviceRequest()->value('customer_id'));
+            // A project in Contract always has a contract to sign (e.g. sample data).
+            $issued = $this->contracts->ensureIssued($project);
+
+            // Reload only when one of the two above changed something.
+            if ($cancelled > 0 || $issued !== null) {
+                $project->refresh();
+            }
+        }
+
+        // Each value below is a function, so it runs only when its prop is sent, and
+        // loads only what it needs (each query is a trip to the database).
+        $progress = null;
+        $progressOf = function () use (&$progress, $project) {
+            return $progress ??= $this->progress->for($project);
+        };
+
+        $consultation = null;
+        $consultationOf = function () use (&$consultation, $project, $request) {
+            return $consultation ??= $this->consultationData($project, $request);
+        };
+
+        // The current step's details come with the page; the other steps' are deferred.
+        // (On the second request every step is "deferred": only the ones asked for run.)
+        $currentStep = $loadingDeferred ? null : $progressOf()['currentStep'];
+        $step = fn (array $keys, callable $value) => in_array($currentStep, $keys, true)
+            ? $value
+            : Inertia::defer($value, 'steps');
+
+        return Inertia::render('customer/project-show', [
+            'project' => fn () => $this->projectData($project),
+            'steps' => fn () => $progressOf()['steps'],
+            'currentStep' => fn () => $progressOf()['currentStep'],
+            'nextAction' => fn () => $progressOf()['nextAction'],
+            // Shown on the current step after the consultation until the fee is verified.
+            'reservationFee' => fn () => $this->reservationFeeData($project),
+            'consultation' => $step(['consultation'], fn () => $consultationOf()['consultation']),
+            'availableSlots' => $step(['consultation'], fn () => $consultationOf()['availableSlots']),
+            'rules' => $step(['consultation'], fn () => $consultationOf()['rules']),
+            'ocularVisit' => $step(['ocular_visit'], fn () => $this->ocularVisitData($project, $request)),
+            'design' => $step(['design'], fn () => $this->designData($project)),
+            'contract' => $step(['contract'], fn () => $this->contractData($project)),
+            'execution' => $step(['fabrication', 'installation'], fn () => $this->executionData($project)),
+        ]);
+    }
+
+    /** The header: code, title, dates, venue and status. @return array<string, mixed> */
+    private function projectData(Project $project): array
+    {
+        $project->loadMissing(['serviceRequest.eventType', 'serviceRequest.customer', 'status']);
         $r = $project->serviceRequest;
+
+        return [
+            'id' => $project->project_id,
+            'requestId' => $r->service_request_id,
+            'code' => self::projectCode($project),
+            'requestCode' => self::requestCode($r),
+            'title' => self::titleOf($r),
+            'requestType' => $r->request_type,
+            'startDate' => $r->start_date->toDateString(),
+            'endDate' => $r->end_date->toDateString(),
+            'startTime' => $r->event_start_time ? substr($r->event_start_time, 0, 5) : null,
+            'endTime' => $r->event_end_time ? substr($r->event_end_time, 0, 5) : null,
+            'venue' => $r->venue,
+            'guests' => $r->guest_count,
+            'budgetMin' => (float) $r->budget_min,
+            'budgetMax' => $r->budget_max === null ? null : (float) $r->budget_max,
+            'status' => self::statusOf($project),
+            'decision' => $project->customer_proceed_decision,
+        ];
+    }
+
+    /** The reservation fee card, while the fee is still to be paid or verified. @return array<string, mixed>|null */
+    private function reservationFeeData(Project $project): ?array
+    {
+        if (! $this->progress->feeOutstanding($project)) {
+            return null;
+        }
+
+        $project->loadMissing(['serviceRequest', 'reservationFee.payments']);
+        $this->attachToBills($project);
+
+        return [
+            'bill' => $project->reservationFee ? $this->billings->card($project->reservationFee) : null,
+            'expectedAmount' => $project->serviceRequest->reservationFee(),
+            'basis' => $project->serviceRequest->reservationFeeBasis(),
+        ];
+    }
+
+    /**
+     * The consultation (Plan Project step 1): the booking, its history, and the open
+     * slots and booking rules.
+     *
+     * @return array{consultation: array<string, mixed>, availableSlots: array<string, list<string>>|object, rules: array<string, mixed>}
+     */
+    private function consultationData(Project $project, Request $request): array
+    {
+        $project->loadMissing('serviceRequest');
 
         $current = $this->scheduler->current($project);
         $history = $this->history($project, ProjectSchedule::TYPE_CONSULTATION, $current);
@@ -109,30 +229,7 @@ class ProjectController extends Controller
         $changeBlocked = $current ? $this->scheduler->changeBlockedReason($project, $current) : null;
         $needsSlots = $bookingBlocked === null || ($current !== null && $changeBlocked === null);
 
-        $progress = $this->progress->for($project);
-
-        return Inertia::render('customer/project-show', [
-            'project' => [
-                'id' => $project->project_id,
-                'requestId' => $r->service_request_id,
-                'code' => self::projectCode($project),
-                'requestCode' => self::requestCode($r),
-                'title' => self::titleOf($r),
-                'requestType' => $r->request_type,
-                'startDate' => $r->start_date->toDateString(),
-                'endDate' => $r->end_date->toDateString(),
-                'startTime' => $r->event_start_time ? substr($r->event_start_time, 0, 5) : null,
-                'endTime' => $r->event_end_time ? substr($r->event_end_time, 0, 5) : null,
-                'venue' => $r->venue,
-                'guests' => $r->guest_count,
-                'budgetMin' => (float) $r->budget_min,
-                'budgetMax' => $r->budget_max === null ? null : (float) $r->budget_max,
-                'status' => self::statusOf($project),
-                'decision' => $project->customer_proceed_decision,
-            ],
-            'steps' => $progress['steps'],
-            'currentStep' => $progress['currentStep'],
-            'nextAction' => $progress['nextAction'],
+        return [
             'consultation' => [
                 'current' => $current ? $this->scheduleData($current, $request) : null,
                 'history' => $history->map(fn (ProjectSchedule $s) => $this->scheduleData($s, $request))->values(),
@@ -144,19 +241,19 @@ class ProjectController extends Controller
                 'officeAddress' => "GR3AT A's office, ".app(PublicWebsite::class)->contact()['address'],
                 'placeMax' => ConsultationRequest::PLACE_MAX,
             ],
-            // Shown on the step after the consultation until the fee is verified.
-            'reservationFee' => $this->progress->feeOutstanding($project) ? [
-                'bill' => $project->reservationFee ? $this->billings->card($project->reservationFee) : null,
-                'expectedAmount' => $project->serviceRequest->reservationFee(),
-                'basis' => $project->serviceRequest->reservationFeeBasis(),
-            ] : null,
-            'ocularVisit' => $this->ocularVisitData($project, $request),
-            'design' => $this->designData($project),
-            'contract' => $this->contractData($project),
-            'execution' => $this->executionData($project),
             'availableSlots' => $needsSlots ? $this->scheduler->availableSlots($project) : (object) [],
             'rules' => $this->scheduler->rules($project) + ['reasonMax' => ConsultationRequest::REASON_MAX],
-        ]);
+        ];
+    }
+
+    /** The bills shown as cards belong to this project: attach it so each card doesn't load the project and its status again. */
+    private function attachToBills(Project $project): void
+    {
+        foreach (['reservationFee', 'downPayment', 'balanceBill'] as $bill) {
+            if ($project->relationLoaded($bill)) {
+                $project->{$bill}?->setRelation('project', $project);
+            }
+        }
     }
 
     /**
@@ -168,7 +265,7 @@ class ProjectController extends Controller
      */
     private function executionData(Project $project): array
     {
-        $project->load(['schedules.outcome.files']);
+        $project->loadMissing(['serviceRequest', 'schedules.outcome.files']);
 
         $stage = function (string $type) use ($project) {
             $current = $this->execution->current($project, $type);
@@ -221,7 +318,8 @@ class ProjectController extends Controller
      */
     private function contractData(Project $project): array
     {
-        $project->load(['contracts', 'downPayment.payments', 'balanceBill.payments']);
+        $project->loadMissing(['serviceRequest.customer', 'status', 'contracts', 'downPayment.payments', 'balanceBill.payments']);
+        $this->attachToBills($project);
         $current = $this->contracts->current($project);
         $blocked = $this->contracts->signBlockedReason($project, $current);
         $base = "/customer/projects/{$project->project_id}/contracts";
@@ -289,7 +387,7 @@ class ProjectController extends Controller
      */
     private function designData(Project $project): array
     {
-        $project->load(['designProposals.items', 'designProposals.files']);
+        $project->loadMissing(['status', 'reservationFee.payments', 'designProposals.items', 'designProposals.files']);
         $visible = $this->proposals->visible($project);
         $latest = $visible->last();
         $awaiting = $this->proposals->awaitingCustomer($project);
@@ -354,6 +452,8 @@ class ProjectController extends Controller
      */
     private function ocularVisitData(Project $project, Request $request): array
     {
+        $project->loadMissing(['serviceRequest', 'status', 'siteAccessDocuments']);
+
         $current = $this->ocular->current($project);
         $held = $this->ocular->held($project);
         $history = $this->history($project, ProjectSchedule::TYPE_OCULAR_VISIT, $current);
@@ -387,7 +487,7 @@ class ProjectController extends Controller
      */
     private function documentsData(Project $project): array
     {
-        $project->unsetRelation('siteAccessDocuments');
+        // Uses the documents loaded by ocularVisitData() (nothing changes them in between).
         $file = fn (SiteAccessDocument $d) => [
             'id' => $d->document_id,
             'name' => $d->file_name,

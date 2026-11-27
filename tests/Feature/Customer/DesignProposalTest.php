@@ -121,7 +121,7 @@ function dpProposal(Project $project, int $version = 1, array $overrides = []): 
 
 function dpPage($test, Project $project)
 {
-    return $test->actingAs($test->user)->get("/customer/projects/{$project->project_id}");
+    return customerProjectPage($test->actingAs($test->user), $project);
 }
 
 function dpUrl(Project $project, DesignProposal $proposal, string $action): string
@@ -163,10 +163,10 @@ test('an approved version is shown with its files and quotation, and reviewing i
 test('My Projects flags the proposal waiting for the customer', function () {
     dpProposal($this->project);
 
-    $this->actingAs($this->user)->get('/customer/projects')
+    inertiaPage($this->actingAs($this->user), '/customer/projects')
         ->assertInertia(fn (Assert $page) => $page
-            ->where('items.0.nextAction.title', 'Review your design proposal')
-            ->where('items.0.nextAction.actionNeeded', true));
+            ->where("nextActions.{$this->project->service_request_id}.title", 'Review your design proposal')
+            ->where("nextActions.{$this->project->service_request_id}.actionNeeded", true));
 });
 
 /* ---------------- Approving ---------------- */

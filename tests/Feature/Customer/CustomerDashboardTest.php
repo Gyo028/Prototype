@@ -27,7 +27,7 @@ function dbCustomer(): User
 }
 
 test('the dashboard lists what needs the customer, the same actions as My Projects', function () {
-    $this->actingAs(dbCustomer())->get('/customer')
+    inertiaPage($this->actingAs(dbCustomer()), '/customer')
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('customer/dashboard')
@@ -67,7 +67,7 @@ test('upcoming shows the next 3 consultations and ocular visits in the next 30 d
     $today = Carbon::now(AppointmentScheduler::TIMEZONE)->toDateString();
     $until = Carbon::now(AppointmentScheduler::TIMEZONE)->addDays(30)->toDateString();
 
-    $this->actingAs(dbCustomer())->get('/customer')
+    inertiaPage($this->actingAs(dbCustomer()), '/customer')
         ->assertInertia(fn (Assert $page) => $page
             ->where('upcoming', function ($items) use ($today, $until) {
                 $items = collect($items);
@@ -83,16 +83,33 @@ test('upcoming shows the next 3 consultations and ocular visits in the next 30 d
 });
 
 test('the countdown is the next event of a project still in progress', function () {
-    $this->actingAs(dbCustomer())->get('/customer')
+    inertiaPage($this->actingAs(dbCustomer()), '/customer')
         ->assertInertia(fn (Assert $page) => $page
             ->where('countdown', fn ($c) => $c === null || ($c['daysLeft'] >= 0 && count($c['steps']) === 7 && $c['currentNumber'] >= 1)));
+});
+
+test('the welcome line comes with the page; the countdown and both cards are deferred', function () {
+    $this->actingAs(dbCustomer())->get('/customer')
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('customer/dashboard')
+            ->where('hasRequests', true)
+            ->where('firstName', 'Sample')
+            ->missing('countdown')
+            ->missing('actions')
+            ->missing('pending')
+            ->missing('upcoming')
+            ->loadDeferredProps('dashboard', fn (Assert $deferred) => $deferred
+                ->has('countdown')
+                ->has('actions', 5)
+                ->has('pending', 1)
+                ->has('upcoming')));
 });
 
 test('a new customer with no requests gets the getting-started dashboard', function () {
     $user = User::factory()->create(['role' => Role::Customer]);
     Customer::create(['user_id' => $user->id, 'first_name' => 'Andrea', 'last_name' => 'Santos', 'contact_number' => uniqueMobile()]);
 
-    $this->actingAs($user)->get('/customer')
+    inertiaPage($this->actingAs($user), '/customer')
         ->assertInertia(fn (Assert $page) => $page
             ->component('customer/dashboard')
             ->where('hasRequests', false)
@@ -110,6 +127,6 @@ test('only customers can open it', function () {
     $staff = User::where('email', Role::ProjectManager->value.'@example.com')->first();
 
     if ($staff !== null) {
-        $this->actingAs($staff)->get('/customer')->assertForbidden();
+        inertiaPage($this->actingAs($staff), '/customer')->assertForbidden();
     }
 });

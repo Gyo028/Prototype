@@ -99,6 +99,7 @@ return [
             'sslmode' => env('DB_SSLMODE', 'prefer'),
              'options' => [
                 \PDO::ATTR_EMULATE_PREPARES => true, // one network trip per query instead of two
+                \PDO::ATTR_PERSISTENT => env('DB_PERSISTENT', false),
             ],
         ],
 
