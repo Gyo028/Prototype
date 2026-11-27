@@ -79,6 +79,11 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
      * $user->role returns the Role enum (read from the roles table), and
      * $user->role = Role::Owner sets role_id, so the rest of the code
      * (route middleware, dashboard redirect) works with the enum as before.
+     *
+     * withoutObjectCaching(): otherwise Laravel keeps the enum and re-runs the
+     * setter (a roles query) whenever it reads the raw attributes, e.g. each
+     * time the logged-in user is sent to a page. Reading it is cheap anyway:
+     * userRole is always loaded with the user.
      */
     protected function role(): Attribute
     {
@@ -89,7 +94,7 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
 
                 return ['role_id' => UserRole::where('name', $role instanceof Role ? $role->value : $role)->value('id')];
             },
-        );
+        )->withoutObjectCaching();
     }
 
     public function isActive(): bool
