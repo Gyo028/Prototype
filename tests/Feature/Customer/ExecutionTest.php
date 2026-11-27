@@ -95,7 +95,7 @@ function exPhotos(int $count = 2): array
 
 function exPage($test)
 {
-    return $test->actingAs($test->user)->get("/customer/projects/{$test->project->project_id}");
+    return customerProjectPage($test->actingAs($test->user), $test->project);
 }
 
 function exDay(string $date): Carbon

@@ -51,10 +51,7 @@ class CustomerDashboard
         $requests = $customer->serviceRequests()
             ->with([
                 'eventType',
-                'customer',
                 'project.status',
-                'project.serviceRequest.eventType',
-                'project.serviceRequest.customer',
                 'project.schedules.outcome',
                 'project.billings.payments',
                 'project.reservationFee.payments',
@@ -65,6 +62,13 @@ class CustomerDashboard
             ])
             ->latest('service_request_id')
             ->get();
+
+        // The customer and each project's service request are already in memory:
+        // attach them instead of loading them again (each query is a trip to the database).
+        foreach ($requests as $r) {
+            $r->setRelation('customer', $customer);
+            $r->project?->setRelation('serviceRequest', $r);
+        }
 
         if ($requests->isEmpty()) {
             return $this->empty($customer);

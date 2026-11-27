@@ -11,10 +11,11 @@ import { Field, Pill, cx, inputClass, textareaClass } from '@/components/dashboa
  * The rules (days, times, slot length) come from the server, so each appointment only passes its own.
  */
 
-export type AppointmentSlot = { date: string; time: string; meetingMode: MeetingMode | '' };
-export type AppointmentErrors = Partial<Record<'date' | 'time' | 'meetingMode' | 'reason' | 'consultation' | 'ocularVisit', string>>;
+// meetingPlace: face-to-face consultations only (any address; '' otherwise).
+export type AppointmentSlot = { date: string; time: string; meetingMode: MeetingMode | ''; meetingPlace: string };
+export type AppointmentErrors = Partial<Record<'date' | 'time' | 'meetingMode' | 'meetingPlace' | 'reason' | 'consultation' | 'ocularVisit', string>>;
 
-export const EMPTY_SLOT: AppointmentSlot = { date: '', time: '', meetingMode: '' };
+export const EMPTY_SLOT: AppointmentSlot = { date: '', time: '', meetingMode: '', meetingPlace: '' };
 
 /** "14:00" + 120 → "16:00" */
 export const addMinutes = (hhmm: string, minutes: number) => {

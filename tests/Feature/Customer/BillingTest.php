@@ -207,7 +207,7 @@ test('a dispute puts the bill on hold: it cannot be paid until it is resolved', 
         'receipt' => UploadedFile::fake()->create('receipt.pdf', 100, 'application/pdf'),
     ])->assertSessionHasErrors(['payment' => 'This bill is on hold while your dispute is reviewed.']);
 
-    $this->actingAs($this->user)->get("/customer/projects/{$this->project->project_id}")
+    customerProjectPage($this->actingAs($this->user), $this->project)
         ->assertInertia(fn (Assert $page) => $page
             ->where('nextAction.title', 'Your reservation fee is disputed')
             ->where('nextAction.actionNeeded', false)

@@ -121,7 +121,7 @@ function dpProposal(Project $project, int $version = 1, array $overrides = []): 
 
 function dpPage($test, Project $project)
 {
-    return $test->actingAs($test->user)->get("/customer/projects/{$project->project_id}");
+    return customerProjectPage($test->actingAs($test->user), $project);
 }
 
 function dpUrl(Project $project, DesignProposal $proposal, string $action): string

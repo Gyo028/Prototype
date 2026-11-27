@@ -129,7 +129,7 @@ test('the pages send the steps, and My Projects flags the project that needs act
     $customer = User::where('email', Role::Customer->value.'@example.com')->firstOrFail();
     $project = ppProject(ProjectStatus::CONSULTATION);
 
-    $this->actingAs($customer)->get("/customer/projects/{$project->project_id}")
+    customerProjectPage($this->actingAs($customer), $project)
         ->assertInertia(fn (Assert $page) => $page
             ->component('customer/project-show')
             ->has('steps', 7)
@@ -143,6 +143,29 @@ test('the pages send the steps, and My Projects flags the project that needs act
             // Book the consultation, pay the reservation fee, book the ocular visit, review the design, and sign the contract.
             ->where('items', fn ($items) => collect($items)->where('nextAction.actionNeeded', true)->count() === 5
                 && collect($items)->firstWhere('projectId', null)['nextAction']['title'] === 'Waiting for review'));
+});
+
+test('the project page comes with the current step only; the other steps are deferred', function () {
+    $customer = User::where('email', Role::Customer->value.'@example.com')->firstOrFail();
+    $project = ppProject(ProjectStatus::CONSULTATION);
+
+    $this->actingAs($customer)->get("/customer/projects/{$project->project_id}")
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('customer/project-show')
+            ->where('currentStep', 'consultation')
+            ->has('steps', 7)
+            ->has('consultation')
+            ->has('availableSlots')
+            ->has('rules')
+            ->missing('ocularVisit')
+            ->missing('design')
+            ->missing('contract')
+            ->missing('execution')
+            ->loadDeferredProps('steps', fn (Assert $deferred) => $deferred
+                ->has('ocularVisit')
+                ->has('design')
+                ->has('contract')
+                ->has('execution')));
 });
 
 test('finished steps keep their details: a summary line and label/value rows', function () {

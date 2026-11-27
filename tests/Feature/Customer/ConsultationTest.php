@@ -138,7 +138,7 @@ test('my projects lists the customer\'s own requests, approved and pending, and 
 test('a customer cannot open someone else\'s project', function () {
     [$otherUser] = csCustomer();
 
-    $this->actingAs($otherUser)->get("/customer/projects/{$this->project->project_id}")->assertNotFound();
+    customerProjectPage($this->actingAs($otherUser), $this->project)->assertNotFound();
     $this->actingAs($otherUser)->post(csUrl($this->project), csBook())->assertNotFound();
 });
 
@@ -152,8 +152,7 @@ test('the folder offers Monday to Saturday slots from 7 days ahead, without take
         'schedule_status' => ProjectSchedule::STATUS_CONFIRMED,
     ]);
 
-    $this->actingAs($this->user)
-        ->get("/customer/projects/{$this->project->project_id}")
+    customerProjectPage($this->actingAs($this->user), $this->project)
         ->assertInertia(fn (Assert $page) => $page
             ->component('customer/project-show')
             ->where('consultation.canBook', true)
@@ -292,11 +291,11 @@ test('changes are allowed until the day before the appointment', function () {
     $this->actingAs($this->user)->post(csUrl($this->project), csBook()); // Nov 23, 9:00
 
     Carbon::setTestNow(Carbon::parse('2026-11-22 20:00', 'Asia/Manila'));
-    $this->actingAs($this->user)->get("/customer/projects/{$this->project->project_id}")
+    customerProjectPage($this->actingAs($this->user), $this->project)
         ->assertInertia(fn (Assert $page) => $page->where('consultation.canChange', true));
 
     Carbon::setTestNow(Carbon::parse('2026-11-23 07:00', 'Asia/Manila'));
-    $this->actingAs($this->user)->get("/customer/projects/{$this->project->project_id}")
+    customerProjectPage($this->actingAs($this->user), $this->project)
         ->assertInertia(fn (Assert $page) => $page->where('consultation.canChange', false));
     $this->actingAs($this->user)->patch(csUrl($this->project, 'cancel'), ['reason' => 'Sick.'])->assertSessionHasErrors('consultation');
 });

@@ -144,6 +144,11 @@ class ReservationFees
             ->when($customerId !== null, fn ($q) => $q->whereHas('project.serviceRequest', fn ($r) => $r->where('customer_id', $customerId)))
             ->get();
 
+        // Nothing overdue (the usual case): skip the status lookup, one database trip fewer.
+        if ($bills->isEmpty()) {
+            return 0;
+        }
+
         $cancelledId = ProjectStatus::idFor(ProjectStatus::CANCELLED);
 
         foreach ($bills as $bill) {

@@ -1,4 +1,4 @@
-import { Link } from '@inertiajs/react';
+import { Deferred, Link } from '@inertiajs/react';
 import { AlertCircle, ArrowLeft, ArrowRight, Check, Clock, FileText, Lock, SkipForward, X, XCircle } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import BillCard from '@/components/customer/bill-card';
@@ -22,6 +22,7 @@ import type {
     StepKey,
 } from '@/components/customer/project-types';
 import { Pill, cx } from '@/components/dashboard/ui';
+import { Skeleton } from '@/components/ui/skeleton';
 
 /*
  * Customer > My Projects > one project: the Plan Project progress page.
@@ -41,6 +42,11 @@ import { Pill, cx } from '@/components/dashboard/ui';
  *
  * Step states, summaries and details come from the server (ProjectProgress).
  * The request details live on their own page ("View project details").
+ *
+ * Only the current step's details come with the page. The other steps' details
+ * (consultation, ocular visit, design, contract, execution) are deferred: the
+ * browser fetches them right after the page appears, and a step opened before
+ * they arrive shows a skeleton until then.
  */
 
 type Props = {
@@ -48,14 +54,15 @@ type Props = {
     steps: Step[];
     currentStep: StepKey;
     nextAction: NextAction;
-    consultation: ConsultationInfo;
     reservationFee: ReservationFeeCard;
-    ocularVisit: OcularVisitInfo;
-    design: DesignInfo;
-    contract: ContractInfo;
-    execution: ExecutionInfo;
-    availableSlots: Record<string, string[]>;
-    rules: ConsultationRules;
+    // Deferred unless it is the current step's: undefined until the second request arrives.
+    consultation?: ConsultationInfo;
+    ocularVisit?: OcularVisitInfo;
+    design?: DesignInfo;
+    contract?: ContractInfo;
+    execution?: ExecutionInfo;
+    availableSlots?: Record<string, string[]>;
+    rules?: ConsultationRules;
 };
 
 const STATE_LABEL: Record<Step['state'], string> = {
@@ -129,27 +136,76 @@ export default function ProjectFolder({ project, steps, currentStep, nextAction,
                     {/* After the consultation: the reservation fee comes first (paid on Billing & Payments). */}
                     {reservationFee && onCurrent && <ReservationFeeBlock fee={reservationFee} />}
 
+                    {/* Deferred renders its children once the step's data is there, the skeleton until then. */}
                     {step.key === 'consultation' ? (
-                        <ConsultationPanel
-                            projectId={project.id}
-                            consultation={consultation}
-                            availableSlots={availableSlots}
-                            rules={rules}
-                            decision={project.decision}
-                        />
+                        <Deferred data={['consultation', 'availableSlots', 'rules']} fallback={<StepSkeleton />}>
+                            {() => (
+                                <ConsultationPanel
+                                    projectId={project.id}
+                                    consultation={consultation!}
+                                    availableSlots={availableSlots!}
+                                    rules={rules!}
+                                    decision={project.decision}
+                                />
+                            )}
+                        </Deferred>
                     ) : step.key === 'ocular_visit' && step.state !== 'skipped' && step.state !== 'cancelled' ? (
-                        <OcularVisitPanel projectId={project.id} venue={project.venue} ocularVisit={ocularVisit} />
-                    ) : step.key === 'design' && step.state !== 'cancelled' && (step.state === 'current' || design.latest) ? (
-                        <DesignProposalPanel projectId={project.id} design={design} />
-                    ) : step.key === 'contract' && step.state !== 'cancelled' && contract.current ? (
-                        <ContractPanel projectId={project.id} contract={contract} stepState={step.state} />
+                        <Deferred data="ocularVisit" fallback={<StepSkeleton />}>
+                            {() => <OcularVisitPanel projectId={project.id} venue={project.venue} ocularVisit={ocularVisit!} />}
+                        </Deferred>
+                    ) : step.key === 'design' && step.state !== 'cancelled' ? (
+                        <Deferred data="design" fallback={<StepSkeleton />}>
+                            {() =>
+                                step.state === 'current' || design!.latest ? (
+                                    <DesignProposalPanel projectId={project.id} design={design!} />
+                                ) : (
+                                    <StepBody step={step} />
+                                )
+                            }
+                        </Deferred>
+                    ) : step.key === 'contract' && step.state !== 'cancelled' ? (
+                        <Deferred data="contract" fallback={<StepSkeleton />}>
+                            {() =>
+                                contract!.current ? (
+                                    <ContractPanel projectId={project.id} contract={contract!} stepState={step.state} />
+                                ) : (
+                                    <StepBody step={step} />
+                                )
+                            }
+                        </Deferred>
                     ) : (step.key === 'fabrication' || step.key === 'installation') && (step.state === 'current' || step.state === 'done') ? (
-                        <ExecutionPanel kind={step.key} execution={execution} />
+                        <Deferred data="execution" fallback={<StepSkeleton />}>
+                            {() => <ExecutionPanel kind={step.key as 'fabrication' | 'installation'} execution={execution!} />}
+                        </Deferred>
                     ) : (
                         <StepBody step={step} />
                     )}
                 </div>
             </section>
+        </div>
+    );
+}
+
+/** Grey placeholder shaped like a step panel, shown while the step's details load. */
+function StepSkeleton() {
+    return (
+        <div className="space-y-4" aria-busy="true" aria-label="Loading this step">
+            <div className="rounded-xl border border-black/10 p-4 sm:p-5">
+                <Skeleton className="h-5 w-40" />
+                <Skeleton className="mt-3 h-4 w-full max-w-md" />
+                <Skeleton className="mt-2 h-4 w-2/3 max-w-sm" />
+                <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                    <Skeleton className="h-16 w-full" />
+                    <Skeleton className="h-16 w-full" />
+                </div>
+            </div>
+            <div className="rounded-xl border border-black/10 p-4 sm:p-5">
+                <Skeleton className="h-5 w-32" />
+                <Skeleton className="mt-3 h-24 w-full" />
+            </div>
+            <div className="flex justify-end">
+                <Skeleton className="h-9 w-32 rounded-lg" />
+            </div>
         </div>
     );
 }

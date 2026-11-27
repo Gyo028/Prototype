@@ -169,7 +169,7 @@ function ctSign($test, array $overrides = [])
 
 function ctPage($test)
 {
-    return $test->actingAs($test->user)->get("/customer/projects/{$test->project->project_id}");
+    return customerProjectPage($test->actingAs($test->user), $test->project);
 }
 
 /* ---------------- Issuing ---------------- */
