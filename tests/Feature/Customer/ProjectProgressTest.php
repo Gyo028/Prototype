@@ -136,13 +136,25 @@ test('the pages send the steps, and My Projects flags the project that needs act
             ->where('currentStep', 'consultation')
             ->where('nextAction.actionNeeded', true));
 
-    $this->actingAs($customer)->get('/customer/projects')
+    inertiaPage($this->actingAs($customer), '/customer/projects')
         ->assertInertia(fn (Assert $page) => $page
             ->component('customer/projects')
             ->has('items', 13) // 12 projects + 1 pending request
             // Book the consultation, pay the reservation fee, book the ocular visit, review the design, and sign the contract.
-            ->where('items', fn ($items) => collect($items)->where('nextAction.actionNeeded', true)->count() === 5
-                && collect($items)->firstWhere('projectId', null)['nextAction']['title'] === 'Waiting for review'));
+            ->where('nextActions', fn ($actions) => collect($actions)->where('actionNeeded', true)->count() === 5
+                && collect($actions)->contains(fn ($a) => ($a['title'] ?? null) === 'Waiting for review')));
+});
+
+test('My Projects comes with the table; the next actions are deferred', function () {
+    $customer = User::where('email', Role::Customer->value.'@example.com')->firstOrFail();
+
+    $this->actingAs($customer)->get('/customer/projects')
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('customer/projects')
+            ->has('items', 13)
+            ->missing('items.0.nextAction')
+            ->missing('nextActions')
+            ->loadDeferredProps('list', fn (Assert $deferred) => $deferred->has('nextActions', 13)));
 });
 
 test('the project page comes with the current step only; the other steps are deferred', function () {

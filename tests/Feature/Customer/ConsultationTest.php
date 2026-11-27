@@ -123,8 +123,7 @@ test('my projects lists the customer\'s own requests, approved and pending, and 
     [, $other] = csCustomer();
     csProject($other);
 
-    $this->actingAs($this->user)
-        ->get('/customer/projects')
+    inertiaPage($this->actingAs($this->user), '/customer/projects')
         ->assertInertia(fn (Assert $page) => $page
             ->component('customer/projects')
             ->has('items', 2)

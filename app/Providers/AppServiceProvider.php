@@ -2,7 +2,13 @@
 
 namespace App\Providers;
 
+use App\Models\WebsiteContent;
+use App\Models\WebsiteContentImage;
+use App\Support\PublicWebsite;
 use Carbon\CarbonImmutable;
+use Illuminate\Console\Events\CommandFinished;
+use Illuminate\Database\Events\MigrationsEnded;
+use Illuminate\Foundation\Http\Events\RequestHandled;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Notifications\Events\NotificationSent;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -32,6 +38,36 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configureDefaults();
         $this->configureEmails();
+        $this->configureWebsiteCache();
+    }
+
+    /**
+     * The public pages' content is cached (PublicWebsite). Clear it whenever
+     * Website Content changes, so the Technical Admin's edits show immediately.
+     */
+    protected function configureWebsiteCache(): void
+    {
+        // Saving, adding or deleting a block, photo or FAQ through the models.
+        foreach ([WebsiteContent::class, WebsiteContentImage::class] as $model) {
+            $model::saved(fn () => PublicWebsite::forget());
+            $model::deleted(fn () => PublicWebsite::forget());
+        }
+
+        // Any save on the Website Content page, including the carousel and showcase
+        // reorders, which update many rows at once without model events.
+        Event::listen(RequestHandled::class, function (RequestHandled $event) {
+            if (! $event->request->isMethodSafe() && $event->request->routeIs('technical-admin.website-content.*')) {
+                PublicWebsite::forget();
+            }
+        });
+
+        // Migrations, seeding and the photo move write to the tables directly.
+        Event::listen(MigrationsEnded::class, fn () => PublicWebsite::forget());
+        Event::listen(CommandFinished::class, function (CommandFinished $event) {
+            if (in_array($event->command, ['db:seed', 'website:photos-to-storage'], true)) {
+                PublicWebsite::forget();
+            }
+        });
     }
 
     /**

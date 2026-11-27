@@ -10,6 +10,7 @@ use App\Models\ProjectSchedule;
 use App\Models\ServiceRequest;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 
 /**
@@ -49,17 +50,7 @@ class CustomerDashboard
         $this->fees->cancelOverdue($customer->customer_id);
 
         $requests = $customer->serviceRequests()
-            ->with([
-                'eventType',
-                'project.status',
-                'project.schedules.outcome',
-                'project.billings.payments',
-                'project.reservationFee.payments',
-                'project.downPayment.payments',
-                'project.siteAccessDocuments',
-                'project.designProposals',
-                'project.contracts',
-            ])
+            ->with(['eventType', 'project'])
             ->latest('service_request_id')
             ->get();
 
@@ -74,8 +65,9 @@ class CustomerDashboard
             return $this->empty($customer);
         }
 
-        /** @var Collection<int, Project> $projects */
-        $projects = $requests->pluck('project')->filter()->values();
+        /** @var EloquentCollection<int, Project> $projects */
+        $projects = new EloquentCollection($requests->pluck('project')->filter()->values()->all());
+        $this->progress->preload($projects);
         $open = $projects->reject(fn (Project $p) => $p->status->is_terminal)->values();
 
         return [

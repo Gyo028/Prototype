@@ -515,10 +515,10 @@ test('another customer cannot open, sign or upload the contract', function () {
 test('My Projects flags the contract waiting for a signature', function () {
     ctIssue($this);
 
-    $this->actingAs($this->user)->get('/customer/projects')
+    inertiaPage($this->actingAs($this->user), '/customer/projects')
         ->assertInertia(fn (Assert $page) => $page
-            ->where('items.0.nextAction.title', 'Review and sign your contract')
-            ->where('items.0.nextAction.actionNeeded', true));
+            ->where("nextActions.{$this->project->service_request_id}.title", 'Review and sign your contract')
+            ->where("nextActions.{$this->project->service_request_id}.actionNeeded", true));
 });
 
 test('the PDF template can be rebuilt for unsigned contracts', function () {

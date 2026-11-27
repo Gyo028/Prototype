@@ -1,9 +1,10 @@
-import { Link } from '@inertiajs/react';
+import { Deferred, Link } from '@inertiajs/react';
 import { CalendarDays, ChevronLeft, ChevronRight, ClipboardCheck, FilePlus, Info, Sparkles, UserRound } from 'lucide-react';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { formatDate, formatTime, fromISO } from '@/components/customer/project-types';
 import { cx } from '@/components/dashboard/ui';
+import { Skeleton } from '@/components/ui/skeleton';
 
 /*
  * Customer > Dashboard, across all of the customer's projects:
@@ -15,6 +16,10 @@ import { cx } from '@/components/dashboard/ui';
  *
  * A new customer (no requests yet) sees "Start your first project" and how it
  * works instead. Phones: one column in the same order.
+ *
+ * The welcome line comes with the page. The countdown, Action needed and Upcoming
+ * are deferred (they read every project's steps): skeletons show until the
+ * second request brings them, right after the page appears.
  */
 
 export type DashboardStep = { label: string; state: 'done' | 'current' | 'locked' | 'skipped' | 'cancelled' };
@@ -23,7 +28,8 @@ export type DashboardData = {
     profileMissing: boolean;
     firstName: string | null;
     hasRequests: boolean;
-    countdown: {
+    // countdown, actions, pending and upcoming are deferred: undefined until they arrive.
+    countdown?: {
         code: string;
         title: string;
         url: string;
@@ -38,7 +44,7 @@ export type DashboardData = {
         currentNumber: number;
         onHold: boolean;
     } | null;
-    actions: {
+    actions?: {
         projectCode: string;
         projectTitle: string;
         title: string;
@@ -48,8 +54,8 @@ export type DashboardData = {
         payment: boolean;
         url: string;
     }[];
-    pending: { code: string; title: string; submittedOn: string; url: string }[];
-    upcoming: {
+    pending?: { code: string; title: string; submittedOn: string; url: string }[];
+    upcoming?: {
         id: number;
         type: 'consultation' | 'ocular_visit';
         date: string;
@@ -81,16 +87,57 @@ export default function CustomerDashboard(props: DashboardData) {
                 <p className="mt-1 text-sm text-ink-soft md:text-base">Here&apos;s what&apos;s happening with your projects.</p>
             </header>
 
-            {props.countdown && <Countdown event={props.countdown} />}
+            <Deferred data={['countdown', 'actions', 'pending', 'upcoming']} fallback={<PanelsSkeleton />}>
+                {() => (
+                    <>
+                        {props.countdown && <Countdown event={props.countdown} />}
 
-            {/*
-              Same height side by side; rows keep their own height, spare space stays at the bottom.
-              grid-cols-1 (minmax(0, 1fr)) on phones: without it the column grows to fit the longest
-              single-line text (the truncated project names) and pushes the cards past the screen.
-            */}
+                        {/*
+                          Same height side by side; rows keep their own height, spare space stays at the bottom.
+                          grid-cols-1 (minmax(0, 1fr)) on phones: without it the column grows to fit the longest
+                          single-line text (the truncated project names) and pushes the cards past the screen.
+                        */}
+                        <div className="grid grid-cols-1 items-stretch gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+                            <ActionNeeded actions={props.actions!} pending={props.pending!} />
+                            <Upcoming items={props.upcoming!} />
+                        </div>
+                    </>
+                )}
+            </Deferred>
+        </div>
+    );
+}
+
+/** Grey placeholders shaped like the countdown and the two cards, while they load. */
+function PanelsSkeleton() {
+    return (
+        <div className="space-y-5 md:space-y-6" aria-busy="true" aria-label="Loading your projects">
+            <div className="flex flex-col gap-4 rounded-2xl border border-gold-light bg-cream p-5 md:flex-row md:items-center md:gap-6 md:p-6">
+                <Skeleton className="h-10 w-40 md:size-28 md:rounded-2xl" />
+                <div className="min-w-0 flex-1 space-y-2">
+                    <Skeleton className="h-3 w-28" />
+                    <Skeleton className="h-6 w-2/3 max-w-sm" />
+                    <Skeleton className="h-4 w-1/2 max-w-xs" />
+                    <Skeleton className="mt-3 h-2 w-full" />
+                </div>
+            </div>
             <div className="grid grid-cols-1 items-stretch gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-                <ActionNeeded actions={props.actions} pending={props.pending} />
-                <Upcoming items={props.upcoming} />
+                {[3, 2].map((rows, i) => (
+                    <div key={i} className={cx(card, 'min-w-0 p-5')}>
+                        <Skeleton className="h-5 w-36" />
+                        <div className="mt-5 space-y-4">
+                            {Array.from({ length: rows }, (_, r) => (
+                                <div key={r} className="flex items-center gap-3">
+                                    <Skeleton className="size-9 shrink-0 rounded-full" />
+                                    <div className="min-w-0 flex-1 space-y-2">
+                                        <Skeleton className="h-4 w-3/4" />
+                                        <Skeleton className="h-3 w-1/2" />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                ))}
             </div>
         </div>
     );
@@ -257,7 +304,7 @@ function Empty({ icon, title, children }: { icon: ReactNode; title: string; chil
 
 const PER_PAGE = 3;
 
-function ActionNeeded({ actions, pending }: { actions: DashboardData['actions']; pending: DashboardData['pending'] }) {
+function ActionNeeded({ actions, pending }: { actions: NonNullable<DashboardData['actions']>; pending: NonNullable<DashboardData['pending']> }) {
     const [page, setPage] = useState(1);
     const pages = Math.max(1, Math.ceil(actions.length / PER_PAGE));
     const current = Math.min(page, pages);
@@ -341,12 +388,12 @@ function ActionNeeded({ actions, pending }: { actions: DashboardData['actions'];
 
 /* ---------------- Upcoming ---------------- */
 
-const UPCOMING_LABEL: Record<DashboardData['upcoming'][number]['type'], string> = {
+const UPCOMING_LABEL: Record<NonNullable<DashboardData['upcoming']>[number]['type'], string> = {
     consultation: 'Consultation',
     ocular_visit: 'Ocular visit',
 };
 
-function Upcoming({ items }: { items: DashboardData['upcoming'] }) {
+function Upcoming({ items }: { items: NonNullable<DashboardData['upcoming']> }) {
     return (
         <section className={cx(card, 'flex min-w-0 flex-col')} aria-labelledby="upcoming">
             <SectionHead id="upcoming" title="Upcoming" aside={<span className="text-sm text-ink-soft">Next 30 days</span>} />

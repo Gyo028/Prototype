@@ -57,7 +57,7 @@ test('the three accounts can log in as customers and have a profile', function (
 test('Steph Curry is new: no requests yet', function () {
     expect(scCustomer('steph.curry@example.com')->serviceRequests()->count())->toBe(0);
 
-    $this->actingAs(User::where('email', 'steph.curry@example.com')->first())->get('/customer')
+    inertiaPage($this->actingAs(User::where('email', 'steph.curry@example.com')->first()), '/customer')
         ->assertInertia(fn (Assert $page) => $page->where('hasRequests', false));
 });
 
@@ -71,7 +71,7 @@ test('Kevin Durant has a request waiting for review and a Booked project with it
         ->and($projects[ProjectStatus::BOOKED]->billings->first()->status)->toBe(Billing::STATUS_PAID);
 
     // Next: book the ocular visit; the pending request shows as being reviewed only when nothing needs him.
-    $this->actingAs(User::where('email', 'kevin.durant@example.com')->first())->get('/customer')
+    inertiaPage($this->actingAs(User::where('email', 'kevin.durant@example.com')->first()), '/customer')
         ->assertInertia(fn (Assert $page) => $page
             ->has('actions', 1)
             ->where('actions.0.title', 'Book your ocular visit')
@@ -97,7 +97,7 @@ test('LeBron James has projects at Designing, Contract, Completed and Cancelled,
         ->and($completed->schedules->whereIn('schedule_type', [ProjectSchedule::TYPE_FABRICATION, ProjectSchedule::TYPE_INSTALLATION])->every(fn ($s) => $s->outcome !== null))->toBeTrue();
 
     // Review the design and sign the contract.
-    $this->actingAs(User::where('email', 'lebron.james@example.com')->first())->get('/customer')
+    inertiaPage($this->actingAs(User::where('email', 'lebron.james@example.com')->first()), '/customer')
         ->assertInertia(fn (Assert $page) => $page->has('actions', 2));
 });
 

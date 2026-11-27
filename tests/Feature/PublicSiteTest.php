@@ -1,5 +1,7 @@
 <?php
 
+use App\Enums\Role;
+use App\Models\User;
 use App\Models\WebsiteContent;
 use App\Models\WebsiteContentImage;
 use App\Support\WebsiteDefaults;
@@ -131,3 +133,29 @@ test('a social link the admin cleared stays hidden', function () {
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page->where('contact.facebook', ''));
 });
+
+test('the public pages are cached, and an admin change shows on the next visit', function () {
+    $this->seed(WebsiteContentSeeder::class);
+    $admin = User::factory()->create(['role' => Role::TechnicalAdmin]);
+
+    // First visit fills the cache; a direct database change (no model events) isn't seen yet.
+    $this->get(route('home'))->assertOk();
+    WebsiteContent::where('block_key', 'about')->update(['content' => "Changed behind the cache.\n\nSecond."]);
+    $this->get(route('home'))->assertInertia(fn (Assert $page) => $page
+        ->where('about.paragraphs', fn ($p) => collect($p)->doesntContain('Changed behind the cache.')));
+
+    // Saving through the Website Content page clears it: the change shows right away.
+    $this->actingAs($admin)
+        ->put(route('technical-admin.website-content.about'), ['first' => 'New first paragraph.', 'second' => 'New second paragraph.'])
+        ->assertSessionHasNoErrors();
+    $this->get(route('home'))->assertInertia(fn (Assert $page) => $page
+        ->where('about.paragraphs', ['New first paragraph.', 'New second paragraph.']));
+
+    // So does a carousel reorder, which updates many rows at once (no model events).
+    $ids = WebsiteContentImage::query()->library()->whereNotNull('homepage_order')->orderBy('homepage_order')->pluck('image_id')->all();
+    $this->put(route('technical-admin.website-content.works.carousel'), ['ids' => array_reverse($ids)])
+        ->assertSessionHasNoErrors();
+    $this->get(route('home'))->assertInertia(fn (Assert $page) => $page
+        ->where('carousel.0.id', end($ids)));
+});
+

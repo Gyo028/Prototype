@@ -64,13 +64,11 @@ function uniqueMobile(): string
 }
 
 /*
-| The customer's project page with every step's details, as the browser ends up
-| with it: the first request, then the deferred steps it fetches right after
-| (see Customer\ProjectController::show). A 404 or redirect comes back as is.
+| A page as the browser ends up with it: the first request, then the deferred
+| props it fetches right after (Inertia::defer). A 404 or redirect comes back as is.
 */
-function customerProjectPage(TestCase $test, Project $project): TestResponse
+function inertiaPage(TestCase $test, string $url): TestResponse
 {
-    $url = "/customer/projects/{$project->project_id}";
     $first = $test->get($url);
 
     if ($first->status() !== 200) {
@@ -90,4 +88,10 @@ function customerProjectPage(TestCase $test, Project $project): TestResponse
         Header::PARTIAL_COMPONENT => $page['component'],
         Header::PARTIAL_ONLY => implode(',', [...array_keys($page['props']), ...$deferred]),
     ]);
+}
+
+/* The customer's project page with every step's details (see Customer\ProjectController::show). */
+function customerProjectPage(TestCase $test, Project $project): TestResponse
+{
+    return inertiaPage($test, "/customer/projects/{$project->project_id}");
 }

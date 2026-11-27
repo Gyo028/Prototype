@@ -26,6 +26,7 @@ use App\Services\ProjectProgress;
 use App\Services\ReservationFees;
 use App\Services\SiteAccessDocuments;
 use App\Support\PublicWebsite;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -60,13 +61,18 @@ class ProjectController extends Controller
     {
         $customer = Customer::query()->where('user_id', $request->user()->id)->first();
 
-        // Unpaid reservation fees past their due date cancel the project first.
-        if ($customer !== null) {
+        // The table (code, title, date, status) comes with the page. What each request
+        // needs next feeds only the "Action needed" filter and reads every project's
+        // steps, so it is deferred: the browser fetches it right after the page appears.
+        $loadingDeferred = $request->header(Header::PARTIAL_COMPONENT) === 'customer/projects';
+
+        // Unpaid reservation fees past their due date cancel the project first (once, on the first request).
+        if ($customer !== null && ! $loadingDeferred) {
             $this->fees->cancelOverdue($customer->customer_id);
         }
 
         $requests = $customer === null ? collect() : $customer->serviceRequests()
-            ->with(['eventType', 'project.status', 'project.schedules.outcome', 'project.reservationFee.payments', 'project.siteAccessDocuments', 'project.designProposals', 'project.contracts', 'project.downPayment.payments'])
+            ->with(['eventType', 'project.status'])
             ->latest('service_request_id')
             ->get();
 
@@ -79,7 +85,7 @@ class ProjectController extends Controller
 
         return Inertia::render('customer/projects', [
             'profileMissing' => $customer === null,
-            'items' => $requests->map(fn (ServiceRequest $r) => [
+            'items' => fn () => $requests->map(fn (ServiceRequest $r) => [
                 'requestId' => $r->service_request_id,
                 'requestCode' => self::requestCode($r),
                 'projectId' => $r->project?->project_id,
@@ -94,8 +100,15 @@ class ProjectController extends Controller
                 'requestStatus' => $r->request_status,
                 'requestDate' => $r->request_date->toDateString(),
                 'status' => $r->project ? self::statusOf($r->project) : null,
-                'nextAction' => $this->listAction($r),
             ])->values(),
+            // { requestId: nextAction } for the "Action needed" filter.
+            'nextActions' => Inertia::defer(function () use ($requests) {
+                $this->progress->preload(new EloquentCollection($requests->pluck('project')->filter()->values()->all()));
+
+                return (object) $requests
+                    ->mapWithKeys(fn (ServiceRequest $r) => [$r->service_request_id => $this->listAction($r)])
+                    ->all();
+            }, 'list'),
         ]);
     }
 
