@@ -95,7 +95,9 @@ return [
             'charset' => env('DB_CHARSET', 'utf8'),
             'prefix' => '',
             'prefix_indexes' => true,
-            'search_path' => 'public',
+            // Empty DB_SEARCH_PATH skips the "set search_path" query Laravel runs on every
+            // request (one trip to the database). Supabase already searches public by default.
+            'search_path' => env('DB_SEARCH_PATH', 'public') ?: null,
             'sslmode' => env('DB_SSLMODE', 'prefer'),
              'options' => [
                 \PDO::ATTR_EMULATE_PREPARES => true, // one network trip per query instead of two

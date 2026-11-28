@@ -82,6 +82,23 @@ class WebsiteContentController extends Controller
                 'answer' => (string) $faq->content,
             ]);
 
+        // When each section last changed. Every row and the latest change to each
+        // block's photos, in two queries for all the sections together.
+        $rows = WebsiteContent::query()->get(['content_id', 'block_key', 'section', 'updated_at']);
+        $photoTimes = WebsiteContentImage::query()
+            ->selectRaw('content_id, max(updated_at) as latest')
+            ->groupBy('content_id')
+            ->pluck('latest', 'content_id');
+        $changed = fn ($blocks) => $blocks->map(fn (WebsiteContent $b) => $b->getRawOriginal('updated_at'))->values()->all();
+        $updatedAgo = function (array $keys) use ($rows, $photoTimes, $changed): ?string {
+            $blocks = $rows->whereIn('block_key', $keys);
+
+            return $this->ago(
+                ...$changed($blocks),
+                ...$blocks->map(fn (WebsiteContent $b) => $photoTimes[$b->content_id] ?? null)->values()->all(),
+            );
+        };
+
         return Inertia::render('technical-admin/website-content', [
             'hero' => [
                 'photos' => $this->slotPhotos($blocks->get('hero'), 'hero'),
@@ -125,17 +142,15 @@ class WebsiteContentController extends Controller
             'contact' => $contact,
             'faqs' => $faqs,
             'updated' => [
-                'hero' => $this->updatedAgo(['hero']),
-                'about' => $this->updatedAgo(['about']),
-                'services' => $this->ago(
-                    WebsiteContent::where('section', WebsiteContent::SECTION_SERVICES)
-                        ->where(fn ($q) => $q->whereNull('block_key')->orWhere('block_key', 'services'))
-                        ->max('updated_at'),
-                ),
-                'pages' => $this->updatedAgo(array_keys(WebsiteDefaults::SERVICE_PAGES)),
-                'works' => $this->updatedAgo(['works']),
-                'contact' => $this->updatedAgo(['contact']),
-                'faq' => $this->ago(WebsiteContent::where('section', WebsiteContent::SECTION_FAQ)->max('updated_at')),
+                'hero' => $updatedAgo(['hero']),
+                'about' => $updatedAgo(['about']),
+                'services' => $this->ago(...$changed($rows
+                    ->where('section', WebsiteContent::SECTION_SERVICES)
+                    ->filter(fn (WebsiteContent $b) => $b->block_key === null || $b->block_key === 'services'))),
+                'pages' => $updatedAgo(array_keys(WebsiteDefaults::SERVICE_PAGES)),
+                'works' => $updatedAgo(['works']),
+                'contact' => $updatedAgo(['contact']),
+                'faq' => $this->ago(...$changed($rows->where('section', WebsiteContent::SECTION_FAQ))),
             ],
         ]);
     }
@@ -292,17 +307,6 @@ class WebsiteContentController extends Controller
                 'sort_order' => $order,
                 'updated_by' => auth()->id(),
             ],
-        );
-    }
-
-    /** When the blocks or any of their photos last changed. */
-    private function updatedAgo(array $keys): ?string
-    {
-        $ids = WebsiteContent::whereIn('block_key', $keys)->pluck('content_id');
-
-        return $this->ago(
-            WebsiteContent::whereIn('content_id', $ids)->max('updated_at'),
-            WebsiteContentImage::whereIn('content_id', $ids)->max('updated_at'),
         );
     }
 

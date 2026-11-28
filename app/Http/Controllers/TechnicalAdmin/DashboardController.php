@@ -9,6 +9,7 @@ use App\Models\LayoutAsset;
 use App\Models\Service;
 use App\Models\User;
 use App\Models\UserRole;
+use Illuminate\Database\Eloquent\Builder;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -24,24 +25,33 @@ class DashboardController extends Controller
 
     public function index(): Response
     {
+        // One query per table: each counts its total and its subsets together.
+        $users = $this->counts(User::query(), ['archived' => ['account_status', User::STATUS_DISABLED]]);
+        $employees = $this->counts(Employee::query(), [
+            'active' => ['employee_status', Employee::STATUS_ACTIVE],
+            'archived' => ['employee_status', Employee::STATUS_INACTIVE],
+        ]);
+        $services = $this->counts(Service::query(), ['active' => ['status', Service::STATUS_ACTIVE]]);
+        $assets = $this->counts(LayoutAsset::query(), ['active' => ['status', 'active']], 'count(distinct asset_category) as categories');
+
         return Inertia::render('technical-admin/dashboard', [
             'stats' => [
                 'users' => [
-                    'total' => User::count(),
-                    'archived' => User::where('account_status', User::STATUS_DISABLED)->count(),
+                    'total' => $users['total'],
+                    'archived' => $users['archived'],
                 ],
                 'employees' => [
-                    'active' => Employee::where('employee_status', Employee::STATUS_ACTIVE)->count(),
-                    'archived' => Employee::where('employee_status', Employee::STATUS_INACTIVE)->count(),
+                    'active' => $employees['active'],
+                    'archived' => $employees['archived'],
                 ],
                 'services' => [
-                    'total' => Service::count(),
-                    'active' => Service::where('status', Service::STATUS_ACTIVE)->count(),
+                    'total' => $services['total'],
+                    'active' => $services['active'],
                 ],
                 'assets' => [
-                    'total' => LayoutAsset::count(),
-                    'active' => LayoutAsset::where('status', 'active')->count(),
-                    'categories' => LayoutAsset::distinct()->count('asset_category'),
+                    'total' => $assets['total'],
+                    'active' => $assets['active'],
+                    'categories' => $assets['categories'],
                 ],
             ],
             'accountsByRole' => $this->accountsByRole(),
@@ -50,10 +60,30 @@ class DashboardController extends Controller
     }
 
     /**
-     * Every role in the order of the Role enum, including roles with no accounts yet.
+     * A table's total plus how many rows match each [column, value], in one query.
      *
-     * @return list<array{role: string, count: int}>
+     * @param  array<string, array{0: string, 1: string}>  $subsets
+     * @return array<string, int>
      */
+    private function counts(Builder $query, array $subsets, ?string $extra = null): array
+    {
+        $select = ['count(*) as total'];
+        $bindings = [];
+
+        foreach ($subsets as $name => [$column, $value]) {
+            $select[] = "sum(case when {$column} = ? then 1 else 0 end) as {$name}";
+            $bindings[] = $value;
+        }
+
+        if ($extra !== null) {
+            $select[] = $extra;
+        }
+
+        $row = (array) $query->toBase()->selectRaw(implode(', ', $select), $bindings)->first();
+
+        return array_map(fn ($count) => (int) $count, $row);
+    }
+
     private function accountsByRole(): array
     {
         $counts = UserRole::withCount('users')->pluck('users_count', 'name');

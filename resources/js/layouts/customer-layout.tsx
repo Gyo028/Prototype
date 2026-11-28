@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import BrandLogo from '@/components/brand-logo';
 import CustomerSidebar from '@/components/dashboard/customer-sidebar';
+import PageSkeleton, { usePendingPage } from '@/components/page-skeleton';
 
 /**
  * Customer shell: top bar + customer sidebar.
@@ -17,6 +18,8 @@ export default function CustomerLayout({
     unreadCount?: number;
 }) {
     const [open, setOpen] = useState(false);
+    // The page being opened, shown as a skeleton until it arrives.
+    const pending = usePendingPage('/customer');
 
     // Phones and tablets: the top bar slides away while scrolling down and comes back when scrolling up.
     // On desktop (lg) it always stays, since the sidebar sits right under it.
@@ -84,7 +87,11 @@ export default function CustomerLayout({
                     </div>
                 )}
 
-                <main className="min-w-0 flex-1 p-4 md:p-8">{children}</main>
+                <main className="min-w-0 flex-1 p-4 md:p-8">
+                    {/* Hidden, not removed: if the visit is cancelled, the page comes back as it was. */}
+                    <div hidden={pending !== null}>{children}</div>
+                    {pending && <PageSkeleton kind={pending} />}
+                </main>
             </div>
         </div>
     );
