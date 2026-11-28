@@ -93,11 +93,20 @@ function saveStatus({ project, usingSample, managerName, onSaved, setUpHeads, st
 }
 
 /* ---------- one assignment's completion ---------- */
-
 type CompletionProps = StepProps & { phaseKey: PhaseKey; title: string };
 
-/** "Mark as Completed" for the Fabrication or Installation assignment. */
+/**
+ * "Mark as Completed" for the Fabrication or Installation assignment (backlog #35).
+ * Decided with the user (Nov 28): follows the group's ExecutionSchedules::markDone, so it needs
+ * 1–10 photos of the finished work (optional note). Installation done completes the project.
+ */
 export function PhaseCompletion({ project, usingSample, managerName, onSaved, phaseKey, title }: CompletionProps) {
+    const [open, setOpen] = useState(false);
+    const [photos, setPhotos] = useState<File[]>([]);
+    const [note, setNote] = useState('');
+    const [error, setError] = useState('');
+    const [saving, setSaving] = useState(false);
+
     const execution = project.execution;
     const phase = execution?.[phaseKey];
     if (!execution || !phase) return null;
@@ -116,13 +125,23 @@ export function PhaseCompletion({ project, usingSample, managerName, onSaved, ph
     // The work order goes out before the work is done, and a cancelled project takes no more updates.
     if (!phase.workOrder || executionStatus(project) !== null) return null;
 
+    const finish = () => {
+        toast.success(
+            phaseKey === 'fabrication'
+                ? 'Fabrication marked as completed. The Installation step is now open, and the customer was notified.'
+                : 'Installation marked as completed. The project is now Completed, and the customer was notified.',
+        );
+        setOpen(false);
+        setPhotos([]);
+        setNote('');
+    };
+
     const markCompleted = () => {
-        const finish = () =>
-            toast.success(
-                phaseKey === 'fabrication'
-                    ? 'Fabrication marked as completed. The Installation step is now open.'
-                    : 'Installation marked as completed. The project can now be marked as Completed in the last step.',
-            );
+        if (photos.length < 1 || photos.length > 10) {
+            setError('Add 1 to 10 photos of the finished work.');
+            return;
+        }
+        setError('');
 
         if (usingSample) {
             const completion = { completedBy: managerName, completedAt: new Date().toISOString() };
@@ -131,15 +150,67 @@ export function PhaseCompletion({ project, usingSample, managerName, onSaved, ph
             return;
         }
 
-        router.patch(`${PROJECTS_URL}/${project.id}/assignments/${phaseKey}/complete`, {}, { preserveScroll: true, onSuccess: finish });
+        router.post(
+            `${PROJECTS_URL}/${project.id}/assignments/${phaseKey}/complete`,
+            { photos, note: note.trim() || null },
+            {
+                forceFormData: true,
+                preserveScroll: true,
+                onStart: () => setSaving(true),
+                onFinish: () => setSaving(false),
+                onSuccess: finish,
+                onError: (err) => setError(String(Object.values(err)[0] ?? 'It was not marked as completed.')),
+            },
+        );
     };
 
+        if (!open) {
+        return (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-black/15 p-3">
+                <p className="text-sm text-ink-soft">Is the {title.toLowerCase()} work finished?</p>
+                <OutlineButton onClick={() => setOpen(true)}>
+                    <CheckCircle2 className="size-4" /> Mark {title} as Completed
+                </OutlineButton>
+            </div>
+        );
+    }
+
     return (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-black/15 p-3">
-            <p className="text-sm text-ink-soft">Is the {title.toLowerCase()} work finished?</p>
-            <OutlineButton onClick={markCompleted}>
-                <CheckCircle2 className="size-4" /> Mark {title} as Completed
-            </OutlineButton>
+        <div className="grid gap-3 rounded-xl border border-gold/40 bg-gold/5 p-4">
+            <p className="text-sm font-bold text-ink">Mark {title} as Completed</p>
+            <Field label="Photos of the finished work (1 to 10)" htmlFor={`${phaseKey}-photos`} required error={error}>
+                <input
+                    id={`${phaseKey}-photos`}
+                    type="file"
+                    multiple
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={(e) => {
+                        setPhotos(Array.from(e.target.files ?? []));
+                        setError('');
+                    }}
+                    className="text-sm text-ink"
+                />
+            </Field>
+            {photos.length > 0 && <p className="text-xs text-ink-soft">{photos.length} photo(s) selected.</p>}
+            <Field label="Note (optional)" htmlFor={`${phaseKey}-note`}>
+                <textarea
+                    id={`${phaseKey}-note`}
+                    maxLength={1000}
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder="e.g. Set-up finished and checked with the venue coordinator."
+                    className={textareaClass}
+                />
+            </Field>
+            {phaseKey === 'installation' && <p className="text-xs text-ink-soft">This also marks the whole project as Completed.</p>}
+            <div className="flex flex-wrap justify-end gap-2">
+                <OutlineButton onClick={() => setOpen(false)} disabled={saving}>
+                    Cancel
+                </OutlineButton>
+                <GoldButton onClick={markCompleted} disabled={saving}>
+                    <CheckCircle2 className="size-4" /> {saving ? 'Saving...' : 'Mark as Completed'}
+                </GoldButton>
+            </div>
         </div>
     );
 }
