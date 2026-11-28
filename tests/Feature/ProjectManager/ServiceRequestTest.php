@@ -11,6 +11,8 @@ use App\Models\ProjectStatus;
 use App\Models\ServiceRequest;
 use App\Models\User;
 use Database\Seeders\ServiceAssetSeeder;
+use App\Mail\NoticeMail;
+use Illuminate\Support\Facades\Mail;
 use Inertia\Testing\AssertableInertia as Assert;
 
 /*
@@ -199,4 +201,62 @@ test('a decided request cannot be decided again', function () {
 
     expect($request->fresh()->request_status)->toBe(ServiceRequest::STATUS_APPROVED)
         ->and(Project::query()->where('service_request_id', $request->service_request_id)->count())->toBe(1);
+});
+
+/* ---------- fix list (Nov 27): #13 decision email, adviser revision G1 calendar ---------- */
+
+test('the customer is emailed the decision', function () {
+    Mail::fake();
+
+    $approved = pmRequest($this->customer);
+    $this->actingAs($this->pm)->patch(route('project-manager.service-requests.approve', $approved), ['remarks' => ''])->assertSessionHasNoErrors();
+    Mail::assertSent(NoticeMail::class, fn (NoticeMail $m) => $m->hasTo('andrea@example.com') && $m->heading === 'Your service request was approved');
+
+    $rejected = pmRequest($this->customer);
+    $this->actingAs($this->pm)->patch(route('project-manager.service-requests.reject', $rejected), ['remarks' => 'Fully booked.'])->assertSessionHasNoErrors();
+    Mail::assertSent(NoticeMail::class, fn (NoticeMail $m) => $m->heading === 'Your service request was rejected' && $m->details['Remarks'] === 'Fully booked.');
+});
+
+test('the calendar shows the event dates of approved projects and hides cancelled ones', function () {
+    $request = pmRequest($this->customer);
+    $this->actingAs($this->pm)->patch(route('project-manager.service-requests.approve', $request), ['remarks' => '']);
+    $project = Project::query()->where('service_request_id', $request->service_request_id)->first();
+
+    $events = null;
+    $this->actingAs($this->pm)->get(route('project-manager.calendar'))->assertOk()
+        ->assertInertia(function (Assert $page) use (&$events) {
+            $all = $page->toArray();
+            $events = ($all['props'] ?? $all)['events'];
+        });
+    expect($events)->toHaveCount(1)
+        ->and($events[0]['code'])->toBe($project->project_code)
+        ->and($events[0]['startDate'])->toBe($request->start_date->toDateString())
+        ->and($events[0]['statusName'])->toBe('Consultation');
+
+    $project->update(['current_status_id' => ProjectStatus::idFor(ProjectStatus::CANCELLED)]);
+    $this->actingAs($this->pm)->get(route('project-manager.calendar'))
+        ->assertInertia(fn (Assert $page) => $page->has('events', 0));
+});
+
+/* ---------- Dashboard and Billing and Payments on real data (Nov 28) ---------- */
+
+test('the dashboard shows the real projects and service requests', function () {
+    pmRequest($this->customer);
+    $approved = pmRequest($this->customer);
+    $this->actingAs($this->pm)->patch(route('project-manager.service-requests.approve', $approved), ['remarks' => '']);
+
+    $this->actingAs($this->pm)->get(route('project-manager.dashboard'))->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->component('project-manager/dashboard')
+            ->has('projects', 1)
+            ->has('requests', 2)
+            ->where('requests.0.status', 'Pending'));
+});
+
+test('the billing and payments page lists the real projects', function () {
+    $approved = pmRequest($this->customer);
+    $this->actingAs($this->pm)->patch(route('project-manager.service-requests.approve', $approved), ['remarks' => '']);
+
+    $this->actingAs($this->pm)->get(route('project-manager.billing-payments'))->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->component('project-manager/billing-payments')
+            ->has('projects', 1));
 });

@@ -37,7 +37,7 @@ class ServiceRequestController extends Controller
 {
     private const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp'];
 
-    private const RELATIONS = ['customer.user', 'eventType', 'services.service', 'files', 'project.projectManager'];
+    public const RELATIONS = ['customer.user', 'eventType', 'services.service', 'files', 'project.projectManager'];
 
     public function index(): Response
     {

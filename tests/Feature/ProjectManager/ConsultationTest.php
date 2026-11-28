@@ -12,6 +12,9 @@ use App\Models\ProjectStatus;
 use App\Models\ServiceRequest;
 use App\Models\User;
 use Database\Seeders\ServiceAssetSeeder;
+use App\Mail\MeetingLinkMail;
+use App\Mail\NoticeMail;
+use Illuminate\Support\Facades\Mail;
 use Inertia\Testing\AssertableInertia as Assert;
 
 /*
@@ -245,4 +248,42 @@ test('a proceed decision is final', function () {
 
     csSave($this, csPayload(['decision' => 'On hold']))->assertSessionHasErrors('outcome');
     expect($this->project->fresh()->customer_proceed_decision)->toBe(Project::DECISION_PROCEED);
+});
+
+/* ---------- fix list (Nov 27): #16 email, adviser revision G3 meeting link ---------- */
+
+test('the customer is emailed the consultation outcome with the reservation fee', function () {
+    Mail::fake();
+
+    csSave($this, csPayload())->assertSessionHasNoErrors();
+
+    Mail::assertSent(NoticeMail::class, fn (NoticeMail $m) => $m->heading === 'Your consultation outcome' && isset($m->details['Reservation fee']));
+});
+
+test('the meeting link of an online consultation is emailed and saved', function () {
+    Mail::fake();
+    $send = fn (string $link) => $this->actingAs($this->pm)->patch(route('project-manager.projects.consultation.meeting-link', $this->project), ['link' => $link]);
+
+    $send('')->assertSessionHasErrors('link');
+    $send('meet.google.com/abc')->assertSessionHasErrors('link');
+    Mail::assertNothingSent();
+
+    $send('https://meet.google.com/abc-defg-hij')->assertSessionHasNoErrors();
+    Mail::assertSent(MeetingLinkMail::class, fn (MeetingLinkMail $m) => $m->meeting['link'] === 'https://meet.google.com/abc-defg-hij');
+    expect($this->booking->fresh()->meeting_link)->toBe('https://meet.google.com/abc-defg-hij');
+
+    $this->actingAs($this->pm)->get(route('project-manager.projects.show', $this->project))
+        ->assertInertia(fn (Assert $page) => $page->where('project.consultationMeeting.mode', 'Online')
+            ->where('project.consultationMeeting.link', 'https://meet.google.com/abc-defg-hij'));
+});
+
+test('a face-to-face consultation gets no meeting link', function () {
+    Mail::fake();
+    $this->booking->update(['meeting_mode' => 'face_to_face']);
+
+    $this->actingAs($this->pm)
+        ->patch(route('project-manager.projects.consultation.meeting-link', $this->project), ['link' => 'https://meet.google.com/abc-defg-hij'])
+        ->assertSessionHasErrors('link');
+
+    Mail::assertNothingSent();
 });

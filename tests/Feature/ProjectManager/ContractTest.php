@@ -18,6 +18,8 @@ use App\Services\ReservationFees;
 use Database\Seeders\ServiceAssetSeeder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use App\Mail\NoticeMail;
+use Illuminate\Support\Facades\Mail;
 use Inertia\Testing\AssertableInertia as Assert;
 
 
@@ -222,4 +224,15 @@ test('the project manager can open the signed contract; other roles cannot', fun
 
     $this->actingAs($this->pm)->get(route('project-manager.projects.contract.file', [$this->project, $this->contract]))->assertOk();
     $this->actingAs($this->customerUser)->get(route('project-manager.projects.contract.file', [$this->project, $this->contract]))->assertForbidden();
+});
+
+/* ---------- fix list (Nov 27): Workflow emails ---------- */
+
+test('the customer is emailed when the contract is returned', function () {
+    Mail::fake();
+    pmCtSign($this);
+
+    ctDecide($this, 'reject', ['remarks' => 'Page 2 is not signed.'])->assertSessionHasNoErrors();
+
+    Mail::assertSent(NoticeMail::class, fn (NoticeMail $m) => $m->heading === 'Please resubmit your contract' && $m->details['Remarks'] === 'Page 2 is not signed.');
 });

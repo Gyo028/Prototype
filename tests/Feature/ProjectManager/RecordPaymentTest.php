@@ -13,6 +13,8 @@ use App\Models\ServiceRequest;
 use App\Models\User;
 use App\Services\ReservationFees;
 use Database\Seeders\ServiceAssetSeeder;
+use App\Mail\NoticeMail;
+use Illuminate\Support\Facades\Mail;
 use Inertia\Testing\AssertableInertia as Assert;
 
 /*
@@ -136,4 +138,16 @@ test('a bill that is not this project\'s is refused', function () {
     rpRecord($this, ['billingId' => 999999, 'method' => 'Cash', 'amount' => 100])->assertSessionHasErrors('target');
 
     expect(Payment::count())->toBe(0);
+});
+
+/* ---------- fix list (Nov 27): acceptance criterion 1, "a payment confirmation is sent" ---------- */
+
+test('recording a payment emails the customer a payment confirmation', function () {
+    Mail::fake();
+
+    rpRecord($this, ['method' => 'Cheque', 'amount' => 25000, 'chequeNo' => 'BDO-001234'])->assertSessionHasNoErrors();
+
+    Mail::assertSent(NoticeMail::class, fn (NoticeMail $m) => $m->heading === 'Payment confirmation'
+        && $m->details['Payment method'] === 'Cheque no. BDO-001234'
+        && $m->details['Remaining balance of this bill'] === '₱0.00');
 });

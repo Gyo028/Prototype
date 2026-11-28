@@ -13,6 +13,8 @@ use App\Models\ServiceRequest;
 use App\Models\User;
 use Database\Seeders\ServiceAssetSeeder;
 use Illuminate\Support\Facades\Storage;
+use App\Mail\NoticeMail;
+use Illuminate\Support\Facades\Mail;
 use Inertia\Testing\AssertableInertia as Assert;
 
 /*
@@ -240,4 +242,14 @@ test('the project manager can open a proposal file; other roles cannot', functio
     $this->actingAs(User::factory()->create(['role' => Role::Customer]))
         ->get(route('project-manager.projects.design-proposal.file', [$this->project, $file]))
         ->assertForbidden();
+});
+
+/* ---------- fix list (Nov 27): Workflow email ---------- */
+
+test('returning for revision emails the Design Specialist', function () {
+    Mail::fake();
+
+    dpDecide($this, 'return', ['remarks' => 'Move the stage to the north wall.'])->assertSessionHasNoErrors();
+
+    Mail::assertSent(NoticeMail::class, fn (NoticeMail $m) => $m->heading === 'A new revision cycle has begun' && $m->details['Revision remarks'] === 'Move the stage to the north wall.');
 });

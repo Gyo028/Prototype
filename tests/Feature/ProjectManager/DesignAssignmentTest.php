@@ -15,6 +15,8 @@ use App\Models\ServiceRequest;
 use App\Models\User;
 use App\Services\ReservationFees;
 use Database\Seeders\ServiceAssetSeeder;
+use App\Mail\NoticeMail;
+use Illuminate\Support\Facades\Mail;
 use Inertia\Testing\AssertableInertia as Assert;
 
 /*
@@ -211,4 +213,14 @@ test('another specialist can be assigned until a design proposal is submitted', 
 
     daAssign($this, $this->bianca->employee_id)->assertSessionHasErrors('specialistId');
     expect($this->project->refresh()->design_specialist_id)->toBe($this->marco->employee_id);
+});
+
+/* ---------- fix list (Nov 27): Workflow email ---------- */
+
+test('the assigned Design Specialist is emailed', function () {
+    Mail::fake();
+
+    daAssign($this, $this->bianca->employee_id)->assertSessionHasNoErrors();
+
+    Mail::assertSent(NoticeMail::class, fn (NoticeMail $m) => $m->hasTo('bianca@example.com') && $m->heading === 'You have a new project');
 });

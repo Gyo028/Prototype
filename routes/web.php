@@ -32,6 +32,7 @@ use App\Http\Controllers\Bookkeeper\FinancialReportController;
 use App\Http\Controllers\ProjectExpenseRecordController;
 use App\Http\Controllers\ProjectManager\ServiceRequestController as PmServiceRequestController;
 use App\Http\Controllers\ProjectManager\ProjectController as PmProjectController;
+use App\Http\Controllers\ProjectManager\ProjectStatusController as PmProjectStatusController;
 use App\Http\Controllers\ProjectManager\ConsultationController as PmConsultationController;
 use App\Http\Controllers\ProjectManager\PaymentController as PmPaymentController;
 use App\Http\Controllers\ProjectManager\SiteAssessmentController as PmSiteAssessmentController;
@@ -43,6 +44,7 @@ use App\Http\Controllers\ProjectManager\AdditionalChargeController as PmAddition
 use App\Http\Controllers\ProjectManager\DisputeController as PmDisputeController;
 use App\Http\Controllers\ProjectManager\ExecutionScheduleController as PmExecutionScheduleController;
 use App\Http\Controllers\ProjectManager\CalendarController as PmCalendarController;
+use App\Http\Controllers\ProjectManager\DashboardController as PmDashboardController;
 use App\Http\Controllers\ProjectManager\MeetingLinkController as PmMeetingLinkController;
 use App\Http\Controllers\ProjectManager\WorkOrderController as PmWorkOrderController;
 use App\Http\Controllers\PublicSiteController;
@@ -165,7 +167,8 @@ Route::middleware(['auth', 'verified', 'role:project_manager'])
     ->prefix('project-manager')
     ->name('project-manager.')
     ->group(function () {
-        Route::inertia('/', 'project-manager/dashboard')->name('dashboard');
+                // The dashboard on real data (Nov 28)
+        Route::get('/', [PmDashboardController::class, 'index'])->name('dashboard');
                 // Backlog #13: Service Requests
         Route::get('service-requests', [PmServiceRequestController::class, 'index'])->name('service-requests');
         Route::get('service-requests/{serviceRequest}', [PmServiceRequestController::class, 'show'])->name('service-requests.show');
@@ -193,6 +196,9 @@ Route::middleware(['auth', 'verified', 'role:project_manager'])
         Route::put('projects/{project}/execution-schedule/{phase}/reschedule', [PmExecutionScheduleController::class, 'reschedule'])->whereIn('phase', ['fabrication', 'installation'])->name('projects.execution-schedule.reschedule');
                 // Backlog #33: Generate and send work orders
         Route::post('projects/{project}/work-orders/{phase}', [PmWorkOrderController::class, 'send'])->whereIn('phase', ['fabrication', 'installation'])->name('projects.work-orders.send');
+                // Backlog #35: Update the project's status
+        Route::post('projects/{project}/assignments/{phase}/complete', [PmProjectStatusController::class, 'complete'])->whereIn('phase', ['fabrication', 'installation'])->name('projects.assignments.complete');
+        Route::patch('projects/{project}/status', [PmProjectStatusController::class, 'update'])->name('projects.status');
                 // Adviser revision G3: send the online consultation link
         Route::patch('projects/{project}/consultation/meeting-link', [PmMeetingLinkController::class, 'send'])->name('projects.consultation.meeting-link');
                 // Backlog #20: Site assessment (and the site access documents)
@@ -210,7 +216,8 @@ Route::middleware(['auth', 'verified', 'role:project_manager'])
         Route::patch('projects/{project}/contract/approve', [PmContractController::class, 'approve'])->name('projects.contract.approve');
         Route::patch('projects/{project}/contract/reject', [PmContractController::class, 'reject'])->name('projects.contract.reject');
         Route::get('projects/{project}/contracts/{contract}/file', [PmContractController::class, 'file'])->name('projects.contract.file');
-        Route::inertia('billing-payments', 'project-manager/billing-payments')->name('billing-payments');
+                // Billing and Payments on real data (Nov 28)
+        Route::get('billing-payments', [PmDashboardController::class, 'billing'])->name('billing-payments');
                 // Adviser revision G1: the Calendar of event dates
         Route::get('calendar', [PmCalendarController::class, 'index'])->name('calendar');
     });

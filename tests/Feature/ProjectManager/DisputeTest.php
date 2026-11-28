@@ -14,6 +14,8 @@ use App\Models\User;
 use Database\Seeders\ServiceAssetSeeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
+use App\Mail\NoticeMail;
+use Illuminate\Support\Facades\Mail;
 use Inertia\Testing\AssertableInertia as Assert;
 
 /*
@@ -212,4 +214,18 @@ test('the project manager can open the customer\'s proof file', function () {
     $this->actingAs($this->pm)
         ->get(route('project-manager.projects.disputes.proof', [$this->project, $this->bill]))
         ->assertOk();
+});
+
+/* ---------- fix list (Nov 27): acceptance criterion 2, the customer is notified ---------- */
+
+test('the customer is emailed the dispute resolution', function () {
+    Mail::fake();
+    dspReview($this);
+
+    dspResolve($this, ['decision' => 'Adjusted', 'newAmount' => 3000, 'remarks' => 'Corrected to 2 uplights.', 'dueDate' => Carbon::today('Asia/Manila')->addDays(7)->toDateString()])
+        ->assertSessionHasNoErrors();
+
+    Mail::assertSent(NoticeMail::class, fn (NoticeMail $m) => $m->heading === 'Your billing dispute was resolved'
+        && $m->details['Decision'] === 'Adjusted'
+        && $m->details['Bill amount'] === '₱3,000.00');
 });

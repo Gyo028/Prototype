@@ -55,6 +55,8 @@ class Project extends Model
         'customer_review_text',
         'customer_reviewed_at',
         'featured_on_website',
+        'status_remarks',
+        'status_changed_at',
     ];
 
     protected function casts(): array
@@ -65,6 +67,7 @@ class Project extends Model
             'customer_rating' => 'integer',
             'customer_reviewed_at' => 'datetime',
             'featured_on_website' => 'boolean',
+            'status_changed_at' => 'datetime',
         ];
     }
 

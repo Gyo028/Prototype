@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Mail\NoticeMail;
 use App\Models\Billing;
+use App\Models\ProjectSchedule;
 use App\Models\Project;
 use Illuminate\Support\Facades\Mail;
 use Throwable;
@@ -129,4 +130,55 @@ class ProjectNotices
             details: ['Project' => (string) $project->project_code, 'Revision remarks' => $remarks],
         ));
     }
+
+        /* ---------- backlog #35 (Nov 28) ---------- */
+
+    /** Workflow: the customer is told when fabrication is done, and when installation is done (the project is completed). */
+    public static function phaseDone(Project $project, string $phase): void
+    {
+        $project->loadMissing('serviceRequest.customer');
+        $completed = $phase === ProjectSchedule::TYPE_INSTALLATION;
+
+        self::toCustomer($project, new NoticeMail(
+            subjectLine: ($completed ? 'Your project is completed' : 'Fabrication is done')." · {$project->project_code}",
+            heading: $completed ? 'Your project is completed' : 'Fabrication is done',
+            greeting: 'Hi '.($project->serviceRequest?->customer?->full_name ?? 'there').',',
+            lines: [$completed
+                ? 'The installation is done and your project is now marked as completed. Thank you for choosing us!'
+                : 'The fabrication of your project is done. Installation is next.'],
+            details: ['Project' => (string) $project->project_code, 'Status' => $completed ? 'Completed' : 'Installation'],
+        ));
     }
+
+    /** Acceptance criterion 2: the cancellation notice to both Heads; Use Case: the customer is notified too. */
+    public static function projectCancelled(Project $project, string $remarks): void
+    {
+        $project->loadMissing(['serviceRequest.customer', 'schedules.assignedEmployee']);
+        $details = ['Project' => (string) $project->project_code, 'Status' => 'Cancelled', 'Remarks' => $remarks];
+
+        foreach ([ProjectSchedule::TYPE_FABRICATION, ProjectSchedule::TYPE_INSTALLATION] as $type) {
+            $schedule = $project->schedules
+                ->where('schedule_type', $type)
+                ->where('schedule_status', '!=', ProjectSchedule::STATUS_CANCELLED)
+                ->sortByDesc('schedule_id')
+                ->first();
+            $head = $schedule?->assignedEmployee;
+
+            self::send($head?->email, new NoticeMail(
+                subjectLine: "Project cancelled · {$project->project_code}",
+                heading: 'Project cancelled',
+                greeting: 'Hi '.($head?->full_name ?? 'Team Leader').',',
+                lines: ['This project was cancelled. Please stop any work on it.'],
+                details: $details,
+            ));
+        }
+
+        self::toCustomer($project, new NoticeMail(
+            subjectLine: "Your project was cancelled · {$project->project_code}",
+            heading: 'Your project was cancelled',
+            greeting: 'Hi '.($project->serviceRequest?->customer?->full_name ?? 'there').',',
+            lines: ['Your project was cancelled. Please see the remarks below.'],
+            details: $details,
+        ));
+    }
+}

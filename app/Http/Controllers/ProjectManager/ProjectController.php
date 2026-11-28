@@ -178,7 +178,7 @@ class ProjectController extends Controller
             'disputes' => self::disputes($p),
                         // Step 5 · Fabrication and Step 6 · Installation (backlog #32)
             'execution' => ExecutionScheduleController::page($p, app(ExecutionSchedules::class)),
-            'statusUpdates' => [],
+            'statusUpdates' => ProjectStatusController::page($p),
         ]);
     }
 

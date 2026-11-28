@@ -15,6 +15,8 @@ use App\Models\User;
 use App\Services\ReservationFees;
 use Database\Seeders\ServiceAssetSeeder;
 use Illuminate\Support\Facades\Storage;
+use App\Mail\NoticeMail;
+use Illuminate\Support\Facades\Mail;
 use Inertia\Testing\AssertableInertia as Assert;
 
 /*
@@ -220,4 +222,14 @@ test('the project manager can open the receipt; other roles cannot', function ()
     $this->actingAs($this->customerUser)
         ->get(route('project-manager.payments.receipt', $this->payment))
         ->assertForbidden();
+});
+
+/* ---------- fix list (Nov 27): payment confirmation ---------- */
+
+test('verifying emails the customer a payment confirmation', function () {
+    Mail::fake();
+
+    pvDecide($this, 'verify')->assertSessionHasNoErrors();
+
+    Mail::assertSent(NoticeMail::class, fn (NoticeMail $m) => $m->heading === 'Payment confirmation' && $m->details['Bill'] === 'Reservation Fee');
 });
