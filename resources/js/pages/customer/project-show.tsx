@@ -8,6 +8,7 @@ import type {
     ExecutionInfo,
     NextAction,
     OcularVisitInfo,
+    PaidReservationFee,
     ProjectDetail,
     ReservationFeeCard,
     Step,
@@ -21,6 +22,7 @@ type Props = {
     currentStep: StepKey;
     nextAction: NextAction;
     reservationFee: ReservationFeeCard;
+    paidReservationFee: PaidReservationFee;
     // Deferred unless it is the current step's (see ProjectController::show).
     consultation?: ConsultationInfo;
     ocularVisit?: OcularVisitInfo;

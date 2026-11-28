@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\Storage;
  *  - Amount: ServiceRequest::reservationFee(): 10% of the initial quotation
  *    (standard) or of the exact budget / budget range's maximum (custom).
  *  - Due 7 days after it is issued (the due date itself still counts).
- *  - Paid in full, by GCash, with the reference number and a receipt.
+ *  - Paid in full, by QR Ph, with the reference number and a receipt.
  *  - One payment waiting for verification at a time. A rejected payment stays
  *    as history and the customer submits a new one.
  *  - Not paid by the due date (no payment submitted or verified, and no open
@@ -96,7 +96,7 @@ class ReservationFees
     }
 
     /**
-     * Saves a GCash payment with its receipt.
+     * Saves a QR Ph payment with its receipt.
      *
      * @param  array{reference: string, paymentDate: string, amount: numeric-string|float}  $data
      */
@@ -113,7 +113,7 @@ class ReservationFees
                 'receipt_file_name' => mb_substr($receipt->getClientOriginalName(), 0, 150),
                 'receipt_file_path' => $path,
                 'submitted_at' => Carbon::now(ConsultationScheduler::TIMEZONE), // Manila wall time, like the schedules
-                'payment_method' => Payment::METHOD_GCASH,
+                'payment_method' => Payment::METHOD_QR_PH,
                 'status' => Payment::STATUS_SUBMITTED,
                 'recorded_by' => $user->id,
             ]));

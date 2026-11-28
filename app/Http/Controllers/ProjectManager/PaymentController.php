@@ -19,7 +19,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Backlog #27: Verify online payments.
- * The customer pays a bill by GCash and uploads the receipt; the Project Manager
+ * The customer pays a bill by QR Ph and uploads the receipt; the Project Manager
  * verifies or rejects the payment.
  *   1. The decision and the payment status are saved; the bill is marked paid once
  *      its verified payments cover the amount.

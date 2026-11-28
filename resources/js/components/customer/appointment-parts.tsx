@@ -51,6 +51,8 @@ export function SlotPicker({
     officeAddress,
     placeMax = 255,
     footer,
+    labelPrefix = '',
+    aside,
 }: {
     noun: string; // "consultation", "ocular visit"
     slot: AppointmentSlot;
@@ -64,6 +66,10 @@ export function SlotPicker({
     placeMax?: number;
     /** E.g. the Book button: sits at the bottom of the right column, level with the bottom of the calendar. */
     footer?: ReactNode;
+    /** Put before the Date and Time labels when the form shows numbered steps, e.g. "1 · ". */
+    labelPrefix?: string;
+    /** More fields in the right column under the time slots (the ocular visit's venue and documents). */
+    aside?: ReactNode;
 }) {
     const Noun = noun[0].toUpperCase() + noun.slice(1);
     const lastEnd = formatTime(addMinutes(rules.slotTimes[rules.slotTimes.length - 1] ?? '16:00', rules.slotMinutes));
@@ -89,7 +95,7 @@ export function SlotPicker({
     return (
         // grid-cols-1 (minmax 0) and min-w-0 keep long one-line text, like the office address, from widening the form on phones.
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:gap-6">
-            <Field label="Date" required error={errors.date}>
+            <Field label={`${labelPrefix}Date`} required error={errors.date}>
                 <DatePicker
                     value={slot.date}
                     onChange={(date) => setSlot({ ...slot, date, time: '' })}
@@ -106,7 +112,7 @@ export function SlotPicker({
             </Field>
 
             <div className="flex min-w-0 flex-col gap-5">
-                <Field label={slot.date ? `Time on ${formatLongDate(slot.date)}` : 'Time'} required error={errors.time}>
+                <Field label={`${labelPrefix}${slot.date ? `Time on ${formatLongDate(slot.date)}` : 'Time'}`} required error={errors.time}>
                     <div className={cx('grid gap-2', longSlots ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-2 sm:grid-cols-4')}>
                         {rules.slotTimes.map((t) => {
                             // Before a date is picked every slot shows, but none can be picked yet.
@@ -221,6 +227,8 @@ export function SlotPicker({
                         <span className="text-[11px] text-ink-soft">For another place, like a restaurant or a cafe, include the address.</span>
                     </Field>
                 )}
+
+                {aside}
 
                 {footer && <div className="mt-auto flex flex-col pt-1 sm:flex-row sm:justify-end">{footer}</div>}
             </div>

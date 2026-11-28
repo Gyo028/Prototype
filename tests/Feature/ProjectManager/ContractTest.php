@@ -205,7 +205,7 @@ test('verifying the down payment after the contract starts fabrication', functio
         'receipt_file_name' => 'down.jpg',
         'receipt_file_path' => 'receipts/down.jpg',
         'submitted_at' => now(),
-        'payment_method' => Payment::METHOD_GCASH,
+        'payment_method' => Payment::METHOD_QR_PH,
         'status' => Payment::STATUS_SUBMITTED,
         'recorded_by' => $this->customerUser->id,
     ]);

@@ -25,7 +25,7 @@ use Illuminate\Support\Facades\DB;
  * Manager side issues and verifies them.
  *
  *  - Sample projects from Booked onward (every customer's) get a paid bill
- *    with a verified GCash payment.
+ *    with a verified QR Ph payment.
  *  - Two new sample projects for customer@example.com, both just after
  *    the consultation:
  *      · "fee due"      the bill is issued and waiting for payment
@@ -76,7 +76,7 @@ class ReservationFeeSeeder extends Seeder
                 'payment_reference' => '1029384756123',
                 'payment_date' => $today->copy()->subDays(3)->setTime(14, 30),
                 'submitted_at' => $today->copy()->subDays(3)->setTime(14, 45),
-                'payment_method' => Payment::METHOD_GCASH,
+                'payment_method' => Payment::METHOD_QR_PH,
                 'status' => Payment::STATUS_SUBMITTED,
                 'recorded_by' => $customerUser->id,
             ]);
@@ -110,7 +110,7 @@ class ReservationFeeSeeder extends Seeder
                 'payment_reference' => (string) (5012345678900 + $i),
                 'payment_date' => $issuedAt->copy()->addDays(2)->setTime(11, 15),
                 'submitted_at' => $issuedAt->copy()->addDays(2)->setTime(11, 20),
-                'payment_method' => Payment::METHOD_GCASH,
+                'payment_method' => Payment::METHOD_QR_PH,
                 'status' => Payment::STATUS_VERIFIED,
                 'recorded_by' => $project->serviceRequest->customer->user_id ?? $customerUser->id,
                 'verified_at' => $issuedAt->copy()->addDays(3)->setTime(9, 0),

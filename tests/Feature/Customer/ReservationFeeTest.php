@@ -160,13 +160,13 @@ test('with no ocular visit needed, the fee is asked for on the Design step', fun
 
 /* ---------------- Paying ---------------- */
 
-test('a GCash payment is saved with its receipt and waits for verification', function () {
+test('a QR Ph payment is saved with its receipt and waits for verification', function () {
     $this->actingAs($this->user)->post(rfPayUrl($this->bill), rfPayment())->assertSessionHasNoErrors();
 
     $payment = $this->bill->payments()->sole();
 
     expect($payment->status)->toBe(Payment::STATUS_SUBMITTED)
-        ->and($payment->payment_method)->toBe(Payment::METHOD_GCASH)
+        ->and($payment->payment_method)->toBe(Payment::METHOD_QR_PH)
         ->and($payment->payment_reference)->toBe('1029384756123') // spaces removed
         ->and((float) $payment->amount_paid)->toBe(25000.0)
         ->and($payment->recorded_by)->toBe($this->user->id)
@@ -205,7 +205,7 @@ test('only one payment can wait for verification at a time', function () {
 test('after a rejected payment the customer pays again', function () {
     $this->bill->payments()->create([
         'amount_paid' => 25000, 'payment_reference' => '1111111111', 'payment_date' => '2026-11-15 12:00',
-        'submitted_at' => '2026-11-15 12:05', 'payment_method' => Payment::METHOD_GCASH,
+        'submitted_at' => '2026-11-15 12:05', 'payment_method' => Payment::METHOD_QR_PH,
         'status' => Payment::STATUS_REJECTED, 'remarks' => 'Receipt is blurry',
     ]);
 

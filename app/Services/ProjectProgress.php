@@ -563,7 +563,7 @@ class ProjectProgress
                 'Pay now',
                 $bill->billing_id,
             ),
-            default => $action('Pay your reservation fee', $this->peso((float) $bill->amount)." by GCash, due {$due}. {$next}", true, 'Pay now', $bill->billing_id),
+            default => $action('Pay your reservation fee', $this->peso((float) $bill->amount)." by QR Ph, due {$due}. {$next}", true, 'Pay now', $bill->billing_id),
         };
     }
 
@@ -621,7 +621,7 @@ class ProjectProgress
             ),
             default => $bill->hasOpenDispute()
                 ? $action('Your down payment is disputed', 'Our Project Manager is reviewing your dispute. The bill is on hold until then.')
-                : $action('Pay your down payment', $this->peso((float) $bill->amount)." by GCash, due {$due}. Work starts once it is verified.", true, 'Pay now', $bill->billing_id),
+                : $action('Pay your down payment', $this->peso((float) $bill->amount)." by QR Ph, due {$due}. Work starts once it is verified.", true, 'Pay now', $bill->billing_id),
         };
     }
 

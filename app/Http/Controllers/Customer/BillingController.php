@@ -25,8 +25,9 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  * index():   one row per project that has bills: contract price, paid,
  *            remaining and the next bill due.
  * project(): one project's bills, with its totals.
- * show():    one bill: its details, the GCash payment form, payment history
- *            and the billing dispute.
+ * show():    one bill: its details, what its amount is based on (with the full
+ *            quotation), the QR Ph payment form, payment history and the
+ *            billing dispute.
  *
  * The project page links here ("Pay now") for the reservation fee and the
  * down payment.
@@ -129,7 +130,16 @@ class BillingController extends Controller
         $this->ensureOwned($request, $billing);
         $this->fees->cancelOverdue($billing->project->serviceRequest->customer_id);
 
-        $billing->refresh()->load(['payments', 'project.serviceRequest.eventType', 'project.serviceRequest.customer', 'project.status', 'project.billings']);
+        $billing->refresh()->load([
+            'payments',
+            'project.serviceRequest.eventType',
+            'project.serviceRequest.customer',
+            'project.serviceRequest.services.service',
+            'project.serviceRequest.preliminaryLayout.items.asset',
+            'project.status',
+            'project.billings',
+            'project.contracts',
+        ]);
         $project = $billing->project;
         $kind = $this->billings->kind($billing);
         $payBlocked = $this->billings->payBlockedReason($billing);
@@ -148,6 +158,7 @@ class BillingController extends Controller
                 'status' => $billing->status,
                 'description' => $billing->description,
                 'texts' => $this->texts($kind, $project->serviceRequest->reservationFeeBasis()),
+                'basis' => $this->basisOf($billing, $kind),
             ],
             // The payment form and history (same shape as before, for the payment panel).
             'payment' => [
@@ -176,7 +187,7 @@ class BillingController extends Controller
                 'payBlockedReason' => $payBlocked,
                 'expectedAmount' => (float) $billing->amount,
                 'dueDays' => $this->fees->dueDays(),
-                'gcash' => config('payments.gcash'),
+                'qrPh' => config('payments.qr_ph'),
                 'receipt' => ['maxMb' => (int) config('payments.receipt.max_mb', 5), 'types' => config('payments.receipt.mimes')],
             ],
             'dispute' => [
@@ -202,7 +213,7 @@ class BillingController extends Controller
         ]);
     }
 
-    /** A GCash payment for the whole bill, with its receipt. */
+    /** A QR Ph payment for the whole bill, with its receipt. */
     public function pay(PaymentRequest $request, Billing $billing): RedirectResponse
     {
         $this->ensureOwned($request, $billing);
@@ -260,6 +271,101 @@ class BillingController extends Controller
     {
         $billing->loadMissing('project.serviceRequest');
         ProjectController::ensureOwned($request, $billing->project);
+    }
+
+    /**
+     * What a bill's amount is a share of, for "10% of your initial quotation ₱68,075.00",
+     * with the full quotation for the "View full quotation" pop-up:
+     *  - reservation fee, standard: the initial quotation from the request
+     *    (the services, then the layout assets, at the prices saved then)
+     *  - reservation fee, custom (or no saved layout): the budget, no items
+     *  - down payment and remaining balance: the approved quotation in the
+     *    verified contract
+     *  - additional charge: null (its description says what it is for)
+     *
+     * @return array<string, mixed>|null
+     */
+    private function basisOf(Billing $billing, string $kind): ?array
+    {
+        $project = $billing->project;
+        $request = $project->serviceRequest;
+
+        if ($kind === Billings::KIND_RESERVATION_FEE) {
+            $percent = (int) round((float) config('payments.reservation_fee.rate', 0.10) * 100);
+            $layout = $request->isCustom() ? null : $request->preliminaryLayout;
+
+            if ($layout === null) {
+                return [
+                    'percent' => $percent,
+                    'label' => 'your budget',
+                    'amount' => (float) ($request->budget_max ?? $request->budget_min),
+                    'quotation' => null,
+                ];
+            }
+
+            $services = $request->services->map(fn ($line) => [
+                'name' => $line->service?->service_name ?? 'Service',
+                'note' => $line->service?->service_category,
+                'quantity' => (int) $line->quantity,
+                'unitPrice' => (float) $line->unit_price,
+                'subtotal' => (float) $line->subtotal,
+            ]);
+            $assets = $layout->items->sortBy('layout_item_id')->map(fn ($item) => [
+                'name' => $item->isCustom() ? (string) $item->custom_item_name : ($item->asset?->asset_name ?? 'Design asset'),
+                'note' => $item->unit_price === null
+                    ? 'Your own item · priced later'
+                    : ($item->isCustom() ? (string) $item->custom_item_category : ($item->asset?->asset_category ?? null)),
+                'quantity' => (int) $item->quantity,
+                'unitPrice' => $item->unit_price === null ? null : (float) $item->unit_price,
+                'subtotal' => $item->subtotal === null ? null : (float) $item->subtotal,
+            ]);
+
+            return [
+                'percent' => $percent,
+                'label' => 'your initial quotation',
+                'amount' => (float) $layout->total_initial_cost,
+                'quotation' => [
+                    'title' => 'Initial quotation',
+                    'source' => 'From your service request, '.$request->request_date->format('M j, Y'),
+                    'items' => $services->concat($assets)->values(),
+                    'total' => (float) $layout->total_initial_cost,
+                    'note' => 'Initial only. The final price is set when you approve your design proposal.',
+                ],
+            ];
+        }
+
+        if ($kind === Billings::KIND_DOWN_PAYMENT || $kind === Billings::KIND_BALANCE) {
+            $contract = $project->contracts->where('status', Contract::STATUS_VERIFIED)->sortByDesc('version_number')->first()
+                ?? $project->contracts->sortByDesc('version_number')->first();
+            $quotation = $contract?->contract_data['quotation'] ?? null;
+
+            if ($quotation === null) {
+                return null;
+            }
+
+            $down = (int) config('contract.payment.down_payment_percent', 50);
+
+            return [
+                'percent' => $kind === Billings::KIND_DOWN_PAYMENT ? $down : 100 - $down,
+                'label' => 'your contract price',
+                'amount' => (float) $quotation['total'],
+                'quotation' => [
+                    'title' => 'Approved quotation',
+                    'source' => 'From your contract, design proposal version '.($quotation['version'] ?? 1),
+                    'items' => collect($quotation['items'] ?? [])->map(fn (array $i) => [
+                        'name' => $i['name'],
+                        'note' => $i['description'] ?? null,
+                        'quantity' => (int) $i['quantity'],
+                        'unitPrice' => (float) $i['unitPrice'],
+                        'subtotal' => (float) $i['subtotal'],
+                    ])->values(),
+                    'total' => (float) $quotation['total'],
+                    'note' => null,
+                ],
+            ];
+        }
+
+        return null;
     }
 
     /** Wording for the payment panel, per kind of bill. @return array<string, string> */

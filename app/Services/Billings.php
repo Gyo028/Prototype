@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\Storage;
  * Bills: the reservation fee, the down payment and the remaining balance (the
  * final billing, from the verified contract), and additional charges.
  *
- * Paying: by GCash with the reference number and receipt, in full; one
+ * Paying: by QR Ph with the reference number and receipt, in full; one
  * payment waits for verification at a time (ReservationFees::submit).
  *
  * Disputes:

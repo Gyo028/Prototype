@@ -101,7 +101,7 @@ function blPayment(Billing $bill, string $status): Payment
         'payment_reference' => '1029384756',
         'payment_date' => '2026-11-16 09:00',
         'submitted_at' => '2026-11-16 09:05',
-        'payment_method' => Payment::METHOD_GCASH,
+        'payment_method' => Payment::METHOD_QR_PH,
         'status' => $status,
     ]);
 }

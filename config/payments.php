@@ -3,18 +3,20 @@
 /*
  * How customers pay.
  *
- * The GCash details are placeholders until the client gives the real ones.
- * Set them in .env, or replace the QR image at public/images/gcash-qr.svg.
+ * QR Ph: the national QR standard, so one code works with any bank or
+ * e-wallet app (GCash, Maya, BPI, BDO…). The client generates it from their
+ * business bank or e-wallet account. Until then the sample QR is shown and
+ * labelled "Sample QR". Set the real one in .env (QRPH_QR_IMAGE, a path under
+ * public/) and set QRPH_QR_IS_SAMPLE=false.
  */
 
 return [
 
-    'gcash' => [
-        'account_name' => env('GCASH_ACCOUNT_NAME', "GR3AT A's Event Styling Services"),
-        'account_number' => env('GCASH_ACCOUNT_NUMBER', '0917 000 0000'),
-        'qr_image' => env('GCASH_QR_IMAGE', '/images/gcash-qr.svg'),
+    'qr_ph' => [
+        'account_name' => env('QRPH_ACCOUNT_NAME', "GR3AT A's Event Styling Services"),
+        'qr_image' => env('QRPH_QR_IMAGE', '/images/gcash-qr.svg'),
         // True while the QR above is the sample one; the page then labels it "Sample QR".
-        'is_sample' => (bool) env('GCASH_QR_IS_SAMPLE', true),
+        'is_sample' => (bool) env('QRPH_QR_IS_SAMPLE', true),
     ],
 
     'reservation_fee' => [

@@ -113,7 +113,7 @@ function ctProject(Customer $customer, string $eventDate = '2027-01-16'): Projec
         'payment_reference' => '1234567890',
         'payment_date' => '2026-10-11 10:00',
         'submitted_at' => '2026-10-11 10:05',
-        'payment_method' => Payment::METHOD_GCASH,
+        'payment_method' => Payment::METHOD_QR_PH,
         'status' => Payment::STATUS_VERIFIED,
         'verified_at' => '2026-10-12 09:00',
     ]);
@@ -447,7 +447,7 @@ test('only a signed contract can be reviewed', function () {
 
 /* ---------------- Down payment ---------------- */
 
-test('the down payment is paid in full by GCash on its bill page, then the project moves to Fabricating once verified', function () {
+test('the down payment is paid in full by QR Ph on its bill page, then the project moves to Fabricating once verified', function () {
     $contract = ctIssue($this);
     ctSign($this);
     $receipt = fn () => UploadedFile::fake()->create('receipt.pdf', 100, 'application/pdf');

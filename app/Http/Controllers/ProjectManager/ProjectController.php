@@ -340,7 +340,7 @@ class ProjectController extends Controller
     ];
 
     private const PAYMENT_METHODS = [
-        Payment::METHOD_GCASH => 'GCash',
+        Payment::METHOD_QR_PH => 'QR Ph',
         Payment::METHOD_CASH => 'Cash',
         Payment::METHOD_CHEQUE => 'Cheque',
     ];

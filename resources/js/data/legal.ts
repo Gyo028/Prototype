@@ -188,7 +188,7 @@ export const termsAndConditions: LegalDocument = {
                 {
                     type: 'clauses',
                     items: [
-                        `8.1. Customers may submit payments through the GCash QR Code provided by GR3AT A's and upload the corresponding proof of payment through the system.`,
+                        `8.1. Customers may submit payments through the QR Ph code provided by GR3AT A's (scannable with any bank or e-wallet app) and upload the corresponding proof of payment through the system.`,
                         `8.2. Payments made through cash or cheque must be coordinated with the Project Manager for proper recording.`,
                         `8.3. All submitted payment receipts are subject to verification by the authorized personnel.`,
                         `8.4. Uploading proof of payment does not automatically mean that the transaction has been verified or accepted.`,

@@ -13,6 +13,7 @@ use App\Models\DesignProposalFile;
 use App\Models\Payment;
 use App\Models\Project;
 use App\Models\ProjectSchedule;
+use App\Models\ProjectStatus;
 use App\Models\ServiceRequest;
 use App\Models\SiteAccessDocument;
 use App\Http\Requests\Customer\ContractUploadRequest;
@@ -159,6 +160,8 @@ class ProjectController extends Controller
             'nextAction' => fn () => $progressOf()['nextAction'],
             // Shown on the current step after the consultation until the fee is verified.
             'reservationFee' => fn () => $this->reservationFeeData($project),
+            // Once it is verified: a "paid" line on the ocular visit until the visit is booked.
+            'paidReservationFee' => fn () => $this->paidReservationFeeData($project),
             'consultation' => $step(['consultation'], fn () => $consultationOf()['consultation']),
             'availableSlots' => $step(['consultation'], fn () => $consultationOf()['availableSlots']),
             'rules' => $step(['consultation'], fn () => $consultationOf()['rules']),
@@ -209,6 +212,30 @@ class ProjectController extends Controller
             'bill' => $project->reservationFee ? $this->billings->card($project->reservationFee) : null,
             'expectedAmount' => $project->serviceRequest->reservationFee(),
             'basis' => $project->serviceRequest->reservationFeeBasis(),
+        ];
+    }
+
+    /**
+     * The verified reservation fee, while the project is Booked (paid, ocular visit
+     * not booked yet), for the "Reservation fee paid" line above the booking form.
+     *
+     * @return array{amount: float, verifiedAt: string|null, url: string}|null
+     */
+    private function paidReservationFeeData(Project $project): ?array
+    {
+        $project->loadMissing(['status', 'reservationFee.payments']);
+        $bill = $project->reservationFee;
+
+        if ($project->status->status_name !== ProjectStatus::BOOKED || $bill === null) {
+            return null;
+        }
+
+        $payment = $bill->payments->firstWhere('status', Payment::STATUS_VERIFIED);
+
+        return $payment === null ? null : [
+            'amount' => (float) $bill->amount,
+            'verifiedAt' => $payment->verified_at?->toDateString(),
+            'url' => "/customer/billing/{$bill->billing_id}",
         ];
     }
 

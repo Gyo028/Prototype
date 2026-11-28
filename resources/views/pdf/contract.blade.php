@@ -171,7 +171,7 @@
             </tr>
         </tbody>
     </table>
-    <p class="small muted" style="margin-top: 4px;">Payments are made by GCash, cash or cheque. Work on the project starts once this contract and the down payment are verified.</p>
+    <p class="small muted" style="margin-top: 4px;">Payments are made by QR Ph (any bank or e-wallet app), cash or cheque. Work on the project starts once this contract and the down payment are verified.</p>
 
     <h2>Terms and conditions</h2>
     <ol class="terms">

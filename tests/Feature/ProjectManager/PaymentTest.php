@@ -101,7 +101,7 @@ function pvProject(Customer $customer, Employee $manager): Project
     return $project;
 }
 
-/** A GCash payment waiting for verification; pass $receipt = null for one without a receipt. */
+/** A QR Ph payment waiting for verification; pass $receipt = null for one without a receipt. */
 function pvPayment(Billing $bill, User $customerUser, ?string $receipt = 'gcash-receipt.jpg'): Payment
 {
     $path = null;
@@ -117,7 +117,7 @@ function pvPayment(Billing $bill, User $customerUser, ?string $receipt = 'gcash-
         'receipt_file_name' => $receipt,
         'receipt_file_path' => $path,
         'submitted_at' => now()->subHours(2),
-        'payment_method' => Payment::METHOD_GCASH,
+        'payment_method' => Payment::METHOD_QR_PH,
         'status' => Payment::STATUS_SUBMITTED,
         'recorded_by' => $customerUser->id,
     ]);
@@ -142,7 +142,7 @@ test('the project page lists the reservation fee payment waiting for verificatio
                 ->and($project['payments'])->toHaveCount(1)
                 ->and($project['payments'][0]['type'])->toBe('Reservation Fee')
                 ->and($project['payments'][0]['billingId'])->toBeNull()
-                ->and($project['payments'][0]['method'])->toBe('GCash')
+                ->and($project['payments'][0]['method'])->toBe('QR Ph')
                 ->and($project['payments'][0]['status'])->toBe('For Verification')
                 ->and($project['payments'][0]['receipt']['url'])->toBe("/project-manager/payments/{$this->payment->payment_id}/receipt")
                 ->and($project['payments'][0]['review'])->toBeNull();
@@ -158,6 +158,26 @@ test('verifying the reservation fee marks the bill paid and books the project', 
         ->and($this->payment->remarks)->toBe('Payment received in full.')
         ->and($this->bill->refresh()->status)->toBe(Billing::STATUS_PAID)
         ->and($this->project->refresh()->status->status_name)->toBe(ProjectStatus::BOOKED);
+});
+
+test('after the fee is verified the customer sees it paid on the ocular visit until the visit is booked', function () {
+    customerProjectPage($this->actingAs($this->customerUser), $this->project)
+        ->assertInertia(fn (Assert $page) => $page->where('paidReservationFee', null));
+
+    pvDecide($this, 'verify')->assertSessionHasNoErrors();
+
+    customerProjectPage($this->actingAs($this->customerUser), $this->project)
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('reservationFee', null)
+            ->where('paidReservationFee.amount', 25000)
+            ->whereType('paidReservationFee.verifiedAt', 'string')
+            ->where('paidReservationFee.url', "/customer/billing/{$this->bill->billing_id}"));
+
+    // Once the visit is booked the project moves past Booked and the line goes away.
+    $this->project->update(['current_status_id' => ProjectStatus::idFor(ProjectStatus::SITE_ASSESSMENT)]);
+
+    customerProjectPage($this->actingAs($this->customerUser), $this->project->refresh())
+        ->assertInertia(fn (Assert $page) => $page->where('paidReservationFee', null));
 });
 
 test('a payment without a receipt cannot be verified', function () {

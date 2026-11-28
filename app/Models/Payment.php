@@ -9,12 +9,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $payment_id
  * @property int $billing_id
  * @property string $amount_paid decimal
- * @property string $payment_reference e.g. the GCash reference number
+ * @property string $payment_reference e.g. the QR Ph reference number from the customer's app
  * @property \Carbon\CarbonInterface $payment_date
  * @property string|null $receipt_file_name
  * @property string|null $receipt_file_path
  * @property \Carbon\CarbonInterface $submitted_at
- * @property string $payment_method gcash | cash | cheque
+ * @property string $payment_method qr_ph | cash | cheque
  * @property string $status submitted | verified | rejected
  * @property int|null $recorded_by
  * @property \Carbon\CarbonInterface|null $verified_at
@@ -22,7 +22,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class Payment extends Model
 {
-    public const METHOD_GCASH = 'gcash';
+    /** Paid by scanning the business's QR Ph code with any bank or e-wallet app. */
+    public const METHOD_QR_PH = 'qr_ph';
 
     public const METHOD_CASH = 'cash';
 

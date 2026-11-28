@@ -70,8 +70,8 @@ export type MeetingMode = 'online' | 'face_to_face';
 export type VenueOwnership = 'own_property' | 'third_party';
 
 export const VENUE_OWNERSHIPS: { value: VenueOwnership; label: string; hint: string }[] = [
-    { value: 'own_property', label: 'My own property', hint: 'Your home or a place you own. No documents needed.' },
-    { value: 'third_party', label: 'Rented or third-party venue', hint: 'Hotel, mall, events place or any venue you rent.' },
+    { value: 'own_property', label: 'My own property', hint: 'Your home or a place you own. No documents needed; confirmed right away.' },
+    { value: 'third_party', label: 'Rented or third-party venue', hint: 'Hotel, mall, events place or any venue you rent. Confirmed once your documents are approved.' },
 ];
 
 /** A booked, held or earlier consultation or ocular visit. */
@@ -236,7 +236,7 @@ export type ReservationPayment = {
     reference: string;
     paymentDate: string;
     submittedAt: string; // 'YYYY-MM-DD HH:mm'
-    method: 'gcash' | 'cash' | 'cheque';
+    method: 'qr_ph' | 'cash' | 'cheque';
     status: 'submitted' | 'verified' | 'rejected';
     remarks: string | null; // the reason, when rejected
     verifiedAt: string | null;
@@ -282,6 +282,9 @@ export type BillCard = {
 /** basis: what the fee is 10% of, "your initial quotation" (standard) or "your budget" (custom). */
 export type ReservationFeeCard = { bill: BillCard | null; expectedAmount: number; basis: string } | null;
 
+/** The verified reservation fee, while the ocular visit is still to be booked ("Reservation fee paid" line). */
+export type PaidReservationFee = { amount: number; verifiedAt: string | null; url: string } | null;
+
 /** A bill's payment form and history (the bill's own page). */
 export type ReservationFeeInfo = {
     billing: {
@@ -297,7 +300,8 @@ export type ReservationFeeInfo = {
     payBlockedReason: string | null;
     expectedAmount: number; // 10% of the initial quotation or budget, shown before the bill is issued
     dueDays: number;
-    gcash: { account_name: string; account_number: string; qr_image: string; is_sample: boolean };
+    /** The business's QR Ph code (any bank or e-wallet app); is_sample while it is the placeholder. */
+    qrPh: { account_name: string; qr_image: string; is_sample: boolean };
     receipt: { maxMb: number; types: string[] };
 };
 
@@ -450,7 +454,9 @@ export function formatDay(p: { startDate: string; endDate: string }) {
     return formatWhen({ ...p, startTime: null, endTime: null });
 }
 
-export const peso = (n: number) => `₱${n.toLocaleString('en-PH')}`;
+/** "₱68,075" for whole pesos, "₱6,807.50" when there are centavos (never "₱6,807.5"). */
+export const peso = (n: number) =>
+    `₱${n.toLocaleString('en-PH', Number.isInteger(Math.round(n * 100) / 100) ? { maximumFractionDigits: 0 } : { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 /** A range ("₱100,000 – ₱250,000", "Below …", "Above …"), or an exact budget saved as one amount ("₱180,000"). */
 export const budgetLabel = (min: number, max: number | null) =>

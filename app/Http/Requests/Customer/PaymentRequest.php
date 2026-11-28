@@ -6,7 +6,7 @@ use App\Services\ReservationFees;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * A GCash payment for the reservation fee.
+ * A QR Ph payment for a bill.
  * The amount must match the bill (paid in full); whether the bill can be
  * paid at all is checked by ReservationFees.
  */
@@ -21,7 +21,7 @@ class PaymentRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         if (is_string($this->input('reference'))) {
-            // GCash shows reference numbers with spaces ("1234 567 890123"); keep the digits and letters only.
+            // Bank and e-wallet apps show reference numbers with spaces ("1234 567 890123"); keep the digits and letters only.
             $this->merge(['reference' => preg_replace('/\s+/', '', $this->input('reference'))]);
         }
     }
@@ -46,7 +46,7 @@ class PaymentRequest extends FormRequest
         $maxMb = (int) config('payments.receipt.max_mb', 5);
 
         return [
-            'reference.required' => 'Enter the GCash reference number.',
+            'reference.required' => 'Enter the reference number from your payment receipt.',
             'reference.min' => 'The reference number looks too short.',
             'reference.regex' => 'Use letters and numbers only.',
             'paymentDate.required' => 'Enter the date you paid.',

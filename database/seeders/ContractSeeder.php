@@ -93,7 +93,7 @@ class ContractSeeder extends Seeder
         }
     }
 
-    /** A verified GCash payment for the whole bill, and the bill marked paid. */
+    /** A verified QR Ph payment for the whole bill, and the bill marked paid. */
     private function pay(Billing $bill, Carbon $paidAt, ?int $customerUserId, ?User $manager): void
     {
         $bill->payments()->create([
@@ -101,7 +101,7 @@ class ContractSeeder extends Seeder
             'payment_reference' => (string) random_int(1000000000000, 9999999999999),
             'payment_date' => $paidAt,
             'submitted_at' => $paidAt->copy()->addMinutes(10),
-            'payment_method' => Payment::METHOD_GCASH,
+            'payment_method' => Payment::METHOD_QR_PH,
             'status' => Payment::STATUS_VERIFIED,
             'recorded_by' => $customerUserId ?? $manager?->id,
             'verified_at' => $paidAt->copy()->addDay(),
